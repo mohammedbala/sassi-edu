@@ -1,0 +1,455 @@
+* ======================================================================================
+* SASSI-EDU tutorial example 8: embedded shear-wall building, subtraction methods against FV
+* ======================================================================================
+* What you learn
+*   - how a reinforced-concrete nuclear-style building with a two-level basement is modelled for
+*     SSI: SHELL walls and slabs with practice thicknesses, a 2 m basemat, lumped equipment masses,
+*     the excavated soil as SOLID elements (ETYPE 2) with the free-field layer properties, one
+*     group and one L number per embedment layer;
+*   - the manual's rule for the basement interior (manual 1.5.1 rule 11, EXCSTRCHK): the excavated
+*     soil and the structure share only the nodes of the foundation-soil interface (the outer
+*     walls and the basemat); the interior walls and the floor slabs inside the excavation have
+*     nodes of their own at the same coordinates as the excavated-soil nodes;
+*   - interaction-node sets generated with INTGEN on the same model: FV (all excavated nodes),
+*     FI-FSIN (subtraction method, SM: lateral and bottom faces) and FI-EVBN (modified subtraction
+*     method, MSM: FI-FSIN plus the top face at grade), with their counts (INTCOUNT);
+*   - the comparison the manual asks for before a reduced method is used for production runs
+*     (manual 1.5.1 item 6, ASCE 4-16 validation against FV): transfer functions, ISRS and wall
+*     forces of SM and MSM against FV, at the basemat, the grade floor and the roof.
+*
+* Physics in one paragraph
+*   ANALYS solves [(K_s - w2 M_s) - (K_e - w2 M_e) + X_ff] U = X_ff U'_f.  In FV every excavated
+*   node carries the free-field impedance and load.  In FI-FSIN the 196 excavated nodes inside the
+*   box and on its top face carry neither: the rows of these nodes keep only -(K_e - w2 M_e).  That
+*   soil volume, held at the walls and the basemat and free at the top, has natural frequencies of
+*   its own; near the first one the subtracted soil resonates and the SSI system gets a resonance
+*   that does not exist (the "subtraction-method anomaly").  FI-EVBN holds the top face as well,
+*   which raises those frequencies above the 20 Hz cut-off of this model.
+*
+* The building (24 m x 24 m, 8 m embedded, three storeys above grade; x, y = -12 .. 12 m):
+*
+*        z = 15  +-------+-------+   roof slab 0.5 m, 50 t of equipment
+*                |       |       |
+*        z = 10  +-------+-------+   floor slab 0.6 m, 2 x 60 t        walls above grade: outer 0.8 m,
+*                |       |       |                                     interior (x = 0, y = 0) 0.6 m
+*        z =  5  +-------+-------+   floor slab 0.6 m, 2 x 80 t
+*                |       |       |
+*  grade z =  0  +=======+=======+   grade slab 0.8 m, 2 x 150 t       basement walls: outer 1.0 m,
+*                #       |       #                                     interior 0.6 m
+*        z = -4  #-------+-------#   basement slab 0.6 m, 2 x 100 t    # = outer basement wall on the
+*                #       |       #                                         excavated soil
+*        z = -8  #################   basemat 2.0 m
+*
+*   Concrete E = 30 GPa, nu = 0.2, 24 kN/m3, 4 % damping (ASCE 4 response level 1: uncracked
+*   stiffness and 4 % damping, as the manual quotes it in its Damping Cutoff note).  The slabs carry
+*   another 4 kN/m3 for distributed equipment, piping and live load (2.4 kPa on a 0.6 m slab).
+*
+* Site: 8 m of medium-dense sand and gravel (Vs 300 m/s, the embedment), 12 m of dense gravel
+*   (Vs 450 m/s) and 12 m of very dense gravel (Vs 650 m/s) on rock (Vs 1500 m/s).  Mesh: 3 m in
+*   plan and 2 m vertically below grade: Vs/(5h) = 300/(5 x 3) = 20 Hz = the cut-off (the lambda/5
+*   rule; the horizontal size is 1.5 times the vertical one).  41 SSI frequencies, 0.1 to 20 Hz.
+*   Input: vertically incident SV wave, control motion in X at the free surface, the RG 1.60 record
+*   of examples/data (PGA 0.324 g).
+*
+* What to observe (examples/README.md, Example 8; lesson 11 of the guided course):
+*   - CHECK: no error and no warning for FV; FI-FSIN and FI-EVBN only EDU-12 (validate against FV).
+*   - INTCOUNT: FV 405 interaction nodes, FI-FSIN 209, FI-EVBN 258.  ANALYS about 18, 13 and 15 s for
+*     the 41 frequencies: on a model this small the 3756 equations of the structure and the
+*     excavation cost as much as the dense impedance, so the reduced sets save little time.
+*   - every transfer function is 1.000 at 0.1 Hz (within 0.04 %);
+*   - FV: the roof X transfer function peaks at 2.44 at 6.5 Hz (fixed base, basemat clamped: 10.7 to
+*     10.9 Hz); 5 % ISRS zero-period accelerations 0.28 g (basemat), 0.32 g (grade), 0.42 g (roof)
+*     for a 0.324 g control motion;
+*   - FI-FSIN follows FV within 2 % below 10 Hz, then resonates at 16 Hz where nothing should: roof X
+*     0.88 against 0.32, basemat X 0.72 against 0.33, the soil enclosed by the walls 12.4 against 1.8,
+*     with a dip at 15 Hz (roof 0.14 against 0.33).  The 5 % ISRS differ by +9.5 % / -8 % at 14-16 Hz,
+*     the basement-wall forces by less than 2 %;
+*   - FI-EVBN follows FV within 2.4 % (transfer functions), 0.7 % (ISRS) and 1.1 % (wall forces).
+*
+* How to run (the working directory must be the examples directory, see examples/README.md):
+*     cd examples
+*     ../.venv/bin/sassi run ex08_embedded_building.pre
+*   or from the repository root:  .venv/bin/sassi --cwd examples run ex08_embedded_building.pre
+* Run time about 1 minute (three ANALYS runs of 41 frequencies); about 55 MB in examples/ex08*.
+* Results: examples/ex08/ (FV), examples/ex08_fsin/ (FI-FSIN, SM), examples/ex08_evbn/ (FI-EVBN, MSM).
+*
+* Units: m, kN, t, s.  Gravity 9.81 m/s2.
+* ======================================================================================
+MDL,ex08,ex08
+TIT,Ex08 - embedded shear-wall building 24 x 24 m, FV interaction set
+GRAVITY,9.81
+*
+* ---------------------------------------------------------------------- soil profile
+* L,<nm>,<thick>,<weight>,<Vp>,<Vs>,<pdamp>,<sdamp>
+*   L 1-4: the four 2 m EMBEDMENT layers (0 to 8 m), one L number each (manual rule: an L number
+*          may be repeated in TOPL for identical layers, but not for embedment layers); the
+*          excavated soil of layer k uses L k (MACT below).  Strain-compatible properties.
+*   L 5:   dense gravel, 8-20 m, in 1 m sublayers (Vs/(5h) = 90 Hz)
+*   L 6:   very dense gravel, 20-32 m, in 2 m sublayers (65 Hz)
+*   L 7:   rock half-space
+L,1,2.0,19.0,600,300,0.04,0.04
+L,2,2.0,19.0,600,300,0.04,0.04
+L,3,2.0,19.0,600,300,0.04,0.04
+L,4,2.0,19.0,600,300,0.04,0.04
+L,5,1.0,20.0,900,450,0.03,0.03
+L,6,2.0,21.0,1300,650,0.02,0.02
+L,7,1.0,23.0,3000,1500,0.01,0.01
+* 22 TOPL layers (the manual recommends more than 20 for the Rayleigh and Love modes)
+TOPL,1,2,3,4,5,5,5,5,5,5
+TOPL,5,5,5,5,5,5,6,6,6,6
+TOPL,6,6
+*
+* ---------------------------------------------------------------------- frequencies
+* dt 0.005 s, NFFT 8192: df = 0.0244 Hz.  41 SSI frequencies: 0.1 Hz, then every 0.5 Hz from 0.5 to
+* 20 Hz (frequency numbers n = f / df).  The building's SSI peak (6.5 Hz), the floor slabs
+* (10-12.5 Hz) and the excavated-soil frequencies of the reduced sets all lie in this range.
+FREQ,1,4,20,41,61,82,102,123,143,164,184
+FREQ,1,205,225,246,266,287,307,328,348,369,389
+FREQ,1,410,430,451,471,492,512,532,553,573,594
+FREQ,1,614,635,655,676,696,717,737,758,778,799
+FREQ,1,819
+* SITE: 20 generated half-space sublayers, half-space = L 7, control point at the free surface (x')
+SITE,0,1,0,20,7,1,0,1,4096,1,0,0.005,8192,1
+* vertically incident SV wave
+WAVE,2,1,1,1,0
+*
+* ---------------------------------------------------------------------- nodes
+* A 9 x 9 grid (3 m) on the five excavation levels z = -8, -6, -4, -2, 0 and on the three
+* levels above grade z = 5, 10, 15.  Numbering bottom-up (interaction nodes must be numbered from
+* the bottom up, EDU-21):
+*     node(i, j, k) = 81 k + 9 j + i + 1     x = -12 + 3 i, y = -12 + 3 j   (i, j = 0..8)
+*     k = 0..4: z = -8 + 2 k (nodes 1-405, the excavated soil)    k = 5, 6, 7: z = 5, 10, 15 (406-648)
+N,1,-12,-12,-8
+N,9,12,-12,-8
+FILL,1,9
+NGEN,8,9,1,9,1,0,3,0
+NGEN,4,81,1,81,1,0,0,2
+NGEN,3,81,325,405,1,0,0,5
+* Separate nodes for the structure INSIDE the excavation (the interior walls and the two slabs,
+* manual rule 11): node(i, j, k) + 1000 at the same coordinates, for the 7 x 7 interior positions
+* (i, j = 1..7) of the levels k = 1..4.  Those not used by an element are removed below.
+N,1092,-9,-9,-6
+N,1098,9,-9,-6
+FILL,1092,1098
+NGEN,6,9,1092,1098,1,0,3,0
+NGEN,3,81,1092,1152,1,0,0,2
+*
+* ---------------------------------------------------------------------- materials
+* M,<nm>,<E>,<nu>,<weight>,<pdamp>,<sdamp>,<type 1>  (M and L are different tables)
+*   M 1: walls and basemat; M 2: slabs, with 4 kN/m3 more for equipment, piping and live load
+M,1,3.0E7,0.2,24.0,0.04,0.04,1
+M,2,3.0E7,0.2,28.0,0.04,0.04,1
+*
+* ---------------------------------------------------------------------- excavated soil
+* Groups 1-4: 64 SOLID elements each (8 x 8 x 1), one group per embedment layer numbered from the
+* surface down (manual rules R5/R6); ETYPE 2 = excavated soil; MACT k = the L number of layer k.
+* SOLID node order: bottom face counter-clockwise seen from above, then the top face.
+GROUP,1,SOLID
+GTIT,1,excavated soil 0 to -2 m
+MACT,1
+E,1,244,245,254,253,325,326,335,334
+EGEN,7,1,1
+EGEN,7,9,1,8
+ETYPE,1,64,1,2
+GROUP,2,SOLID
+GTIT,2,excavated soil -2 to -4 m
+MACT,2
+E,1,163,164,173,172,244,245,254,253
+EGEN,7,1,1
+EGEN,7,9,1,8
+ETYPE,1,64,1,2
+GROUP,3,SOLID
+GTIT,3,excavated soil -4 to -6 m
+MACT,3
+E,1,82,83,92,91,163,164,173,172
+EGEN,7,1,1
+EGEN,7,9,1,8
+ETYPE,1,64,1,2
+GROUP,4,SOLID
+GTIT,4,excavated soil -6 to -8 m
+MACT,4
+E,1,1,2,11,10,82,83,92,91
+EGEN,7,1,1
+EGEN,7,9,1,8
+ETYPE,1,64,1,2
+*
+* ---------------------------------------------------------------------- basement on the excavation boundary
+* Group 5: the basemat, 64 shells on the bottom face (nodes 1-81), 2.0 m
+GROUP,5,SHELL
+GTIT,5,basemat
+MACT,1
+E,1,1,2,11,10
+EGEN,7,1,1
+EGEN,7,9,1,8
+THICK,1,64,1,2.0
+* Group 6: the outer basement walls on the lateral faces, 1.0 m, 8 x 4 shells per wall:
+*   1-32 south (y = -12), 33-64 north (y = 12), 65-96 west (x = -12), 97-128 east (x = 12)
+GROUP,6,SHELL
+GTIT,6,outer basement walls
+MACT,1
+E,1,1,2,83,82
+EGEN,7,1,1
+EGEN,3,81,1,8
+E,33,73,74,155,154
+EGEN,7,1,33
+EGEN,3,81,33,40
+E,65,1,10,91,82
+EGEN,7,9,65
+EGEN,3,81,65,72
+E,97,9,18,99,90
+EGEN,7,9,97
+EGEN,3,81,97,104
+THICK,1,128,1,1.0
+*
+* ---------------------------------------------------------------------- basement interior on its own nodes
+* Group 7: the interior basement walls x = 0 (elements 1-32) and y = 0 (33-64), 0.6 m.  They sit on
+* the basemat (nodes 1-81) and end on the outer walls (shared interface nodes); every other node is
+* a separate node (+1000).  Row by row from the bottom: the first and last element of a row touch an
+* outer wall, the six between are generated with EGEN; the rows above the first are copies (+81).
+GROUP,7,SHELL
+GTIT,7,interior basement walls
+MACT,1
+E,1,5,14,1095,86
+E,2,14,23,1104,1095
+EGEN,5,9,2
+E,8,68,77,158,1149
+E,9,86,1095,1176,167
+E,10,1095,1104,1185,1176
+EGEN,5,9,10
+E,16,1149,158,239,1230
+EGEN,2,81,9,16
+E,33,37,38,1119,118
+E,34,38,39,1120,1119
+EGEN,5,1,34
+E,40,44,45,126,1125
+E,41,118,1119,1200,199
+E,42,1119,1120,1201,1200
+EGEN,5,1,42
+E,48,1125,126,207,1206
+EGEN,2,81,41,48
+THICK,1,64,1,0.6
+* Group 8: the basement slab at z = -4 (elements 1-64, 0.6 m) and the grade slab at z = 0 (65-128,
+* 0.8 m).  The edge nodes are on the outer walls (shared); the 7 x 7 interior nodes are separate.
+* Corners, edge strips (EGEN along the edge) and the 6 x 6 interior block, then the grade slab as a
+* copy (+162 = two levels).
+GROUP,8,SHELL
+GTIT,8,basement and grade slabs
+MACT,2
+E,1,163,164,1173,172
+E,2,164,165,1174,1173
+EGEN,5,1,2
+E,8,170,171,180,1179
+E,9,172,1173,1182,181
+EGEN,5,9,9
+E,15,1173,1174,1183,1182
+EGEN,5,1,15
+EGEN,5,9,15,20
+E,51,1179,180,189,1188
+EGEN,5,9,51
+E,57,226,1227,236,235
+E,58,1227,1228,237,236
+EGEN,5,1,58
+E,64,1233,234,243,242
+EGEN,1,162,1,64
+THICK,1,64,1,0.6
+THICK,65,128,1,0.8
+*
+* ---------------------------------------------------------------------- superstructure
+* Group 9: outer walls above grade, 0.8 m, one element per storey (3 m x 5 m), 8 x 3 per wall:
+*   1-24 south, 25-48 north, 49-72 west, 73-96 east.  They stand on the top edge of the outer
+*   basement walls (the top perimeter of the excavation).
+GROUP,9,SHELL
+GTIT,9,outer walls above grade
+MACT,1
+E,1,325,326,407,406
+EGEN,7,1,1
+EGEN,2,81,1,8
+E,25,397,398,479,478
+EGEN,7,1,25
+EGEN,2,81,25,32
+E,49,325,334,415,406
+EGEN,7,9,49
+EGEN,2,81,49,56
+E,73,333,342,423,414
+EGEN,7,9,73
+EGEN,2,81,73,80
+THICK,1,96,1,0.8
+* Group 10: interior walls above grade x = 0 (1-24) and y = 0 (25-48), 0.6 m; the first storey
+* stands on the separate nodes of the grade slab
+GROUP,10,SHELL
+GTIT,10,interior walls above grade
+MACT,1
+E,1,329,1338,419,410
+E,2,1338,1347,428,419
+EGEN,5,9,2
+E,8,1392,401,482,473
+E,9,410,419,500,491
+EGEN,7,9,9
+EGEN,1,81,9,16
+E,25,361,1362,443,442
+E,26,1362,1363,444,443
+EGEN,5,1,26
+E,32,1368,369,450,449
+E,33,442,443,524,523
+EGEN,7,1,33
+EGEN,1,81,33,40
+THICK,1,48,1,0.6
+* Group 11: floor slabs at z = 5 (1-64) and z = 10 (65-128), 0.6 m; roof slab at z = 15 (129-192), 0.5 m
+GROUP,11,SHELL
+GTIT,11,floors and roof
+MACT,2
+E,1,406,407,416,415
+EGEN,7,1,1
+EGEN,7,9,1,8
+EGEN,2,81,1,64
+THICK,1,128,1,0.6
+THICK,129,192,1,0.5
+*
+* ---------------------------------------------------------------------- numbering clean-up
+* RMVUNUSED deletes the 72 separate nodes no element uses (interior positions of z = -6 and -2 off
+* the two interior walls); NCOM then closes the gaps (CHECK warns about every missing number).
+* Nodes 1-648 keep their numbers; the separate nodes become 649-772:
+*     z = -6: 649-661 and z = -2: 711-723 (interior-wall nodes)
+*     z = -4: node = 654 + 7 j + i   and   z = 0: node = 716 + 7 j + i      (i, j = 1..7)
+RMVUNUSED
+NCOM
+*
+* ---------------------------------------------------------------------- drilling rotations
+* A flat shell has no stiffness about its normal.  FIXROT fixes that rotation at the nodes connected
+* to shells alone (the superstructure and the separate basement nodes) and the rotations of the
+* nodes connected to solids alone.  It does not act on nodes shared by shells and excavated solids:
+* at the face-interior nodes of the basemat (normal Z) and of the outer basement walls at z = -6 and
+* -2 (normal Y or X) the rotation about the normal is fixed with D, row by row (first and last
+* node of each row); where a wall or a slab meets the face, its bending restrains that rotation.
+FIXROT
+VAR,BS,11,15,20,24,29,33,47,51,56,60,65,69
+VAR,BE,13,17,22,26,31,35,49,53,58,62,67,71
+FOREACH,BS,D,@BS[#],@BE[#],1,1,ROTZ
+VAR,YS,83,87,245,249,155,159,317,321
+VAR,YE,85,89,247,251,157,161,319,323
+FOREACH,YS,D,@YS[#],@YE[#],1,1,ROTY
+VAR,XS,91,127,253,289,99,135,261,297
+VAR,XE,109,145,271,307,117,153,279,315
+FOREACH,XS,D,@XS[#],@XE[#],9,1,ROTX
+*
+* ---------------------------------------------------------------------- equipment masses
+* MT,<node>,<wx>,<wy>,<wz>: lumped masses as weights (kN = t x 9.81) at the centres of rooms:
+*   grade slab 2 x 150 t (x = -6 and 6, y = -6), basement slab 2 x 100 t (x = -6 and 6, y = 6),
+*   floor z = 5 2 x 80 t (y = -6), floor z = 10 2 x 60 t (y = 6), roof 50 t (x = 6, y = 6)
+MT,732,1471.5,1471.5,1471.5
+MT,736,1471.5,1471.5,1471.5
+MT,698,981,981,981
+MT,702,981,981,981
+MT,426,784.8,784.8,784.8
+MT,430,784.8,784.8,784.8
+MT,543,588.6,588.6,588.6
+MT,547,588.6,588.6,588.6
+MT,628,490.5,490.5,490.5
+*
+* ---------------------------------------------------------------------- 3D view
+* A cutaway for the 3D view (MODELPLOT): hide the south and east outer walls above grade (group 9,
+* elements 1-24 and 73-96) and below grade (group 6, 1-32 and 97-128), so that the floors, the
+* interior walls and the excavated soil filling the basement show.  Display requests only (stored
+* with the model, no effect on the analysis); WINDOWSETTINGS,SHOWALL shows every element again.
+WINDOWSETTINGS,HIDEELEM,9,1-24
+WINDOWSETTINGS,HIDEELEM,9,73-96
+WINDOWSETTINGS,HIDEELEM,6,1-32
+WINDOWSETTINGS,HIDEELEM,6,97-128
+*
+* ---------------------------------------------------------------------- interaction nodes (FV) and checks
+* INTGEN,<type>: 0 clear, 1 FV, 2 FI-EVBN, 3 FI-FSIN, 5 FFV (types add up).  Model 1: FV, every
+* node of the excavated volume (405 nodes).
+INTGEN,1
+INTCOUNT
+* the model checks the manual strongly recommends before production runs; CALCM: the building
+* weighs 1.48E5 kN (15,060 t with the equipment), the excavated soil 8.76E4 kN (8,925 t)
+EXCSTRCHK
+FIXEDINT
+HINGED
+CALCM
+*
+* ---------------------------------------------------------------------- module options
+* POINT: 4 embedded TOPL layers (point loads at interfaces 1..5), R0 = 0.9 x 3 m
+POINT,0,4,2.7
+HOUSE,9.81,0,0,2,0,0,0,0,0
+ANALYS,0,0,0,0,1,0,0,0,0,0,0
+MOTION,0,0,0,20,0,0.1,100,301,1,0,1,0,0,0,0,1,0,0,1
+DAMP,0.05
+THFILE,../data/rg160h_030g.acc
+THTIT,RG 1.60 horizontal spectrum-compatible motion (EQUAKE, seed 11975)
+* NOUT,<dir>,<TF print>,<save history>,<plot>,<plot RS>,<save RS>,<print max>,<nodes>
+* X (TF, history, 5 % ISRS): basemat centre 41, basement slab centre 686, grade slab centre 748, floor
+* centres 446 (z = 5) and 527 (z = 10), roof centre 608, roof corner 648, and the excavated-soil node
+* 365 at the centre of the excavation top face (not a structure node: the soil the walls enclose)
+NOUT,1,1,1,0,0,1,1,41,686,748,446,527,608,648,365
+* Z (rocking and slab response): basemat edge 45 and grade-floor edge 369 (x = 12, y = 0), grade
+* slab under the 150 t equipment 736, roof corner 648
+NOUT,3,1,1,0,0,1,1,45,369,736,648
+* STRESS: maxima of the six shell components and histories of the bottom panels of two outer
+* basement walls (group 6): south wall elements 4-5 (in-plane shear FXY, X carries the base shear)
+* and west wall elements 68-69 (bending MXX and MYY, the wall loaded by the soil)
+STRESS,0,0,1,0,1
+EOUT,1,1,2,1,1,1,0,0,0,0,0,0,6,4-5
+EOUT,1,1,1,2,2,1,0,0,0,0,0,0,6,68-69
+AOPT,0,0,0,1,1,1,0,0,1,0,1,1,0,0
+*
+CHECK
+AFWRITE
+RUNSITE
+RUNPOINT
+RUNHOUSE
+RUNANALYS
+RUNMOTION
+RUNSTRESS
+WRITE
+*
+* ======================================================================================
+* Model 2: the same building with the FI-FSIN interaction set (subtraction method, SM)
+* ======================================================================================
+* CPMODEL copies the active model (everything, including the options) to model 2; ACTM makes it
+* active and MDL gives it its own name and directory (relative to examples/ex08, the working
+* directory after the first MDL).
+CPMODEL,2
+ACTM,2
+MDL,ex08fsin,../ex08_fsin
+TIT,Ex08 - embedded shear-wall building 24 x 24 m, FI-FSIN interaction set (SM)
+* clear the FV flags, then generate the lateral and bottom faces of the excavation: 209 nodes
+INTGEN,0
+INTGEN,3
+INTCOUNT
+* HOUSE <imp> = 2 (FI) records the method; CHECK then reminds you to validate it against FV (EDU-12)
+HOUSE,9.81,0,0,2,2,0,0,0,0
+* The site, the frequencies and the embedment are unchanged: reuse FILE1 (free field) and FILE3
+* (point-load solutions) of model 1.  SITE stays enabled in AOPT because HOUSE reads the layer
+* table of the .sit deck.
+FCOPY,../ex08/FILE1,FILE1
+FCOPY,../ex08/FILE3,FILE3
+AOPT,0,0,0,1,0,1,0,0,1,0,1,1,0,0
+CHECK
+AFWRITE
+RUNHOUSE
+RUNANALYS
+RUNMOTION
+RUNSTRESS
+WRITE
+*
+* ======================================================================================
+* Model 3: the FI-EVBN interaction set (modified subtraction method, MSM)
+* ======================================================================================
+CPMODEL,3
+ACTM,3
+MDL,ex08evbn,../ex08_evbn
+TIT,Ex08 - embedded shear-wall building 24 x 24 m, FI-EVBN interaction set (MSM)
+* lateral, bottom and top faces of the excavation: 258 nodes
+INTGEN,0
+INTGEN,2
+INTCOUNT
+FCOPY,../ex08/FILE1,FILE1
+FCOPY,../ex08/FILE3,FILE3
+CHECK
+AFWRITE
+RUNHOUSE
+RUNANALYS
+RUNMOTION
+RUNSTRESS
+WRITE

@@ -703,13 +703,13 @@ lesson stays open.
 
 | Lesson, step | Figure | Computed from |
 |---|---|---|
-| 1, step 1; 5, introduction | free field + structure − excavated soil = SSI system, built up term by term | manual Eq. 2.1 (schematic) |
+| 1, step 1; 5, introduction; 11, introduction | free field + structure − excavated soil = SSI system, built up term by term | manual Eq. 2.1 (schematic) |
 | 1, step 3 | control motion → H(f) → floor motion → oscillators → ISRS, building up as the record plays | IFFT[H A]; Nigam-Jennings oscillators |
 | 1, step 4; 4, step 9 | a one-mode stick on a fixed base and on sway-rocking springs and dashpots, with wave fronts for the radiated energy and \|H(f)\| of both | 3-DOF steady state with the lesson 4 impedance of the mat |
 | 1, step 5; 5, step 10 | SSI = kinematic interaction + inertial interaction | the exact superposition of the two problems (schematic drawing) |
 | 2, step 6 | shear wave in the layered column: displacement profile, outcrop and within amplification | exact layer solution (SHAKE recursion, complex modulus) |
 | 3, step 7 | spring and dashpot under harmonic motion: phase lag and force-displacement ellipse | K(ω) = k + iωc, E_D = πcωU², ξ = ωc/2k |
-| 5, step 9 | the FV, FI-FSIN, FI-EVBN and FFV interaction nodes on the excavation mesh | the INTGEN sets (150, 105, 114, 132 nodes) |
+| 5, step 9; 11, step 5 | the FV, FI-FSIN, FI-EVBN and FFV interaction nodes on the excavation mesh | the INTGEN sets (150, 105, 114, 132 nodes) |
 | 7, step 3 | vertically propagating SV, SH and P waves (X, Y, Z input) | incident + reflected pulse in a half-space |
 | 7, step 8 | envelope of soil cases and ±b peak broadening | BROADEN window maximum |
 | 9, steps 1 and 8 | backbone, Masing loop, secant stiffness and ξ = E_D/(4πE_S) against the amplitude | hyperbolic soil / BBCGEN panel backbone, Masing rule |
@@ -748,7 +748,7 @@ output tabs and its File Editor tabs of course-workspace files (a file with unsa
 tabs that were open before the lesson stay.
 
 Workspaces stay on disk after a lesson, so you can come back to the results (most lessons leave a few
-MB; lessons 8 and 9 leave several tens of MB). **Learn > Free Disk Space...** lists the workspaces with
+MB; lessons 8, 9 and 11 leave several tens of MB). **Learn > Free Disk Space...** lists the workspaces with
 their size and deletes those that are not in use (the working directory, a model in memory or the open
 lesson keep theirs); a lesson recreates its workspace the next time it is opened.
 

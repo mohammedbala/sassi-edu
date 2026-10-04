@@ -6,7 +6,8 @@ AFWRITE write the module decks and the RUN<MODULE> commands run the modules (ARC
 3 and 8, requirements 2.4 and 3.3).  This module
 
 * stages an example in a work directory and runs it through :class:`sassi.prep.Interpreter`
-  (:func:`stage_example`, :func:`run_example`; also used by ``tests/integration/test_examples.py``);
+  (:func:`stage_example`, :func:`run_example`; also used by ``tests/integration/test_examples.py``,
+  which runs the examples listed in :data:`EXAMPLES`);
 * defines **VP-E1**: example 1 (lumped-mass stick on a rigid surface mat, vertical SV input) run
   through the interpreter gives the same FILE8 (relative difference <= 1e-12) as the same model
   written *by hand* as module decks with the primitives of :mod:`sassi.verify.builders`
@@ -48,6 +49,7 @@ EXAMPLES: Dict[str, Tuple[str, ...]] = {
     "ex03_forced_vibration": ("ex03",),
     "ex04_site_response": ("ex04",),
     "ex05_xyz_simultaneous": ("ex05",),
+    "ex08_embedded_building": ("ex08", "ex08_fsin", "ex08_evbn"),
 }
 
 #: binary intermediate files deleted by :func:`purge_binaries` (decks, listings and text results kept)

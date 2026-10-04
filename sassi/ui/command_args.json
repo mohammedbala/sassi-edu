@@ -800,6 +800,13 @@
    }
   ]
  },
+ "CALCM": {
+  "summary": "Prints the mass of the active model: the element weight and mass (material weight x volume / g), the excavated soil separately (not included), the lumped MT/MR masses and the total per direction.",
+  "configures": "Model check",
+  "source": "requirements §3.4.J; spec 04 §8.3",
+  "notes": "g is the model's gravity (GRAVITY, HOUSE <gravity>); masses given as weights (MUNITS 1) are divided by it. Compare with a hand calculation before the SSI runs; on a cross-section model it gives the mass of the section pieces.",
+  "args": []
+ },
  "CALCPAR": {
   "summary": "Prints the area, centroid, moments of inertia and the six section resultants of the active cross-section model (from CSECT), like ANSYS SPOINT + FSUM on a section.",
   "configures": "Post-processing: section cuts",
@@ -7780,6 +7787,45 @@
     "pos": 1,
     "name": "FORCE",
     "meaning": "SASSI-EDU: the word FORCE also collapses zero-length SPRING elements (FIXROT drilling springs, MERGESOIL interface springs)"
+   }
+  ]
+ },
+ "WINDOWSETTINGS": {
+  "summary": "Settings of the active plot (Window Settings / Window Options dialog). The field form sets one field, so every dialog action has command text: titles, scale factors and frames of plots and animations, and the elements and nodes shown in the 3D views of a model.",
+  "configures": "Plots",
+  "source": "spec 06 §1.4; spec 10 §4.4.3",
+  "notes": "Without arguments the GUI opens the dialog; in batch mode that is an error (D-UI-08). HIDEGROUP, HIDEELEM, HIDENODE, VOLUME and SHOWALL are stored with the model (copied by CPMODEL) and apply to all its 3D plots, also before one is open; they change only what is drawn, never the analysis.",
+  "args": [
+   {
+    "pos": 1,
+    "name": "field",
+    "meaning": "the setting to change",
+    "values": {
+     "TITLE": "plot title (the rest of the line)",
+     "SCALE": "scale factor of a deformed-shape or vector animation",
+     "UNDEFORMED": "show the undeformed shape too (0/1)",
+     "FRAME": "show frame k of an animation",
+     "FRAMEPAUSE": "pause between animation frames, ms",
+     "RANGE": "colour-map range (bubble, contour)",
+     "DIRECTION": "vector direction X, Y, Z or ALL",
+     "START": "first layer of the soil layer plot",
+     "END": "last layer of the soil layer plot",
+     "SHOW": "show a column or line of a soil plot (0/1)",
+     "VOLUME": "model display volume xmin, xmax, ymin, ymax, zmin, zmax (blank = the model's box)",
+     "HIDEGROUP": "hide element group g",
+     "SHOWGROUP": "show element group g again",
+     "HIDEELEM": "hide elements of group g (a list or ranges)",
+     "SHOWELEM": "show those elements again",
+     "HIDENODE": "hide nodes",
+     "SHOWNODE": "show those nodes again",
+     "SHOWALL": "clear every hide request and the display volume"
+    }
+   },
+   {
+    "pos": 2,
+    "name": "values",
+    "meaning": "the value(s) of the field, e.g. HIDEELEM,<group>,<elements>; HIDEGROUP,<group>; TITLE,<text>; SCALE,<s>",
+    "repeat": true
    }
   ]
  },

@@ -742,7 +742,8 @@ Fewer interaction nodes are cheaper, because the impedance matrix is dense
 ASCE 4-16 and SRP 3.7.2 require that a non-FV method be **validated against FV** (CHECK warning
 EDU-12): compare the transfer functions at the common structure/excavation nodes. Example 2 shows the
 spurious peak of FI-FSIN at 6 Hz (roof amplitude 1.34 against 0.85 with FV, +58 %) and its removal by
-FI-EVBN.
+FI-EVBN. Example 8 does the same comparison on a full shear-wall building with a two-level basement:
+FI-FSIN resonates at 16 Hz (2 to 3 times the FV transfer functions), FI-EVBN stays within 2.4 % of FV.
 
 ### 8.4 The central-zone radius
 
@@ -1564,7 +1565,7 @@ A paraphrase of the "Engineering Considerations" of manual §4.1.2, with the num
 The examples in `examples/` are ordinary `.pre` files, commented line by line. Run them from the
 `examples` directory (`../.venv/bin/sassi run exNN_....pre`) or with `--cwd examples` from the
 project root; the results go to `examples/exNN/`. [examples/README.md](../../examples/README.md)
-lists the expected results, which `tests/integration/test_examples.py` (examples 1-5),
+lists the expected results, which `tests/integration/test_examples.py` (examples 1-5 and 8),
 `tests/unit/test_nlsoil_example.py` (example 6) and `tests/unit/test_nonlinear_example.py` (example 7)
 check.
 
@@ -1577,6 +1578,7 @@ check.
 | ex05 | X, Y and Z input in one ANALYS run | SITE ×3 POINT HOUSE ANALYS MOTION ×3 RELDISP | ~4 s |
 | ex06 | loose backfill behind a wall: near-field soil iterations | SOIL SITE ×3 POINT HOUSE ANALYS STRESS ×3, then 6 iterations HOUSE ANALYS STRESS ×3; MOTION | ~5 s |
 | ex07 | Option NON: shear-wall building with cracking wall panels | SITE ×3 POINT HOUSE ANALYS MOTION ×3 RELDISP ×3 NONLINEAR, then 7 iterations; MOTION | 30-120 s |
+| ex08 | embedded shear-wall building: FV against FI-FSIN (SM) and FI-EVBN (MSM) | SITE POINT HOUSE ANALYS MOTION STRESS (3 models) | ~60 s |
 
 ### 15.1 Example 1: stick on a surface mat (the basic workflow)
 
@@ -1711,6 +1713,28 @@ walls stay elastic (μ = 0.84). With the converged model the X acceleration is 0
 the hysteresis loops). [OPTION_NON.md §11](OPTION_NON.md#11-tutorial-example-7) discusses the variants
 (a 7 % damping cut-off, the Gulec-Whittaker backbone). Tested by `tests/unit/test_nonlinear_example.py`.
 
+### 15.8 Example 8: an embedded shear-wall building, FV against the subtraction methods
+
+*Model.* A 24 m × 24 m reinforced-concrete shear-wall building embedded 8 m: a 2 m basemat, 1.0 m outer
+basement walls, 0.6 m interior walls on the axes x = 0 and y = 0, a 0.6 m basement slab and a 0.8 m grade
+slab, three storeys of 5 m above grade (0.8 m outer walls, 0.6 m floors, 0.5 m roof), 830 t of equipment
+(`MT`); 15,063 t in all. Site: 8 m of sand and gravel (Vs 300 m/s) over dense gravels and rock. The
+excavated soil (256 SOLID elements, 3 m × 3 m × 2 m: 20 Hz by the λ/5 rule) shares nodes with the
+basemat and the outer walls only; the interior walls and slabs have nodes of their own (manual rule 11,
+`EXCSTRCHK`), generated as "excavation node + 1000" and renumbered by `RMVUNUSED` and `NCOM`. `INTGEN`
+builds the FV (405 nodes), FI-FSIN (209) and FI-EVBN (258) sets on copies of the model (`CPMODEL`,
+`FCOPY` of FILE1 and FILE3).
+
+*Results to look at.* FV: roof transfer function 2.44 at 6.5 Hz, 5 % ISRS ZPA 0.277 g at the basemat,
+0.322 g at grade and 0.420 g at the roof. FI-FSIN follows FV within 2 % below 10 Hz but resonates at
+16 Hz (roof 0.88 against 0.32, the soil enclosed by the basement 12.4 against 1.8) with a dip at 15 Hz:
+the excavated soil inside the interface, which carries no impedance, has its own natural frequency
+there. Its ISRS differ by up to +9.5 % / −8 % at 14-16 Hz and the wall forces by less than 2 %, because
+the resonance is narrow and far above the 6.5 Hz SSI mode. FI-EVBN follows FV within 2.4 % (ISRS 0.7 %).
+On this small model the reduced sets save little time (ANALYS 18 s FV, 13 s FI-FSIN, 15 s FI-EVBN): the
+structure's equations cost as much as the impedance. Lesson 11 of the guided course builds the example
+step by step, animates the spurious resonance, runs FFV and discusses the validation against FV.
+
 ---
 
 ## 16. Verification
@@ -1796,7 +1820,7 @@ VP-LA1, VP-LA2; SOIL-NON VP-SN1, VP-SN2, VP-SN3; water VP-54W, VP-W1.
 | complex modulus form | `CMODFORM` | 0 SASSI form (default), 1 = 1 + 2iβ |
 | algorithm switches | `EDUOPT,<key>,<value>` | requirements §7 decisions |
 | V&V Manual problems | `VERIFY`, `VERIFYREPORT`, `python -m sassi.verify.report` | Verification Manual |
-| Demo 1-12 (vendor examples) | `examples/ex01` ... `ex07` | similar workflows (ex07 as Demo 9) |
+| Demo 1-12 (vendor examples) | `examples/ex01` ... `ex08` | similar workflows (ex07 as Demo 9; ex02 and ex08 as the embedded Demo 5) |
 | Binary files FILE1 ... FILE91 | same names, NumPy `.npz` containers without extension | readable with `sassi.io.container` |
 
 ---

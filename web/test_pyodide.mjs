@@ -87,7 +87,7 @@ r = get("/api/events?since=0&timeout=20");
 check(r.status === 200 && now() - t1 < 1.0, "GET /api/events does not wait (timeout ignored)");
 r = get("/api/lessons");
 const lessonIds = r.payload.parts.flatMap((p) => p.lessons.map((l) => l.id));
-check(lessonIds.length === 10 && lessonIds[0] === LESSON, `10 lessons (got ${lessonIds.length})`);
+check(lessonIds.length === 11 && lessonIds[0] === LESSON, `11 lessons (got ${lessonIds.length})`);
 r = get("/api/help");
 check(r.status === 200 && r.payload.docs.some((d) => d.id === "docs/user/GUI.md"), "Help lists the documents");
 check(!r.payload.docs.some((d) => d.id.startsWith("docs/spec/") || d.id.startsWith("docs/internal/")), "no internal documents");

@@ -17,6 +17,8 @@ physically sensible (requirements 2.4, 3.3; ARCHITECTURE sections 3 and 8):
   reproducing the SOIL amplification (ex04);
 * simultaneous X/Y/Z cases with their control directions, the X-to-Y coupling of the eccentric mass
   kept under its own file names, RELDISP with the free-field reference in Y (ex05);
+* an embedded shear-wall building: clean CHECK, INTGEN counts and masses, FI-EVBN close to FV, FI-FSIN
+  with the spurious resonance of the enclosed excavated soil near 16 Hz, its ISRS and wall forces (ex08);
 * WRITE -> INP gives back the same model (UT-03) for every model of every example.
 
 The binary inter-module files are deleted as soon as each example has run and the results the tests
@@ -56,7 +58,8 @@ def _assert_clean_run(ui, summary, ex_dir, name, modules):
     assert summary.ok and summary.errors == 0 and not errors, "\n".join(errors[:20])
     for d, mods in modules.items():
         status = listing_status(ex_dir / d)
-        model = {"ex02_fsin": "ex02fsin", "ex02_evbn": "ex02evbn"}.get(d, d)
+        model = {"ex02_fsin": "ex02fsin", "ex02_evbn": "ex02evbn", "ex08_fsin": "ex08fsin",
+                 "ex08_evbn": "ex08evbn"}.get(d, d)
         for mod in mods:
             line = status.get(f"{model}_{mod}.out", "listing missing")
             assert "status OK" in line, f"{name} {d} {mod}: {line}"
@@ -388,6 +391,142 @@ def test_ex05_decks_carry_the_direction_of_their_case(ex05):
     assert mot["cm"] == 2 and mot["file8"] == "FILE8Z"
     d, _ = textfiles.read_history(md / "00027TR_Y.THD")
     assert 1e-4 < np.max(np.abs(d)) < 0.05                             # roof drift relative to the ground
+
+
+# ======================================================================================
+# Example 8: embedded shear-wall building, FV / FI-FSIN (SM) / FI-EVBN (MSM)
+# ======================================================================================
+EX08_DIRS = {"fv": "ex08", "fsin": "ex08_fsin", "evbn": "ex08_evbn"}
+#: (node, DOF) of the structure outputs: basemat, basement slab, grade slab, floors and roof (X), basemat
+#: and grade edges, the grade slab under the 150 t equipment and the roof corner (Z)
+EX08_X = (41, 686, 748, 446, 527, 608, 648)
+EX08_Z = (45, 369, 736, 648)
+EX08_SOIL = 365                                  # excavated soil, centre of the excavation top face
+
+
+@pytest.fixture(scope="module")
+def ex08(tmp_path_factory):
+    ui, summary, ex = _run("ex08_embedded_building", tmp_path_factory)
+    f8 = {k: B.read_file8(ex / d) for k, d in EX08_DIRS.items() if (ex / d / "FILE8").exists()}
+    for d in EX08_DIRS.values():
+        purge_binaries(ex / d)
+    return ui, summary, ex, f8
+
+
+def _ex08_dev(f8, method, node, dof):
+    """max |H_method - H_FV| / max |H_FV| per frequency (complex difference, relative to the FV peak)."""
+    a, b = B.tf(f8[method], node, dof), B.tf(f8["fv"], node, dof)
+    return np.abs(a - b) / np.max(np.abs(b))
+
+
+@pytest.mark.slow                     # three ANALYS runs of 41 frequencies: about 1 minute
+def test_ex08_runs_every_model(ex08):
+    ui, summary, ex, f8 = ex08
+    full = ("HOUSE", "ANALYS", "MOTION", "STRESS")
+    _assert_clean_run(ui, summary, ex, "ex08", {"ex08": ("SITE", "POINT") + full, "ex08_fsin": full,
+                                                "ex08_evbn": full})
+    assert set(f8) == set(EX08_DIRS)
+    _assert_write_inp_roundtrip(ui, ex, {0: "ex08/ex08.pre", 2: "ex08_fsin/ex08fsin.pre",
+                                         3: "ex08_evbn/ex08evbn.pre"})
+
+
+@pytest.mark.slow
+def test_ex08_model_checks_counts_and_masses(ex08):
+    """CHECK: no error; no warning for FV, only the EDU-12 reminder for the reduced sets.  The interior
+    structure has its own nodes (no excavation-interior node shared), the numbering has no gap, the
+    INTGEN sets have the counts of the documentation and HOUSE has the masses of CALCM."""
+    ui, _, ex, _ = ex08
+    counts = {0: 405, 2: 209, 3: 258}
+    for num, n_int in counts.items():
+        m = ui.models[num]
+        rep = run_check(m, dirs=[m.path])
+        assert not rep.errors(), [x.line() for x in rep.errors()][:5]
+        warn = {x.number for x in rep.warnings()}
+        assert warn == (set() if num == 0 else {"EDU-12"}), warn
+        assert sum(1 for nd in m.nodes.values() if 0 in nd.flags) == n_int
+        assert len(m.nodes) == max(m.nodes) == 772
+    for d in EX08_DIRS.values():
+        txt = (ex / d / f"{d.replace('_', '')}_HOUSE.out").read_text(encoding="utf-8")
+        line = next(ln for ln in txt.splitlines() if "Total structural mass" in ln)
+        assert abs(float(line.split(":")[1].split()[0]) - 15062.7) < 1.0, line     # 14,233 t + 830 t equipment
+        line = next(ln for ln in txt.splitlines() if "Total excavated soil mass" in ln)
+        assert abs(float(line.split(":")[1].split()[0]) - 8924.8) < 1.0, line      # 24 x 24 x 8 m x 1.937 t/m3
+
+
+@pytest.mark.slow
+def test_ex08_low_frequency_transfer_functions_are_rigid_body(ex08):
+    f8 = ex08[3]
+    for k, f in f8.items():
+        assert float(f["freq"][0]) < 0.11
+        for node in EX08_X + (EX08_SOIL,):
+            assert abs(abs(B.tf(f, node, 1)[0]) - 1.0) < 0.01, (k, node)
+        for node in EX08_Z:
+            assert abs(B.tf(f, node, 3)[0]) < 0.01, (k, node)
+
+
+@pytest.mark.slow
+def test_ex08_modified_subtraction_follows_fv(ex08):
+    """FI-EVBN: within 3 % of the FV peak at every computed frequency (observed 2.4 % at most)."""
+    f8 = ex08[3]
+    for node in EX08_X:
+        assert np.max(_ex08_dev(f8, "evbn", node, 1)) < 0.03, node
+    for node in EX08_Z:
+        assert np.max(_ex08_dev(f8, "evbn", node, 3)) < 0.03, node
+
+
+@pytest.mark.slow
+def test_ex08_subtraction_method_has_the_spurious_resonance(ex08):
+    """FI-FSIN follows FV below 10 Hz, then resonates near 16 Hz: the soil enclosed by the walls and the
+    basemat (the non-interaction excavated nodes) has its first natural frequency there."""
+    f8 = ex08[3]
+    freq = np.asarray(f8["fv"]["freq"])
+    low, band = freq < 10.0, (freq > 14.5) & (freq < 17.5)
+    for node, dof in [(n, 1) for n in EX08_X] + [(n, 3) for n in EX08_Z]:
+        dev = _ex08_dev(f8, "fsin", node, dof)
+        assert np.max(dev[low]) < 0.03, (node, dof)
+        k = int(np.argmax(dev))
+        assert 14.5 < freq[k] < 17.5 and dev[k] > 0.15, (node, dof, freq[k], dev[k])
+    k16 = int(np.argmin(np.abs(freq - 16.0)))
+    for node in (41, 748, 608):                             # basemat, grade, roof: about 2 to 3 times FV
+        ratio = abs(B.tf(f8["fsin"], node, 1)[k16]) / abs(B.tf(f8["fv"], node, 1)[k16])
+        assert ratio > 1.8, (node, ratio)
+    soil = {k: abs(B.tf(f8[k], EX08_SOIL, 1)[k16]) for k in f8}
+    assert soil["fsin"] > 5.0 * soil["fv"], soil            # the enclosed soil rings (12.4 against 1.8)
+    assert np.max(np.abs(B.tf(f8["fv"], 41, 1))) < 1.01     # FV: the basemat never exceeds the free surface
+    fp, _ = _peak(freq, B.tf(f8["fv"], 608, 1))
+    assert 6.0 < fp < 7.0, fp                               # SSI peak of the roof (fixed base 10.7-10.9 Hz)
+
+
+@pytest.mark.slow
+def test_ex08_isrs(ex08):
+    """5 % ISRS: amplification up the building; MSM within 2 % of FV; SM within 2 % below 10 Hz and off by
+    more than 5 % in the 13-17 Hz band of its spurious resonance."""
+    _, _, ex, _ = ex08
+    pga = _pga(ex / "data" / "rg160h_030g.acc")
+    zpa = [_rs(ex / "ex08" / f"0{n:04d}TR_X01.RS")[1][-1] for n in (41, 748, 608)]
+    assert 0.7 < zpa[0] / pga < 1.0, (zpa, pga)             # kinematic interaction: basemat below the PGA
+    assert zpa[0] < zpa[1] < zpa[2], zpa
+    files = [f"0{n:04d}TR_X01.RS" for n in EX08_X] + [f"0{n:04d}TR_Z01.RS" for n in EX08_Z]
+    for fn in files:
+        f, fv = _rs(ex / "ex08" / fn)
+        r_evbn = _rs(ex / "ex08_evbn" / fn)[1] / fv
+        r_fsin = _rs(ex / "ex08_fsin" / fn)[1] / fv
+        assert np.max(np.abs(r_evbn - 1.0)) < 0.02, fn
+        assert np.max(np.abs(r_fsin[f < 10.0] - 1.0)) < 0.02, fn
+        band = (f > 13.0) & (f < 17.0)
+        assert np.max(np.abs(r_fsin[band] - 1.0)) > 0.05, fn
+
+
+@pytest.mark.slow
+def test_ex08_basement_wall_forces(ex08):
+    """Peak in-plane shear of the south wall and bending of the west wall: SM and MSM within 3 % of FV
+    (the spurious resonance is narrow and far above the 6.5 Hz SSI peak that governs them)."""
+    _, _, ex, _ = ex08
+    for e, comp in ((4, "FXY"), (5, "FXY"), (68, "MYY"), (69, "MYY")):
+        peak = {k: np.max(np.abs(textfiles.read_history(ex / d / f"SHELL_006_{e:05d}_{comp}.THS")[0]))
+                for k, d in EX08_DIRS.items()}
+        for k in ("fsin", "evbn"):
+            assert abs(peak[k] / peak["fv"] - 1.0) < 0.03, (e, comp, peak)
 
 
 # ======================================================================================

@@ -159,7 +159,7 @@ the same complex modulus.
 
 **Code:** `sassi/core/ssi_solver.py`, `sassi/modules/analys.py`, `sassi/modules/house.py`.
 **Verified by:** VP-16 (zero-SSI identity), VP-15, VP-E1, VP-S2, the impedance problems VP-10 to
-VP-17, and example 2 (FV against FI).
+VP-17, and examples 2 and 8 (FV against FI).
 
 ### 3.1 The idea
 
@@ -246,7 +246,9 @@ dense matrix) much smaller:
 
 In SASSI-EDU the variants differ **only** by the interaction set (INT/INTGEN); the equations and the
 code are the same. Example 2 shows the SM anomaly at 6 Hz on a 10 × 10 × 5 m box and its removal by
-FI-EVBN. Screening frequencies used in practice (DOE/STP 2011): the soil-layer frequency $V_s/(4H)$
+FI-EVBN; example 8 shows it at 16 Hz on a 24 × 24 m shear-wall building embedded 8 m, whose interior
+structure has nodes of its own, so that the anomaly comes from the enclosed excavated soil alone.
+Screening frequencies used in practice (DOE/STP 2011): the soil-layer frequency $V_s/(4H)$
 for embedment $H$ and the excavated-volume frequency $f_\text{EV}$.
 
 ---

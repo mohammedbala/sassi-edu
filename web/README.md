@@ -33,7 +33,7 @@ also download Pyodide, NumPy and SciPy from cdn.jsdelivr.net at their first visi
 32 MB unpacked), which their browser then caches: about 27 MB in all.
 
 The front end `sassi/ui/static/` is copied with its subfolders: `katex/` and `examples/`, the pictures of
-the examples gallery (seven PNGs, about 40 kB, written by `python -m sassi.ui.thumbnails`; regenerate them
+the examples gallery (eight PNGs, about 50 kB, written by `python -m sassi.ui.thumbnails`; regenerate them
 after changing an example).
 
 The build never bundles `reference/` (the ACS SASSI manual text), `docs/spec/`, `docs/internal/`,
@@ -57,7 +57,7 @@ The Node test runs the built bundle in Pyodide without a browser:
 
 ```bash
 cd web && npm install && cd ..          # once: the pinned pyodide package (about 30 MB, git-ignored)
-node web/test_pyodide.mjs               # lesson 01 through the bridge, then every lesson headless (~2.5 min)
+node web/test_pyodide.mjs               # lesson 01 through the bridge, then every lesson headless (~6 min)
 node web/test_pyodide.mjs --quick       # lesson 01 only (~20 s); pytest runs this one
 ```
 

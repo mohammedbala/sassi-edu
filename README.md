@@ -60,7 +60,7 @@ Around the modules:
 python3 -m venv .venv && .venv/bin/pip install -e .[test]
 .venv/bin/sassi --cwd examples run ex01_surface_stick.pre    # batch run of the first tutorial model
 .venv/bin/sassi                                              # interactive command console
-.venv/bin/sassi-gui                                          # browser GUI; opens on Learn, the guided course (10 lessons)
+.venv/bin/sassi-gui                                          # browser GUI; opens on Learn, the guided course (11 lessons)
 .venv/bin/python -m pytest -q                                # unit tests and verification problems
 .venv/bin/python -m sassi.verify.report                      # regenerate the Verification Manual and the Command Reference
 .venv/bin/python -m sassi.verify.report --commands-only      # regenerate the Command Reference only
@@ -70,7 +70,7 @@ python3 -m venv .venv && .venv/bin/pip install -e .[test]
 in the page (Pyodide); `python web/build.py` builds that static site for GitHub Pages
 ([web/README.md](web/README.md), [GUI.md §16](docs/user/GUI.md#16-web-version-github-pages)).
 
-**New to SSI or SASSI?** Start the GUI: it opens on the **Learn** tab, a guided course of ten lessons
+**New to SSI or SASSI?** Start the GUI: it opens on the **Learn** tab, a guided course of eleven lessons
 for structural engineers who design with fixed-base models (fundamentals, design applications,
 advanced). Each step runs real commands next to their plots and listings and explains what they do,
 why they matter for ISRS, member forces and displacements, their technical basis and the ANSYS
@@ -107,10 +107,11 @@ RUNANALYS
 RUNMOTION
 ```
 
-The seven tutorial examples in [`examples/`](examples/README.md) are complete, commented models: a stick
+The eight tutorial examples in [`examples/`](examples/README.md) are complete, commented models: a stick
 on a surface mat, an embedded box (FV, FI-FSIN, FI-EVBN), forced vibration and foundation impedance,
 the EQUAKE-SOIL-SITE chain, X+Y+Z input in one run, near-field soil nonlinearity (a loose backfill behind
-a wall) and Option NON (a shear-wall building with cracking walls).
+a wall), Option NON (a shear-wall building with cracking walls) and an embedded shear-wall building with
+a two-level basement, analysed with FV and validated against the subtraction methods.
 
 ## Documentation
 

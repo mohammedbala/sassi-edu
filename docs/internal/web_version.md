@@ -112,4 +112,6 @@ sassi/web/bridge.py  -- Bridge(push): GuiSession(web mode) + route() + run_pendi
   every local URL (hash of the content; also in `web/worker.js?v=` and `sassi-edu.zip?v=`).
 * Measured: bundle zip 1.93 MB, site 7.7 MB (3.9 MB gzip), CDN 23.1 MB (brotli); Node: Pyodide +
   NumPy + SciPy + bundle 3.5 s, lesson 01 through the bridge 15.9 s, the ten lessons headless 128 s
-  (native 1.2-1.6 x faster); browser: ready in 3-8 s with a warm cache.
+  (native 1.2-1.6 x faster); browser: ready in 3-8 s with a warm cache. With lesson 11 (2026-10-04):
+  the eleven lessons headless 333 s, lesson 11 alone 206 s (86 s native: 2.4 x; four ANALYS runs of
+  41 frequencies with 627 to 1215 interaction DOFs).

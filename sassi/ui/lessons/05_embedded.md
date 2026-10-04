@@ -502,7 +502,7 @@ comparison with FV: no error, no warning beyond the EDU-12 reminder. This is, in
 subtraction-method problem identified by the US Department of Energy in 2011 (operating-experience
 report OE-3 2011-02, Theory §3.3); it is why, as the ACS SASSI manual states (§4.1.2 item 15),
 ASCE 4-16 and SRP 3.7.2 require reduced methods to be **validated against FV** before production
-runs.
+runs. Lesson 11 repeats this comparison on a full shear-wall building with a two-level basement.
 
 ### Technical basis
 In FI-FSIN the rows of the non-interaction excavated DOFs (the $w$ set) keep only $-C^e_{ww}$ (plus
