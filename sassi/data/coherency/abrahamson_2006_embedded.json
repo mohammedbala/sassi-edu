@@ -1,0 +1,12 @@
+{
+  "model": 4,
+  "name": "Abrahamson (2006) plane-wave coherency, all sites, embedded foundations",
+  "short": "Abrahamson 2006 embedded",
+  "verified": false,
+  "components": null,
+  "reason": "coefficients not available: EPRI report 1014101 (December 2006), cited by the ACS SASSI manual as reference 3, could not be retrieved, and no other primary or authoritative source of its coefficients was found during implementation. SASSI-EDU does not use coefficients from memory (requirements D-INC-04).",
+  "alternative": "Model 5: EPRI 1015110 (2007), Chapter 7 'Coherency for Embedded Sites', recommends the hard-rock coherency function for SSI applications with embedded foundations of 10 m or more.",
+  "source": {
+    "primary": "N. A. Abrahamson (2006). Program on Technology Innovation: Spatial Coherency for Soil-Structure Interaction. EPRI 1014101, Palo Alto, CA, and U.S. DOE, December 2006 (ACS SASSI manual reference 3). Not retrieved."
+  }
+}

@@ -1,0 +1,263 @@
+* ======================================================================================
+* SASSI-EDU tutorial example 2: shallow embedded box, flexible volume (FV) and FI-FSIN
+* ======================================================================================
+* What you learn
+*   - how an embedded structure is modelled in the flexible-volume method: the structure
+*     (here a reinforced-concrete basement of SHELL walls and slabs) PLUS the soil it
+*     displaces (the "excavated soil", SOLID elements with ETYPE 2 and the free-field layer
+*     properties, MSET = L layer);
+*   - how the interaction nodes are chosen with INT (here with FOREACH loops):
+*       model 1  FV      every node of the excavated volume is an interaction node;
+*       model 2  FI-FSIN only the nodes on the lateral faces and on the bottom face
+*                        ("subtraction method", SM);
+*       model 3  FI-EVBN FI-FSIN plus the top (ground-surface) face of the excavation
+*                        ("modified subtraction method", MSM);
+*   - how to copy a model (CPMODEL) and reuse the free-field and point-load files (FCOPY) of
+*     the first run, because the site and the embedment depth are the same.
+*
+* Physics in one paragraph
+*   ANALYS solves [(K_s - w2 M_s) - (K_e - w2 M_e) + X_ff] U = X_ff U'_f.  The excavated soil
+*   (K_e, M_e) is subtracted from the free field, the structure (K_s, M_s) is added, and the
+*   soil impedance X_ff acts on the interaction nodes.  In FV every excavated node feels the
+*   free-field load; the FI sets load only part of the excavation boundary, and the excavated
+*   soil that is not an interaction node enters the equations only through the subtracted
+*   -(K_e - w2 M_e).  What to observe (see examples/README.md):
+*     - all three sets agree at low frequency (rigid-body motion with the ground, ATF -> 1);
+*     - FI-FSIN shows a spurious peak of the roof response and of the rocking near 6-7 Hz:
+*       the roof slab sits on top-face nodes that are NOT interaction nodes, so the slab and
+*       the subtracted soil under it form an unphysical oscillator;
+*     - FI-EVBN (the same set plus the top face) removes it and follows FV closely.
+*   Embedment also filters the free-field motion (kinematic interaction): the basement moves
+*   less than the free surface at higher frequencies and rocks under vertically incident waves.
+*
+* How to run (the working directory must be the examples directory, see examples/README.md):
+*     cd examples
+*     ../.venv/bin/sassi run ex02_embedded_box.pre
+*   or from the repository root:  .venv/bin/sassi --cwd examples run ex02_embedded_box.pre
+* Results: examples/ex02/ (FV), examples/ex02_fsin/ (FI-FSIN), examples/ex02_evbn/ (FI-EVBN).
+*
+* Units: m, kN, t, s.  Gravity 9.81 m/s2.
+* ======================================================================================
+MDL,ex02,ex02
+TIT,Ex02 - embedded basement 10 x 10 x 5 m, FV interaction set
+*
+* ---------------------------------------------------------------------- soil profile
+* L,<nm>,<thick>,<weight>,<Vp>,<Vs>,<pdamp>,<sdamp>
+*   L 1-5: 5 m of medium-dense sand (Vs 250 m/s), the five 1 m EMBEDMENT layers: the
+*          excavation depth coincides with a layer interface, as it must (interaction nodes on
+*          interfaces).  The manual rule for embedded models: an L number may be repeated in
+*          TOPL for identical layers, but NOT for embedment layers -- each embedment layer gets
+*          its own L number, and the excavated elements of that layer use it (MSET, below).
+*          Here the five layers are identical; after SOIL (SITEX,1, example 4) they would not be.
+*   L 6:   16 m of dense gravel (Vs 400 m/s) in 1 m sublayers (repeated: not embedment layers)
+*   L 7:   half-space (Vs 800 m/s)
+L,1,1.0,19.0,500,250,0.05,0.05
+L,2,1.0,19.0,500,250,0.05,0.05
+L,3,1.0,19.0,500,250,0.05,0.05
+L,4,1.0,19.0,500,250,0.05,0.05
+L,5,1.0,19.0,500,250,0.05,0.05
+L,6,1.0,20.0,800,400,0.04,0.04
+L,7,1.0,21.0,1600,800,0.02,0.02
+TOPL,1,2,3,4,5
+TOPL,6,6,6,6,6,6,6,6,6,6
+TOPL,6,6,6,6,6,6
+*
+* ---------------------------------------------------------------------- frequencies
+* dt 0.005 s, NFFT 8192: df = 0.0244 Hz; 21 SSI frequencies from 0.1 to 20 Hz
+FREQ,1,4,20,41,61,82,102,123,143,164,184
+FREQ,1,205,246,287,328,369,410,492,573,655,737
+FREQ,1,819
+* SITE: 20 generated half-space sublayers, half-space = L 7, control point at the free surface
+SITE,0,1,0,20,7,1,0,1,4096,1,0,0.005,8192,1
+WAVE,2,1,1,1,0
+*
+* ---------------------------------------------------------------------- nodes
+* A 5 x 5 grid (2.5 m spacing) on each of the 6 interface levels z = -5, -4, ..., 0.
+* Numbering is bottom-up (interaction nodes must be numbered from the bottom up, EDU-21):
+*     node(i, j, k) = 25 k + 5 j + i + 1      i, j = 0..4 (x, y),  k = 0..5 (z = -5 + k)
+N,1,-5,-5,-5
+N,5,5,-5,-5
+FILL,1,5
+NGEN,4,5,1,5,1,0,2.5,0
+NGEN,5,25,1,25,1,0,0,1
+*
+* ---------------------------------------------------------------------- excavated soil
+* Groups 1-5: 4 x 4 x 5 = 80 SOLID elements filling the excavation, one group per embedment
+* layer numbered from the surface down (manual rules R5/R6: one group per embedment layer, and
+* its soil uses the L number of that layer in TOPL; STRESS recovers soil pressures group by
+* group, layer by layer).  ETYPE 2 = excavated soil; for excavated elements MACT/MSET is an L
+* (layer) number: group k lies in TOPL layer k, whose L number is k (CHECK EDU-08 verifies it).
+* SOLID node order: bottom face I J K L (counter-clockwise seen from above), then the top face.
+GROUP,1,SOLID
+GTIT,1,excavated soil 0 to -1 m
+MACT,1
+E,1,101,102,107,106,126,127,132,131
+EGEN,3,1,1
+EGEN,3,5,1,4
+ETYPE,1,16,1,2
+GROUP,2,SOLID
+GTIT,2,excavated soil -1 to -2 m
+MACT,2
+E,1,76,77,82,81,101,102,107,106
+EGEN,3,1,1
+EGEN,3,5,1,4
+ETYPE,1,16,1,2
+GROUP,3,SOLID
+GTIT,3,excavated soil -2 to -3 m
+MACT,3
+E,1,51,52,57,56,76,77,82,81
+EGEN,3,1,1
+EGEN,3,5,1,4
+ETYPE,1,16,1,2
+GROUP,4,SOLID
+GTIT,4,excavated soil -3 to -4 m
+MACT,4
+E,1,26,27,32,31,51,52,57,56
+EGEN,3,1,1
+EGEN,3,5,1,4
+ETYPE,1,16,1,2
+GROUP,5,SOLID
+GTIT,5,excavated soil -4 to -5 m
+MACT,5
+E,1,1,2,7,6,26,27,32,31
+EGEN,3,1,1
+EGEN,3,5,1,4
+ETYPE,1,16,1,2
+*
+* ---------------------------------------------------------------------- basement structure
+* Material 1: reinforced concrete  M,<nm>,<E>,<nu>,<weight>,<pdamp>,<sdamp>,<type 1>
+* (M and L are different tables: MACT,1 below means M 1 for the shells)
+M,1,3.0E7,0.2,24.0,0.05,0.05,1
+* Group 6: SHELL basement on the excavation boundary
+*   elements  1-16  base slab (z = -5), 1.0 m        elements 17-32 roof slab (z = 0), 0.5 m
+*   elements 33-112 walls y = -5, y = +5, x = -5, x = +5, 0.5 m
+GROUP,6,SHELL
+GTIT,6,basement
+MACT,1
+E,1,1,2,7,6
+EGEN,3,1,1
+EGEN,3,5,1,4
+EGEN,1,125,1,16
+* wall y = -5 (j = 0)
+E,33,1,2,27,26
+EGEN,3,1,33
+EGEN,4,25,33,36
+* wall y = +5 (j = 4)
+E,53,21,22,47,46
+EGEN,3,1,53
+EGEN,4,25,53,56
+* wall x = -5 (i = 0)
+E,73,1,6,31,26
+EGEN,3,5,73
+EGEN,4,25,73,76
+* wall x = +5 (i = 4)
+E,93,5,10,35,30
+EGEN,3,5,93
+EGEN,4,25,93,96
+THICK,1,16,1,1.0
+THICK,17,112,1,0.5
+*
+* Shell drilling rotations: a flat shell has no stiffness for the rotation about its normal,
+* and the excavated SOLID elements that share these nodes have no rotations at all.  Fix the
+* rotation about the face normal at the nodes inside each face (on wall/slab edges the other
+* face's bending restrains it).  Each pair of variables holds the first and last node of the
+* rows of face-interior nodes.  (FIXROT does this automatically only for nodes that are
+* connected to shells alone, so it cannot be used here.)
+*   slabs (normal Z): rows of 3 nodes
+VAR,ZS,7,12,17,132,137,142
+VAR,ZE,9,14,19,134,139,144
+FOREACH,ZS,D,@ZS[#],@ZE[#],1,1,ROTZ
+*   walls y = -5 and y = +5 (normal Y): rows of 3 nodes on the levels k = 1..4
+VAR,YS,27,52,77,102,47,72,97,122
+VAR,YE,29,54,79,104,49,74,99,124
+FOREACH,YS,D,@YS[#],@YE[#],1,1,ROTY
+*   walls x = -5 and x = +5 (normal X): columns of 3 nodes, increment 5
+VAR,XS,31,56,81,106,35,60,85,110
+VAR,XE,41,66,91,116,45,70,95,120
+FOREACH,XS,D,@XS[#],@XE[#],5,1,ROTX
+*
+* ---------------------------------------------------------------------- interaction nodes (FV)
+* FV: every node of the excavated volume, level by level with a FOREACH loop over the first
+* and last node numbers of each level
+VAR,LFIRST,1,26,51,76,101,126
+VAR,LLAST,25,50,75,100,125,150
+FOREACH,LFIRST,INT,@LFIRST[#],@LLAST[#],1,1
+*
+* ---------------------------------------------------------------------- module options
+* POINT: 5 embedded TOPL layers (point loads at interfaces 1..6), R0 = 0.9 x 2.5 m
+POINT,0,5,2.25
+HOUSE,9.81,0,0,2,0,0,0,0,0
+ANALYS,0,0,0,0,1,0,0,0,0,0,0
+MOTION,0,0,0,20,0,0.1,100,301,1,0,1,0,0,0,0,1,0,0,1
+DAMP,0.05
+THFILE,../data/rg160h_030g.acc
+THTIT,RG 1.60 horizontal spectrum-compatible motion (EQUAKE, seed 11975)
+* X at the base-slab centre (13) and the roof centre (138); Z at the roof edges x = -5 / +5
+NOUT,1,1,1,0,0,1,1,13,138
+NOUT,3,1,0,0,0,0,1,136,140
+* STRESS: bending moments of the four bottom wall panels of wall x = -5 (group 6, 73-76)
+STRESS,0,0,1,0,1
+EOUT,1,1,1,2,2,1,0,0,0,0,0,0,6,73-76
+AOPT,0,0,0,1,1,1,0,0,1,0,1,1,0,0
+*
+CHECK
+AFWRITE
+RUNSITE
+RUNPOINT
+RUNHOUSE
+RUNANALYS
+RUNMOTION
+RUNSTRESS
+WRITE
+*
+* ======================================================================================
+* Model 2: the same basement with the FI-FSIN interaction set
+* ======================================================================================
+* CPMODEL copies the active model (everything, including the options) to model 2; ACTM makes
+* it active and MDL gives it its own name and directory.  NOTE: MDL also changes the working
+* directory to the model directory, so the second path is given relative to examples/ex02.
+CPMODEL,2
+ACTM,2
+MDL,ex02fsin,../ex02_fsin
+TIT,Ex02 - embedded basement 10 x 10 x 5 m, FI-FSIN interaction set
+* FI-FSIN keeps the lateral faces and the bottom face: reset the interior nodes (i, j = 1..3)
+* of the levels above the bottom (k = 1..5).  Each row of 3 interior nodes is one INT range.
+VAR,RFIRST,32,37,42,57,62,67,82,87,92,107,112,117,132,137,142
+VAR,RLAST,34,39,44,59,64,69,84,89,94,109,114,119,134,139,144
+FOREACH,RFIRST,INT,@RFIRST[#],@RLAST[#],1,0
+* HOUSE <imp> = 2 (FI) is informative: the interaction set defines the method
+HOUSE,9.81,0,0,2,2,0,0,0,0
+* The site, the frequencies and the embedment are unchanged: reuse FILE1 (free field) and
+* FILE3 (point-load solutions) of model 1 instead of running SITE and POINT again.  SITE stays
+* enabled in AOPT because HOUSE reads the layer table of the .sit deck.
+FCOPY,../ex02/FILE1,FILE1
+FCOPY,../ex02/FILE3,FILE3
+AOPT,0,0,0,1,0,1,0,0,1,0,1,1,0,0
+CHECK
+AFWRITE
+RUNHOUSE
+RUNANALYS
+RUNMOTION
+RUNSTRESS
+WRITE
+*
+* ======================================================================================
+* Model 3: FI-EVBN = FI-FSIN plus the top face (copied from model 2, still active)
+* ======================================================================================
+CPMODEL,3
+ACTM,3
+MDL,ex02evbn,../ex02_evbn
+TIT,Ex02 - embedded basement 10 x 10 x 5 m, FI-EVBN interaction set
+* set the interaction flag again on the interior nodes of the top level (k = 5, z = 0)
+VAR,TFIRST,132,137,142
+VAR,TLAST,134,139,144
+FOREACH,TFIRST,INT,@TFIRST[#],@TLAST[#],1,1
+FCOPY,../ex02/FILE1,FILE1
+FCOPY,../ex02/FILE3,FILE3
+CHECK
+AFWRITE
+RUNHOUSE
+RUNANALYS
+RUNMOTION
+RUNSTRESS
+WRITE

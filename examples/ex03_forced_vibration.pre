@@ -1,0 +1,150 @@
+* ======================================================================================
+* SASSI-EDU tutorial example 3: forced vibration of a surface foundation -- compliance,
+* impedance and the global impedance option
+* ======================================================================================
+* What you learn
+*   - a foundation-vibration analysis (ANALYS <type> = 1): FORCE turns nodal load factors (F, MM)
+*     into frequency-domain load vectors (FILE9) and ANALYS returns the displacement per unit
+*     load (FILE8): the dynamic COMPLIANCE of the foundation;
+*   - several load cases in one ANALYS run: each FORCE run is copied to FILE9001 ... FILE9006
+*     (FCOPY) and ANALYS <simul> = 6 writes FILE8001 ... FILE8006;
+*   - the global impedance option (ANALYS <impe> = 2): K_G = T' X_ff T, the 6 x 6 impedance of
+*     the rigid foundation about the reference point, written to FOUNSTIF (Re K), FOUNDASH
+*     (Im K / w), FOUNDAMP (Im K / 2 Re K), FOUNIMPD (|K|) and FILE11.  For a rigid, massless
+*     surface foundation the inverse of the 6 x 6 compliance matrix of the six load cases IS K_G:
+*     two independent routes to the same impedance;
+*   - MOTION for a vibration analysis: the displacement history of the foundation under a
+*     1000 kN Ricker pulse (MOTIONX <resp> = 0), which dies out quickly by radiation damping.
+*
+* The model: a rigid, massless 12 m x 12 m square mat (half-width B = 6 m) on a uniform
+* half-space (Vs 200 m/s, nu 1/3, rho 2 t/m3, 2 % damping).  The mat is a grid of 7 x 7
+* interaction nodes tied to the centre node 25 by stiff massless beams ("rigid links").
+* Expected static stiffnesses (Pais & Kausel 1988, R2 B.2; G = 80 000 kPa):
+*     K_z = 7.05 G B = 3.38E6 kN/m      K_x = K_y = 5.52 G B = 2.65E6 kN/m
+*     K_xx = K_yy = 6.00 G B^3 = 1.04E8 kN m/rad      K_zz = 8.31 G B^3 = 1.44E8 kN m/rad
+* The 2 m mesh (6 elements across the mat) is coarse and over-predicts the static stiffness, the
+* more so for the moments: at 0.2 Hz the computed K_x = K_y and K_z are about 6 % above
+* Pais-Kausel, K_xx = K_yy about 20 % and K_zz about 18 % above (VP-14 shows the convergence
+* with mesh refinement).  The inverse compliance and K_G agree within 0.2 % (the rigid links
+* are stiff but not infinitely rigid).
+*
+* How to run (the working directory must be the examples directory, see examples/README.md):
+*     cd examples
+*     ../.venv/bin/sassi run ex03_forced_vibration.pre
+*   or from the repository root:  .venv/bin/sassi --cwd examples run ex03_forced_vibration.pre
+* Results: examples/ex03/.
+*
+* Units: m, kN, t, s.  Gravity 9.81 m/s2.
+* ======================================================================================
+MDL,ex03,ex03
+TIT,Ex03 - rigid square surface foundation, forced vibration and global impedance
+*
+* ---------------------------------------------------------------------- uniform half-space
+* 24 TOPL sublayers of 1 m (4 B deep) of the same soil as the half-space (L 2)
+L,1,1.0,19.62,400,200,0.02,0.02
+L,2,1.0,19.62,400,200,0.02,0.02
+TOPL,1,1,1,1,1,1,1,1,1,1
+TOPL,1,1,1,1,1,1,1,1,1,1
+TOPL,1,1,1,1
+*
+* ---------------------------------------------------------------------- frequencies
+* dt 0.005 s, NFFT 4096: df = 0.0488 Hz; 16 frequencies 0.2 .. 20 Hz.
+* Dimensionless frequency a0 = w B / Vs = 0.188 f  (a0 = 1 at 5.3 Hz).
+FREQ,1,4,20,41,61,82,102,123,143,164,184
+FREQ,1,205,246,287,328,369,410
+* Forced vibration needs only the eigen-solutions of SITE Mode 1 (FILE2, read by POINT);
+* there is no free field (Mode 2 off) and no WAVE.
+SITE,0,1,0,20,2,0,0,1,2048,1,0,0.005,4096,1
+*
+* ---------------------------------------------------------------------- foundation
+* 7 x 7 interaction nodes, 2 m spacing, numbered row by row; node 25 is the centre
+N,1,-6,-6,0
+N,7,6,-6,0
+FILL,1,7
+NGEN,6,7,1,7,1,0,2,0
+INT,1,49,1,1
+* K node of the rigid links (above the centre, off the axis of every horizontal link)
+N,50,0,0,5
+* Rigid links: E = 1E5 x G of the soil, massless, square section 2 m x 2 m
+M,1,8.0E9,0.25,0.0,0.0,0.0,1
+R,1,4.0,3.333,3.333,2.25,1.333,1.333
+GROUP,1,BEAMS
+GTIT,1,rigid links
+MACT,1
+RACT,1
+* one link from the centre to each of the other 48 mat nodes: a FOREACH over a node list
+VAR,RIM,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49
+FOREACH,RIM,E,#,25,@RIM[#],50
+* (each rim node is the end of one link, whose bending and torsion stiffen all six of its DOFs:
+* no rotation needs to be fixed)
+*
+* ---------------------------------------------------------------------- module options
+POINT,0,0,1.8
+HOUSE,9.81,0,0,2,0,0,0,0,0
+FORCE,0
+*
+* ---------------------------------------------------------------------- 1. site, point loads, house
+AOPT,0,0,0,1,1,1,0,0,0,0,0,0,0,0
+CHECK
+AFWRITE
+RUNSITE
+RUNPOINT
+RUNHOUSE
+*
+* ---------------------------------------------------------------------- 2. six unit load cases
+* F,<node>,<fx>,<fy>,<fz>,<tx>,<ty>,<tz>  (factors and arrival times); MM likewise for moments.
+* Each case: define the load, write the FORCE deck, run FORCE, keep FILE9 as FILE900k.
+AOPT,0,0,0,0,0,0,0,1,0,0,0,0,0,0
+F,25,1,0,0
+AFWRITE
+RUNFORCE
+FCOPY,FILE9,FILE9001
+FDEL,25
+F,25,0,1,0
+AFWRITE
+RUNFORCE
+FCOPY,FILE9,FILE9002
+FDEL,25
+F,25,0,0,1
+AFWRITE
+RUNFORCE
+FCOPY,FILE9,FILE9003
+FDEL,25
+MM,25,1,0,0
+AFWRITE
+RUNFORCE
+FCOPY,FILE9,FILE9004
+MMDEL,25
+MM,25,0,1,0
+AFWRITE
+RUNFORCE
+FCOPY,FILE9,FILE9005
+MMDEL,25
+MM,25,0,0,1
+AFWRITE
+RUNFORCE
+FCOPY,FILE9,FILE9006
+*
+* ---------------------------------------------------------------------- 3. ANALYS: 6 cases + K_G
+* ANALYS,<opmode>,<type>,<mode>,<save>,<prnt>,<fopt>,<ang>,<xc>,<yc>,<zc>,<impe>,<simul>
+*   type 1 = foundation vibration; prnt 0 = real and imaginary parts in the listing;
+*   impe 2 = full 6 x 6 global impedance about (xc, yc, zc) = the mat centre; simul 6 load cases
+ANALYS,0,1,0,0,0,0,0,0,0,0,2,6
+AOPT,0,0,0,1,0,1,0,0,1,0,0,0,0,0
+AFWRITE
+RUNANALYS
+*
+* ---------------------------------------------------------------------- 4. MOTION: Ricker pulse
+* Displacement of the mat centre under a vertical 1000 kN Ricker pulse (5 Hz): the vertical
+* load case FILE8003 (EDUOPT,TFFILE) times the load history (THFILE, factor 1000).
+EDUOPT,TFFILE,FILE8003
+* MOTIONX,<f1213>,<resp>: response type 0 = displacement
+MOTIONX,0,0
+MOTION,0,0,0,5,0,0.1,100,301,1000,0,1,0,0,0,0,1,0,0,1
+THFILE,../data/ricker_5hz.th
+THTIT,Ricker wavelet 5 Hz, peak 1 at t = 0.5 s
+NOUT,3,1,1,0,0,0,1,25
+AOPT,0,0,0,1,0,0,0,0,0,0,1,0,0,0
+AFWRITE
+RUNMOTION
+WRITE

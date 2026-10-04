@@ -1,0 +1,277 @@
+* ======================================================================================
+* SASSI-EDU tutorial example 6: non-linear soil SSI -- a loose backfill block behind an
+* embedded wall under strong shaking (equivalent-linear SSI iterations)
+* ======================================================================================
+* What you learn
+*   - the two kinds of soil nonlinearity of an SSI analysis (manual 1.5.4 and 4.1.2 item 18):
+*       PRIMARY  (free field): SOIL iterates the layer properties of the site (SHAKE); the SSI
+*                model then uses these strain-compatible layers and the SOIL surface motion;
+*       SECONDARY (near field): the soil next to the structure strains more (or less) than the
+*                free field -- here a block of loose backfill behind a wall.  It is modelled
+*                with SOLID elements of the STRUCTURE model (ETYPE 1, a low-strain soil material)
+*                at the nodes of the excavated soil, and their shear modulus and damping are
+*                iterated element by element ("non-linear soil group", the .pin input of HOUSE);
+*   - the .pin input with the commands PIN / PINGRP (AFWRITE writes ex06.pin): effective strain
+*     factor ESF, strain measure ISTR, initial factors GFAC / DFAC and the soil curve ICURVE
+*     (given here by its DYNP label Sand);
+*   - the iteration loop of the manual (requirements 2.4, D-NLS-01):
+*       HOUSE   iteration 0: G = GFAC G_layer, beta = DFAC beta_layer -- the factors scale the FREE
+*               FIELD at the element (the TOPL layer at its mid-depth; GFAC = 1 "same as in free-field");
+*               later: G = G_max (G/G_max)(gamma_eff), beta = D(gamma_eff) from FILE74 + FILE73, with
+*               G_max = the low-strain modulus of the backfill material (M table);
+*               writes FILE78 (the properties used) and ex06.liq = 1;
+*       ANALYS  "New Structure" restart (<mode> 1): the soil impedance of the initiation run
+*               (COOXqqq) is reused -- only the structure (the backfill) has changed;
+*       STRESS  <iter> = 1, for the X, Y and Z input: effective strains of the backfill -> FILE74;
+*       COMBXYZSTRAIN  SRSS of the X, Y and Z effective strains -> FILE74;
+*     driven by NLSSIITER, which stops when max |dG/G| < 2 % and max |d beta| < 0.5 % (D-NLS-02).
+*
+* The model: a reinforced-concrete wall (SHELL, 0.6 m, 4 m long, 2 m high, its top at the ground
+* surface) carrying 150 t of a bridge deck at its top edge (an abutment), in a 10 m deposit of
+* medium-dense sand on rock.  Behind the wall (x = 0 .. 4 m) the soil is a block of LOOSE BACKFILL
+* (Vs 160 m/s at low strain), 4 m x 4 m x 2 m.  The rock outcrop motion is the RG 1.60 record of the
+* examples scaled to 0.30 g; SOIL amplifies it to 0.58 g at the surface.
+*
+*        y = +2   +-------+-------+        plan of the backfill, z = 0 .. -2 m (2 levels of 1 m)
+*            wall |       |       |        x = 0      the wall (SHELL), the face of the excavation
+*            x = 0|  backfill     |        x = 0 .. 4 excavated native soil (ETYPE 2) + the backfill
+*        y = -2   +-------+-------+                   SOLIDs at the same nodes (ETYPE 1, non-linear)
+*               x = 0   x = 2   x = 4
+*
+* Flexible volume method: every node of the excavated volume is an interaction node.  The excavated
+* soil carries the free-field (strain-compatible native) properties; the backfill SOLIDs are part of
+* the structure and replace it.  With a backfill material equal to the native soil and its
+* free-field state (GFAC = DFAC = 1) there would be no secondary nonlinearity at all (verification
+* problem VP-N1).  Here the backfill is looser than the native soil, so it strains more.
+*
+* How to run (the working directory must be the examples directory, see examples/README.md):
+*     cd examples
+*     ../.venv/bin/sassi run ex06_nonlinear_soil.pre
+*   or from the repository root:  .venv/bin/sassi --cwd examples run ex06_nonlinear_soil.pre
+* Results: examples/ex06/.  Look at ex06_HOUSE.out (tables "Non-linear soil SSI", "Non-linear soil
+* elements" and "Non-linear soil convergence"), ex06_STRESS.out (effective strains of the last
+* direction), FILE78, FILE74X/Y/Z, FILE74, NLSOIL_CONVERGENCE.TXT and the spectrum at the wall top
+* 00022TR_X01.RS (converged backfill).  Run time: a few seconds.
+* Expected results (tests/unit/test_nlsoil_example.py):
+*   - SOIL: rock outcrop 0.30 g -> 0.58 g at the surface; native Vs 245 -> 148 m/s, damping
+*     1.4 -> 10.3 % from the top to the bottom of the sand;
+*   - the iterations converge in 6 passes: max |dG/G| = 66, 22, 14, 9.4, 4.0, 2.9, 1.5 % (iterations
+*     0..6); the converged backfill has G/G_max = 0.52-0.57 and 6.4-7.2 % damping (effective
+*     octahedral strain 0.041-0.053 %).  The elements next to the wall (x = 0..2 m, odd numbers)
+*     strain more and soften more than those at the back (x = 2..4 m);
+*   - X input: the wall top (node 22, carrying the deck) reaches 0.75 g (zero-period acceleration
+*     of the 5 % spectrum), the back of the backfill (node 24) 0.58 g, the free-field value.
+* Units: m, kN, t, s.  Gravity 9.81 m/s2.
+* ======================================================================================
+MDL,ex06,ex06
+TIT,Ex06 - loose backfill behind an embedded wall (equivalent-linear SSI iterations)
+*
+* ======================================================================================
+* 1. Free field: SOIL (primary nonlinearity)
+* ======================================================================================
+* Low-strain native soil: 10 m of medium-dense sand (Vs 250 m/s) on rock (Vs 800 m/s)
+* L,<nm>,<thick>,<weight>,<Vp>,<Vs>,<pdamp>,<sdamp>
+L,1,1.0,19.0,500,250,0.02,0.02
+L,2,1.0,19.0,500,250,0.02,0.02
+L,3,2.0,19.0,500,250,0.02,0.02
+L,7,1.0,21.0,1600,800,0.01,0.01
+* dt 0.005 s, NFFT 8192 (df = 0.0244 Hz); SITE half-space = L 7, control point at the surface
+SITE,0,1,0,20,7,1,0,1,4096,1,0,0.005,8192,1
+WAVE,2,1,1,1,0
+HOUSE,9.81,0,0,2,0,0,0,0,0
+* curves of SHAKE91 (DYNP labels Clay, Sand, Rock) and the SOIL column: sublayers of 1, 1, 2, 2,
+* 2, 2 m of sand and the rock half-space (the last SPRO)
+INP,../sassi/data/dynp_library.pre
+SPRO,1,1,Sand
+SPRO,2,2,Sand
+VAR,SANDL,3,4,5,6
+FOREACH,SANDL,SPRO,@SANDL[#],3,Sand
+SPRO,7,7
+* SOIL,<nrval>,<grav>,<header>,<outcrop>,<save>,<iter>,<ratio>,<gravmult>,<cof>
+*   4000 values after the dt line, rock OUTCROP input, FILE88, 8 iterations, effective strain
+*   ratio 0.65 (the SSI iterations below use the same factor: ESF = 0.65)
+SOIL,4000,9.81,1,1,1,8,0.65,1,0
+* SOILX,<indir>,<mult>,<max>,<cl>,<file>: rock outcrop scaled to 0.30 g at the top of sublayer 7
+SOILX,0,0,0.3,7,../data/rg160h_030g.acc
+* the SSI analysis stops at 15 Hz: SOIL uses the same frequency content
+EDUOPT,SOILCUTOFF,15
+* the surface (within) motion ACC001.TH is the SSI control motion
+SACC,1,2,0
+AOPT,0,1,0,0,0,0,0,0,0,0,0,0,0,0
+CHECK
+AFWRITE
+RUNSOIL
+*
+* ======================================================================================
+* 2. The SSI model
+* ======================================================================================
+* ---- strain-compatible site: FILE88 of the SOIL run above, rounded.  Each embedment layer has
+* its own L number (L 11, L 12); the excavated soil of a layer uses it (MSET).  If you change the
+* motion, copy the new FILE88 values here (SITEX,1 would make SITE read FILE88, but the excavated
+* soil must have the same properties as the free field, and it is taken from the L table).
+L,11,1.0,19.0,489,245,0.014,0.014
+L,12,1.0,19.0,459,230,0.029,0.029
+L,13,2.0,19.0,410,205,0.048,0.048
+L,14,2.0,19.0,361,181,0.072,0.072
+L,15,2.0,19.0,324,162,0.089,0.089
+L,16,2.0,19.0,297,148,0.103,0.103
+TOPL,11,12,13,14,15,16
+* SSI frequencies: 24 numbers from 0.1 to 15 Hz (df = 0.0244 Hz)
+FREQ,1,4,20,41,61,82,102,123,143,164,184
+FREQ,1,205,225,246,266,287,307,328,369,410,451
+FREQ,1,492,533,573,614
+* ---- nodes: x = 0, 2, 4 (i = 0..2), y = -2, 0, 2 (j = 0..2), z = -2, -1, 0 (k = 0..2), numbered
+*      bottom-up (EDU-21): node(i, j, k) = 9 k + 3 j + i + 1
+N,1,0,-2,-2
+N,3,4,-2,-2
+FILL,1,3
+NGEN,2,3,1,3,1,0,2,0
+NGEN,2,9,1,9,1,0,0,1
+* ---- excavated soil: one group per embedment layer, numbered from the surface down (rules R5/R6),
+*      MSET = the L number of the layer.  2 x 2 SOLID elements per layer.
+*      SOLID node order: bottom face I J K L (counter-clockwise seen from above), then the top face.
+GROUP,1,SOLID
+GTIT,1,excavated soil 0 to -1 m
+MACT,11
+E,1,10,11,14,13,19,20,23,22
+EGEN,1,1,1
+EGEN,1,3,1,2
+ETYPE,1,4,1,2
+GROUP,2,SOLID
+GTIT,2,excavated soil -1 to -2 m
+MACT,12
+E,1,1,2,5,4,10,11,14,13
+EGEN,1,1,1
+EGEN,1,3,1,2
+ETYPE,1,4,1,2
+* ---- the backfill: loose sand, Vs 160 m/s at low strain (G_max = 48.3 MPa), nu 1/3, 2 % damping,
+*      as STRUCTURE elements (ETYPE 1) at the nodes of the excavated soil: group 3 is the
+*      NON-LINEAR SOIL GROUP.  Its material holds the LOW-STRAIN properties: G_max of the curves
+*      (never strain-compatible values: the curve would soften them a second time).
+*      M,<nm>,<Vp>,<Vs>,<weight>,<pdamp>,<sdamp>,<type 3>
+M,2,320,160,18.5,0.02,0.02,3
+GROUP,3,SOLID
+GTIT,3,backfill (non-linear soil)
+MACT,2
+E,1,1,2,5,4,10,11,14,13
+EGEN,1,1,1
+EGEN,1,3,1,2
+EGEN,1,9,1,4
+ETYPE,1,8,1,1
+* ---- the wall: SHELL elements in the plane x = 0 (the face of the excavation), 0.6 m concrete
+M,1,3.0E7,0.2,24.0,0.05,0.05,1
+GROUP,4,SHELL
+GTIT,4,wall
+MACT,1
+E,1,1,4,13,10
+EGEN,1,3,1
+EGEN,1,9,1,2
+THICK,1,4,1,0.6
+* the wall nodes (x = 0, every third node) are connected to solids only besides the wall: fix the
+* drilling rotation about the wall normal (ROTX) at all of them (FIXROT cannot be used here)
+D,1,25,3,1,ROTX
+* the bridge deck: 150 t on the three top nodes of the wall (MT in weight units: 490 kN each)
+MT,19,490,490,490
+MT,22,490,490,490
+MT,25,490,490,490
+* ---- interaction nodes: FV, every node of the excavated volume
+INT,1,27,1,1
+*
+* ======================================================================================
+* 3. Non-linear soil input (.pin): group 3, effective strain 0.65 x max, octahedral strain
+* ======================================================================================
+* PIN,<esf>,<ncurv>: ESF and the number of curves of FILE73 (blank = number of DYNP labels)
+PIN,0.65
+* PINGRP,<igrp>,<istr>,<gfac>,<dfac>,<icurve>: group 3, ISTR 1 = octahedral shear strain, curve =
+* the DYNP label Sand.  GFAC and DFAC scale the free field at each element (requirements 4.4 item 7):
+* the strain-compatible native soil has G = 116 MPa (0-1 m) and 102 MPa (1-2 m), the loose backfill
+* G_max = 48 MPa, so GFAC = 0.4 starts the backfill near its own low-strain modulus (G/G_max = 0.96
+* and 0.85) and DFAC = 1 with the free-field damping (1.4 and 2.9 %).  GFAC = 1 would start it at the
+* native free field, stiffer than its G_max (HOUSE warns): only the start changes, the iterations
+* converge to the same strain-compatible backfill.  A group with several materials gets one
+* PINMAT,<igrp>,<mat>,<gfac>,<dfac>,<icurve> line per material.
+PINGRP,3,1,0.4,1.0,Sand
+* HOUSEX,<optimize>,<supmode>,<nsim>,<nlssi>: Non-Linear SSI on
+HOUSEX,0,0,1,1
+PINLIST
+*
+* ======================================================================================
+* 4. Initiation: SITE (X, Y, Z), POINT, HOUSE (iteration 0), ANALYS (<mode> 0, <save> 1)
+* ======================================================================================
+* POINT: 2 embedded layers (loads at interfaces 1..3), central zone R0 = 0.9 x 2 m
+POINT,0,2,1.8
+* the control motion: ACC001.TH holds NFFT = 8192 values (41 s); records 1-5000 (the 20 s motion and
+* 5 s of free vibration) leave a 16 s quiet zone.  MOTION <rec2> is shared with STRESS.
+THFILE,ACC001.TH
+THTIT,SOIL surface motion (rock outcrop 0.30 g)
+MOTION,0,0,0,20,0,0.1,100,301,1,0,1,5000,0,0,0,1,0,0,1
+* STRESS,<opmode>,<iter>,<save>,<itran>,<interopt>: Auto Computation of Strains in Soil El. on
+STRESS,0,1,0,0,1
+* SITE three times (as example 5): SV x' -> FILE1X, SH y' -> FILE1Y, P z' -> FILE1Z
+AOPT,0,0,0,1,0,0,0,0,0,0,0,0,0,0
+CHECK
+AFWRITE
+RUNSITE
+FCOPY,FILE1,FILE1X
+SITE,0,0,0,20,7,1,1,1,4096,1,1,0.005,8192,1
+WAVE,2,0
+WAVE,4,1,1,1,0
+AFWRITE
+RUNSITE
+FCOPY,FILE1,FILE1Y
+SITE,0,0,0,20,7,1,0,1,4096,1,2,0.005,8192,1
+WAVE,4,0
+WAVE,3,1,1,1,0
+AFWRITE
+RUNSITE
+FCOPY,FILE1,FILE1Z
+* ANALYS,<opmode>,<type>,<mode>,<save>,<prnt>,<fopt>,<ang>,<xc>,<yc>,<zc>,<impe>,<simul>:
+*   initiation with Save Restart Files (COOXqqq for the New Structure restarts), X/Y/Z cases
+ANALYS,0,0,0,1,1,0,0,0,0,0,0,1
+* a new non-linear analysis: ex06.liq = 0, the next HOUSE run takes the .pin initial properties
+NLSSIRESET
+AOPT,0,0,0,1,1,1,0,0,1,0,0,1,0,0
+CHECK
+AFWRITE
+RUNPOINT
+RUNHOUSE
+RUNANALYS
+* ---- STRESS per input direction (FILE8X, Y, Z) and the SRSS of the effective strains.  The
+*      commands are kept in variables (quoted items contain commas): FOREACH runs them now,
+*      NLSSIITER in every iteration.  The vertical motion is 2/3 of the horizontal one (MOTION
+*      <mult>, shared with STRESS), each direction keeps its strains as FILE74X/Y/Z.
+VAR,NLX,"EDUOPT,TFFILE,FILE8X","MOTION,0,0,0,20,0,0.1,100,301,1,0,1,5000,0,0,0,1,0,0,1",AFWRITE,RUNSTRESS,"FCOPY,FILE74,FILE74X"
+VAR,NLY,"EDUOPT,TFFILE,FILE8Y",AFWRITE,RUNSTRESS,"FCOPY,FILE74,FILE74Y"
+VAR,NLZ,"EDUOPT,TFFILE,FILE8Z","MOTION,0,0,0,20,0,0.1,100,301,0.6667,0,1,5000,0,0,0,1,0,0,1",AFWRITE,RUNSTRESS,"FCOPY,FILE74,FILE74Z"
+VAR,NLCOMB,"COMBXYZSTRAIN,FILE74X,FILE74Y,FILE74Z,FILE74"
+* only the STRESS deck changes between the directions
+AOPT,0,0,0,0,0,0,0,0,0,0,0,1,0,0
+FOREACH,NLX,@NLX[#]
+FOREACH,NLY,@NLY[#]
+FOREACH,NLZ,@NLZ[#]
+FOREACH,NLCOMB,@NLCOMB[#]
+*
+* ======================================================================================
+* 5. Iterations: HOUSE (FILE74 -> new backfill properties) -> ANALYS New Structure -> STRESS x 3
+*    -> COMBXYZSTRAIN, until max |dG/G| < 2 % and max |d beta| < 0.5 % (at most 8 passes)
+* ======================================================================================
+* ANALYS <mode> 1 = New Structure (manual Mode 2): X_ff from COOXqqq, no new restart files
+ANALYS,0,0,1,0,1,0,0,0,0,0,0,1
+* HOUSE, ANALYS and STRESS decks are written by every AFWRITE of the loop (they stay up to date)
+AOPT,0,0,0,0,0,1,0,0,1,0,0,1,0,0
+AFWRITE
+VAR,NLRUN,RUNHOUSE,RUNANALYS
+NLSSIITER,NLRUN+NLX+NLY+NLZ+NLCOMB,8
+*
+* ======================================================================================
+* 6. Results with the converged backfill: X response of the wall top (node 22) and of the back of
+*    the backfill (node 24): transfer functions and 5 % spectra
+* ======================================================================================
+DAMP,0.05
+EDUOPT,TFFILE,FILE8X
+MOTION,0,0,0,20,0,0.1,100,301,1,0,1,5000,0,0,0,1,0,0,1
+NOUT,1,1,1,0,0,1,1,22,24
+AOPT,0,0,0,0,0,0,0,0,0,0,1,0,0,0
+AFWRITE
+RUNMOTION
+WRITE

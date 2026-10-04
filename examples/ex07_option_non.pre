@@ -1,0 +1,292 @@
+* ======================================================================================
+* SASSI-EDU tutorial example 7: Option NON -- a low-rise reinforced-concrete shear-wall building on a
+* surface mat under strong shaking (nonlinear wall panels, equivalent-linear SSI iterations)
+* ======================================================================================
+* What you learn
+*   - the nonlinear STRUCTURE workflow of ACS SASSI Option NON (manual 1.5.4, Fig. 1.2; requirements 4.15):
+*       elastic SSI   SITE (X, Y, Z), POINT, HOUSE, ANALYS (Save Restart Files), MOTION + RELDISP for each
+*                     input direction, COMB_XYZ_THD, NONLINEAR (no PANEL.NON: elastic run)
+*       iteration     <model>_new.hou -> <model>.hou, HOUSE, ANALYS "New Structure" restart (<mode> 1: the
+*                     soil impedance of the elastic run is reused), MOTION + RELDISP (X, Y, Z),
+*                     COMB_XYZ_THD, NONLINEAR (PANEL.NON = 1) ... until the panel moduli and dampings change
+*                     by less than 2 % and 0.5 % (D-NON-06);
+*   - wall PANELS: each storey of each wall is a SHELL group with its own material (D-NON-12); P defines
+*     the panel (Disp. Opt 1 = shear strain from the four corner nodes, Force Opt 1 = Cheng-Mertz Shear
+*     hysteresis); SHEAR compares the shear capacities of ACI 318-08, Wood, Barda and Gulec-Whittaker;
+*     BBCGEN builds the 22-point backbone curve of every panel from the ACI 318-08 capacity V_u
+*     (cracking at 0.3 V_u, yield at 0.4 % strain with V_u, failure at 2 %);
+*   - NONLINMOTDISP adds the panel corners to the MOTION and RELDISP requests (before AFWRITE);
+*   - EQL: equivalent-linear displacement factor 0.8, damping = elastic 4 % + hysteretic (no cut-off);
+*   - the iteration driver NONLINITER (or the generic script that NONLINBAT,1 writes: ex07_NONLINBAT.pre).
+*
+* The model: a 12 m x 12 m two-storey box (storeys of 4 m) of 0.3 m concrete walls on a 1.5 m stiff mat at
+* the ground surface; 0.4 m floor and roof slabs carrying 400 t of equipment each.  8 panels: the four
+* walls of each storey (h/l = 1/3, low-rise, shear governed).  Site: 10 m of stiff soil (Vs 400 m/s) on
+* rock.  Input: the RG 1.60 record of the examples scaled to 0.6 g horizontally (X and Y) and 0.4 g
+* vertically (Z), as Demo 9 of the manual (0.60 g).
+*
+*        z = 8  +----+----+----+----+   roof slab      walls (SHELL, 0.3 m) on the four sides,
+*               |                   |                  meshed 3 m x 2 m; panel = one wall x one storey
+*        z = 4  +----+----+----+----+   floor slab
+*               |                   |
+*        z = 0  +====+====+====+====+   mat (interaction nodes 1-25, 3 m grid, x, y = -6 .. 6)
+*
+* Node numbers: node(i, j, k) = 25 k + 5 j + i + 1 at x = 3 i - 6, y = 3 j - 6, z = 2 k (i, j, k = 0..4);
+* the interior nodes of the mid-storey levels k = 1, 3 are deleted.
+*
+* How to run (the working directory must be the examples directory, see examples/README.md):
+*     cd examples
+*     ../.venv/bin/sassi run ex07_option_non.pre
+*   or from the repository root:  .venv/bin/sassi --cwd examples run ex07_option_non.pre
+* Run time about 30-120 s (9 module runs per pass); about 95 MB in examples/ex07 (35 MB of text results,
+* the rest binary inter-module files such as the ANALYS restart files COOTKnnn).
+* Results: examples/ex07/.  Look at ex07_NONLINEAR.out (panels, backbone curves, equivalent-linear
+* properties, ductility, convergence), NONLINEAR_CONVERGENCE.TXT, Panel_EQL_Matl_Prop.txt (the converged
+* E and damping of every panel), Panel.fmu (ductility mu and F_mu), Panel000k.thd / .ths (strain and force
+* histories: plot one against the other for the hysteresis loops), Panel000k.crv (E/E_el and damping
+* versus strain), and the floor spectra 00063TR_X01.RS (floor centre) of the converged model.
+* Expected: convergence after 7 iterations (max |dE/E| 28.0, 22.9, 17.1, 11.5, 6.6, 4.2, 2.4, 1.3 %);
+* the four storey-1 walls crack: E/E_el = 0.35, damping 16.7 % (4 % + 12.7 % hysteretic), max shear strain
+* 3.7e-4 (mu = 4.4 times the cracking strain, F_mu = 3.3); the storey-2 walls stay elastic (mu = 0.84).
+* Try: EQL,0.8,1,7,0,1 (damping cut-off 7 %, the ASCE 4 level for cracked concrete) or BBCGEN with
+* <ShearModel> 4 (Gulec-Whittaker) and see how the convergence changes (OPTION_NON.md sections 8, 11).
+* Units: m, kN, t, s.  Gravity 9.81 m/s2.
+* ======================================================================================
+MDL,ex07,ex07
+TIT,Ex07 - Option NON: two-storey RC shear-wall building, nonlinear wall panels
+*
+* ---------------------------------------------------------------------- site
+L,1,0.4,19.6,800,400,0.05,0.05
+L,2,1.0,22.0,2400,1200,0.02,0.02
+* 10 m of soil in 25 sublayers of 0.4 m (the manual recommends more than 20 layers), on rock (L 2)
+TOPL,1,1,1,1,1,1,1,1,1,1
+TOPL,1,1,1,1,1,1,1,1,1,1
+TOPL,1,1,1,1,1
+* dt 0.005 s, NFFT 8192 (df = 0.0244 Hz); 28 SSI frequencies 0.1 .. 20 Hz, dense where the building
+* frequencies fall as the walls crack (manual 1.5.4: nonlinear SSI needs more frequencies)
+FREQ,1,4,20,41,61,82,102,123,143,164,184
+FREQ,1,205,225,246,266,287,307,328,348,369,389
+FREQ,1,410,451,492,532,573,655,737,819
+*
+* ---------------------------------------------------------------------- nodes
+N,1,-6,-6,0
+N,5,6,-6,0
+FILL,1,5
+NGEN,4,5,1,5,1,0,3,0
+NGEN,4,25,1,25,1,0,0,2
+* interior nodes of the mid-storey levels (z = 2 and z = 6) are not used
+NDEL,32,34
+NDEL,37,39
+NDEL,42,44
+NDEL,82,84
+NDEL,87,89
+NDEL,92,94
+*
+* ---------------------------------------------------------------------- materials
+* mat 1: the foundation mat, ten times stiffer than concrete; 2: slab concrete; 11..18: one material per
+* wall panel (D-NON-12: NONLINEAR changes E of each panel separately).  Concrete E = 30 GPa, nu = 0.2,
+* 24 kN/m3, 4 % damping (ASCE 4-17 response level 1, uncracked)
+M,1,3.0E8,0.2,24.0,0.04,0.04,1
+M,2,3.0E7,0.2,24.0,0.04,0.04,1
+M,11,3.0E7,0.2,24.0,0.04,0.04,1
+M,12,3.0E7,0.2,24.0,0.04,0.04,1
+M,13,3.0E7,0.2,24.0,0.04,0.04,1
+M,14,3.0E7,0.2,24.0,0.04,0.04,1
+M,15,3.0E7,0.2,24.0,0.04,0.04,1
+M,16,3.0E7,0.2,24.0,0.04,0.04,1
+M,17,3.0E7,0.2,24.0,0.04,0.04,1
+M,18,3.0E7,0.2,24.0,0.04,0.04,1
+*
+* ---------------------------------------------------------------------- elements
+* group 1: the mat (4 x 4 shells on the interaction nodes)
+GROUP,1,SHELL
+GTIT,1,foundation mat
+MACT,1
+E,1,1,2,7,6
+EGEN,3,1,1
+EGEN,3,5,1,4
+THICK,1,16,1,1.5
+* groups 2-5: storey-1 walls South (y = -6), East (x = 6), North (y = 6), West (x = -6); 4 x 2 shells each
+GROUP,2,SHELL
+GTIT,2,panel 1: storey 1 south wall
+MACT,11
+E,1,1,2,27,26
+EGEN,3,1,1
+EGEN,1,25,1,4
+GROUP,3,SHELL
+GTIT,3,panel 2: storey 1 east wall
+MACT,12
+E,1,5,10,35,30
+EGEN,3,5,1
+EGEN,1,25,1,4
+GROUP,4,SHELL
+GTIT,4,panel 3: storey 1 north wall
+MACT,13
+E,1,21,22,47,46
+EGEN,3,1,1
+EGEN,1,25,1,4
+GROUP,5,SHELL
+GTIT,5,panel 4: storey 1 west wall
+MACT,14
+E,1,1,6,31,26
+EGEN,3,5,1
+EGEN,1,25,1,4
+* groups 6-9: the same walls in storey 2 (node numbers + 50)
+GROUP,6,SHELL
+GTIT,6,panel 5: storey 2 south wall
+MACT,15
+E,1,51,52,77,76
+EGEN,3,1,1
+EGEN,1,25,1,4
+GROUP,7,SHELL
+GTIT,7,panel 6: storey 2 east wall
+MACT,16
+E,1,55,60,85,80
+EGEN,3,5,1
+EGEN,1,25,1,4
+GROUP,8,SHELL
+GTIT,8,panel 7: storey 2 north wall
+MACT,17
+E,1,71,72,97,96
+EGEN,3,1,1
+EGEN,1,25,1,4
+GROUP,9,SHELL
+GTIT,9,panel 8: storey 2 west wall
+MACT,18
+E,1,51,56,81,76
+EGEN,3,5,1
+EGEN,1,25,1,4
+THICK,1,8,1,0.3
+* the wall thickness of groups 2-8 (THICK acts on the active group)
+GROUP,2
+THICK,1,8,1,0.3
+GROUP,3
+THICK,1,8,1,0.3
+GROUP,4
+THICK,1,8,1,0.3
+GROUP,5
+THICK,1,8,1,0.3
+GROUP,6
+THICK,1,8,1,0.3
+GROUP,7
+THICK,1,8,1,0.3
+GROUP,8
+THICK,1,8,1,0.3
+* group 10: floor (z = 4) and roof (z = 8) slabs, 0.4 m
+GROUP,10,SHELL
+GTIT,10,floor and roof slabs
+MACT,2
+E,1,51,52,57,56
+EGEN,3,1,1
+EGEN,3,5,1,4
+EGEN,1,50,1,16
+THICK,1,32,1,0.4
+* shell drilling rotations: fixed where the shells are coplanar and parallel to a global plane
+FIXROT
+* equipment: 400 t on each slab (16 t = 157 kN at each of its 25 nodes; MT in weight units)
+MT,51,157,157,157
+MTGEN,24,1,51
+MTGEN,1,50,51,75
+INT,1,25,1,1
+POINT,0,0,2.7
+HOUSE,9.81,0,0,2,0,0,0,0,0
+*
+* ======================================================================================
+* 1. Option NON data: panels, capacities, backbone curves, EQL
+* ======================================================================================
+* P,<num>,<group>,<bbc>,<disp>,<force> for panels 1-8 = groups 2-9, BBC = panel number, shear strain, CMS:
+* PNLGEN does it in one command: one panel per vertical shell group, in group order
+PNLGEN
+PLIST
+* SHEAR,<panel>,<fc>,<fy>,<rho>,<Nu>: capacities with f'c = 30 MPa, fy = 420 MPa, 0.5 % web
+* reinforcement, no axial force (kN/m2, kN: SI units from the gravity 9.81)
+SHEAR,0,30000,420000,0.005,0
+* BBCGEN,<Panel>,<ShearModel>,<fc>,<fy>,<Pn>,<Nu>,<bre>,<bys>,<CrackingForceLevel>: ACI 318-08 (1)
+* ultimate shear, cracking at 0.3 V_u (CrackingForceLevel 0.3), for all panels (0)
+BBCGEN,0,1,30000,420000,0.005,0,0,0,0.3
+* EQL,<disp>,<NonLinOpts>,<dampCutoff %>,<dampScale>,<ElasicD>: EDF 0.8, panels, no damping cut-off,
+* scale 1, elastic damping added (xi = 4 % + hysteretic)
+EQL,0.8,1,0,0,1
+* the corner nodes of the panels in the MOTION (NOUT) and RELDISP (RDND) requests
+NONLINMOTDISP
+*
+* ======================================================================================
+* 2. Elastic SSI: three SITE runs (as example 5), POINT, HOUSE, ANALYS with restart files
+* ======================================================================================
+AOPT,0,0,0,1,0,0,0,0,0,0,0,0,0,0
+SITE,0,1,0,20,2,1,0,1,4096,1,0,0.005,8192,1
+WAVE,2,1,1,1,0
+CHECK
+AFWRITE
+RUNSITE
+FCOPY,FILE1,FILE1X
+SITE,0,0,0,20,2,1,1,1,4096,1,1,0.005,8192,1
+WAVE,2,0
+WAVE,4,1,1,1,0
+AFWRITE
+RUNSITE
+FCOPY,FILE1,FILE1Y
+SITE,0,0,0,20,2,1,0,1,4096,1,2,0.005,8192,1
+WAVE,4,0
+WAVE,3,1,1,1,0
+AFWRITE
+RUNSITE
+FCOPY,FILE1,FILE1Z
+* ANALYS,<opmode>,<type>,<mode>,<save>,<prnt>,<fopt>,<ang>,<xc>,<yc>,<zc>,<impe>,<simul>: Save Restart
+* Files (<save> 1) for the New Structure restarts; X, Y, Z cases (<simul> 1)
+ANALYS,0,0,0,1,1,0,0,0,0,0,0,1
+AOPT,0,0,0,0,1,1,0,0,1,0,0,0,0,0
+AFWRITE
+RUNPOINT
+RUNHOUSE
+RUNANALYS
+*
+* ======================================================================================
+* 3. MOTION + RELDISP per direction, COMB_XYZ_THD, NONLINEAR (elastic run)
+* ======================================================================================
+THFILE,../data/rg160h_030g.acc
+THTIT,RG 1.60 spectrum-compatible motion
+DAMP,0.05
+RELD,1,0,0
+* NONLINBAT,1 writes the generic batch script ex07_NONLINBAT.pre and COMB_XYZ_THD.inp (one line per
+* corner THD file: <file> X_<file> Y_<file> Z_<file>)
+NONLINBAT,1
+* a new nonlinear analysis: no PANEL.NON, no Panel_EQL_Matl_Prop.txt
+NONLINRESET
+AOPT,0,0,0,0,0,0,0,0,0,0,1,0,1,0
+* MOTION,<opmode>,<out>,<step>,<dur>,<res>,<freq1>,<freq2>,<fstep>,<mult>,<max>,<rec1>,<rec2>,<fopt>,<bl>,
+*        <smo>,<cplx>,<cnvrt>,<pzadj>,<interp>: 20 s, PGA 0.6 g horizontally, 0.4 g vertically, complex TF
+*        saved (RELDISP needs it); NONLINTHD keeps the corner THD files of each direction as X_*, Y_*, Z_*
+VAR,NLDX,"AOPT,0,0,0,0,0,0,0,0,0,0,1,0,1,0","EDUOPT,TFFILE,FILE8X","MOTION,0,0,0,20,0,0.1,100,301,0,0.6,1,0,0,0,0,1,0,0,1",AFWRITE,RUNMOTION,RUNRELDISP,"NONLINTHD,X"
+VAR,NLDY,"EDUOPT,TFFILE,FILE8Y",AFWRITE,RUNMOTION,RUNRELDISP,"NONLINTHD,Y"
+VAR,NLDZ,"EDUOPT,TFFILE,FILE8Z","MOTION,0,0,0,20,0,0.1,100,301,0,0.4,1,0,0,0,0,1,0,0,1",AFWRITE,RUNMOTION,RUNRELDISP,"NONLINTHD,Z"
+VAR,NLNON,"COMBXYZTHD,COMB_XYZ_THD.inp",RUNNONLINEAR
+FOREACH,NLDX,@NLDX[#]
+FOREACH,NLDY,@NLDY[#]
+FOREACH,NLDZ,@NLDZ[#]
+FOREACH,NLNON,@NLNON[#]
+* keep the elastic results under the names of Fig. 1.2 (Panel000k_elastic.thd ...)
+NONLINSAVE,elastic
+*
+* ======================================================================================
+* 4. Iterations: ANALYS New Structure (<mode> 1), at most 10 passes (D-NON-06)
+* ======================================================================================
+ANALYS,0,0,1,0,1,0,0,0,0,0,0,1
+AOPT,0,0,0,0,0,0,0,0,1,0,0,0,0,0
+AFWRITE
+* the HOUSE deck of every iteration is the one NONLINEAR wrote (ex07_new.hou); AFWRITE inside the loop
+* writes the MOTION and RELDISP decks only, so it never overwrites it
+VAR,NLHOUSE,"FCOPY,ex07_new.hou,ex07.hou",RUNHOUSE,RUNANALYS
+NONLINITER,NLHOUSE+NLDX+NLDY+NLDZ+NLNON,10
+*
+* ======================================================================================
+* 5. Results of the converged model: X spectra of the floor and roof centres (nodes 63 and 113)
+* ======================================================================================
+EDUOPT,TFFILE,FILE8X
+MOTION,0,0,0,20,0,0.1,100,301,0,0.6,1,0,0,0,0,1,0,0,1
+NOUT,0
+NOUT,1,1,1,0,0,1,1,13,63,113
+AOPT,0,0,0,0,0,0,0,0,0,0,1,0,0,0
+AFWRITE
+RUNMOTION
+WRITE

@@ -1,0 +1,33 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "sassi-edu"
+version = "0.1.0"
+description = "SASSI-EDU: educational re-implementation of the ACS SASSI flexible-volume soil-structure interaction methodology"
+readme = "README.md"
+requires-python = ">=3.9"
+dependencies = ["numpy>=1.24", "scipy>=1.10", "matplotlib>=3.7", "plotly>=5"]
+
+[project.optional-dependencies]
+test = ["pytest>=7"]
+
+[project.scripts]
+sassi = "sassi.cli:main"
+sassi-gui = "sassi.ui.server:main"
+
+[tool.setuptools.packages.find]
+include = ["sassi*"]
+
+[tool.setuptools.package-data]
+sassi = ["ui/static/*", "ui/static/katex/*", "ui/static/katex/fonts/*", "ui/lessons/*", "ui/command_args.json", "verify/models/*", "data/*", "data/**/*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+tmp_path_retention_count = 1
+tmp_path_retention_policy = "failed"
+markers = [
+  "slow: long-running verification problem",
+  "p1: tier P1 feature",
+]

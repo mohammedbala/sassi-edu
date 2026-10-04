@@ -1,0 +1,58 @@
+* =====================================================================================
+* SASSI-EDU dynamic soil property library (DYNP commands; read with INP)
+* -------------------------------------------------------------------------------------
+* Strain-dependent modulus-reduction (G/Gmax) and damping curves of the public-domain
+* SHAKE91 sample input (Idriss & Sun 1992, User's Manual for SHAKE91, Table B-1; file
+* INP.DAT, distributed with github.com/ocrickard/SHAKE16, public domain).
+*
+*   DYNP,<no>,<sg>,<g>,<sd>,<d>,<label>
+*     <sg>, <sd> shear strain in PERCENT; <g> = G/Gmax; <d> damping in PERCENT.
+*   SOIL interpolates both curves linearly in log10(strain) with constant values
+*   outside the tabulated range (D-SOL-03), the SHAKE91 rule.
+*
+* Labels (case-sensitive, referenced by SPRO,<layer>,<prop>,<label>):
+*   Clay  modulus: Seed & Sun (1989) upper range for clay; damping: Idriss (1990) clay
+*   Sand  modulus: Seed & Idriss (1970) upper range for sand; damping: Idriss (1990) sand
+*   Rock  modulus: Schnabel (1973) "attenuation of rock, average"; damping: Schnabel (1973) rock
+*
+* The Rock damping curve is tabulated in INP.DAT at 0.0001, 0.001, 0.01, 0.1 and 1 % only.
+* Because DYNP pairs both curves on one index, the damping is listed here at the eight
+* modulus strains; the added points (0.0003, 0.003, 0.03 %) lie exactly on the log-linear
+* interpolant of the original five points, so SOIL uses an identical curve.
+* =====================================================================================
+*
+* ---- Clay: Seed & Sun (1989) upper range / Idriss (1990) ----------------------------
+DYNP,1,0.0001,1.000,0.0001,0.24,Clay
+DYNP,2,0.0003,1.000,0.0003,0.42,Clay
+DYNP,3,0.001,1.000,0.001,0.80,Clay
+DYNP,4,0.003,0.981,0.003,1.40,Clay
+DYNP,5,0.01,0.941,0.01,2.80,Clay
+DYNP,6,0.03,0.847,0.03,5.10,Clay
+DYNP,7,0.1,0.656,0.1,9.80,Clay
+DYNP,8,0.3,0.438,0.3,15.50,Clay
+DYNP,9,1.0,0.238,1.0,21.00,Clay
+DYNP,10,3.0,0.144,3.16,25.00,Clay
+DYNP,11,10.0,0.110,10.0,28.00,Clay
+*
+* ---- Sand: Seed & Idriss (1970) upper range / Idriss (1990) -------------------------
+DYNP,1,0.0001,1.000,0.0001,0.24,Sand
+DYNP,2,0.0003,1.000,0.0003,0.42,Sand
+DYNP,3,0.001,0.990,0.001,0.80,Sand
+DYNP,4,0.003,0.960,0.003,1.40,Sand
+DYNP,5,0.01,0.850,0.01,2.80,Sand
+DYNP,6,0.03,0.640,0.03,5.10,Sand
+DYNP,7,0.1,0.370,0.1,9.80,Sand
+DYNP,8,0.3,0.180,0.3,15.50,Sand
+DYNP,9,1.0,0.080,1.0,21.00,Sand
+DYNP,10,3.0,0.050,3.0,25.00,Sand
+DYNP,11,10.0,0.035,10.0,28.00,Sand
+*
+* ---- Rock: Schnabel (1973) average ---------------------------------------------------
+DYNP,1,0.0001,1.000,0.0001,0.4,Rock
+DYNP,2,0.0003,1.000,0.0003,0.5908485,Rock
+DYNP,3,0.001,0.9875,0.001,0.8,Rock
+DYNP,4,0.003,0.9525,0.003,1.1339849,Rock
+DYNP,5,0.01,0.900,0.01,1.5,Rock
+DYNP,6,0.03,0.810,0.03,2.2156819,Rock
+DYNP,7,0.1,0.725,0.1,3.0,Rock
+DYNP,8,1.0,0.550,1.0,4.6,Rock

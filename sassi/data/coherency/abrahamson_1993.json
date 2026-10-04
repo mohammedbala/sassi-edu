@@ -1,0 +1,12 @@
+{
+  "model": 2,
+  "name": "Abrahamson (1993) plane-wave coherency, all soil types",
+  "short": "Abrahamson 1993",
+  "verified": false,
+  "components": null,
+  "reason": "coefficients not available: the functional form and coefficients of this model could not be confirmed from a primary or authoritative source during implementation (the 1993 paper is a seminar proceedings paper that is not publicly available; the EPRI reports retrieved -- EPRI 1012968 and EPRI 1015110 -- give the later 1998/2005 and 2007 models only). SASSI-EDU does not use coefficients from memory (requirements D-INC-04).",
+  "alternative": "Model 3 (Abrahamson 2005, EPRI 1012968), which the ACS SASSI manual describes as similar, or Model 7 with user tables.",
+  "source": {
+    "primary": "N. A. Abrahamson (1993). Spatial Variation of Multiple Support Inputs. Proc. First US Seminar on Seismic Evaluation and Retrofit of Steel Bridges, Caltrans and University of California at Berkeley, San Francisco, October 18, 1993 (ACS SASSI manual reference 1). Not retrieved."
+  }
+}

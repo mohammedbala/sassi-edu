@@ -1,0 +1,119 @@
+* ======================================================================================
+* SASSI-EDU tutorial example 4: the free-field chain EQUAKE -> SOIL -> SITE
+* ======================================================================================
+* What you learn
+*   1. EQUAKE: generate an acceleration history whose 5 % response spectrum matches a design
+*      spectrum (an RG 1.60 horizontal spectrum anchored to 0.30 g, given as a .rsi file of
+*      frequency / spectral acceleration pairs), with the SRP 3.7.1 acceptance checks;
+*   2. SOIL: SHAKE-type equivalent-linear site response.  The motion is applied as a rock
+*      OUTCROP motion at the top of the half-space; SOIL iterates the shear modulus and damping
+*      of every sublayer on the strain-dependent curves (DYNP) until they are compatible with
+*      the effective strains (0.65 x maximum), and saves the strain-compatible properties to
+*      FILE88, the surface motion ACC001.TH and response spectra;
+*   3. SITEX,1 + SITE: the SITE module reads FILE88 instead of the low-strain L properties
+*      (Non-Linear Soil option), so the free field FILE1 used by an SSI analysis is consistent
+*      with the strain level of the earthquake.  The SSI control motion is then the SOIL
+*      surface motion ACC001.TH at the control point of SITE (top of layer 1, within motion).
+*
+* Check of the chain (tests/integration): the surface / base amplification of SITE (thin-layer
+* model with the FILE88 properties) agrees with the final linear SHAKE transfer function of SOIL
+* (SSAF Fourier amplification file SAF001W_023W.TFU).
+*
+* Soil profile: 10 m of sand (Vs 200 m/s) on 12 m of clay (Vs 300 m/s) on rock (Vs 1200 m/s),
+* each soil layer modelled as 1 m sublayers (TOPL and SPRO list the same 22 sublayers).
+*
+* How to run (the working directory must be the examples directory, see examples/README.md):
+*     cd examples
+*     ../.venv/bin/sassi run ex04_site_response.pre
+*   or from the repository root:  .venv/bin/sassi --cwd examples run ex04_site_response.pre
+* Results: examples/ex04/.   Run time: about 20 s (EQUAKE is the slow step).
+*
+* Units: m, kN, t, s.  Gravity 9.81 m/s2.  Histories and spectra in g.
+* ======================================================================================
+MDL,ex04,ex04
+TIT,Ex04 - free-field chain EQUAKE - SOIL - SITE (sand and clay on rock)
+*
+* ---------------------------------------------------------------------- soil layers
+* L,<nm>,<thick>,<weight>,<Vp>,<Vs>,<pdamp>,<sdamp>   (low-strain properties)
+L,1,1.0,19.0,400,200,0.01,0.01
+L,2,1.0,18.5,900,300,0.01,0.01
+L,3,1.0,22.0,2400,1200,0.01,0.01
+TOPL,1,1,1,1,1,1,1,1,1,1
+TOPL,2,2,2,2,2,2,2,2,2,2
+TOPL,2,2
+*
+* ---------------------------------------------------------------------- time grid, frequencies
+* dt 0.005 s, NFFT 8192 (40.96 s: the 20 s motion plus a quiet zone): df = 0.0244 Hz.
+* The SITE frequencies are multiples of 20 df = 0.488 Hz (plus 0.1 Hz) so that they coincide
+* with the SSAF frequency step of SOIL below.  Cut-off 13.7 Hz: the strain-softened sand at
+* 7-10 m depth (Vs about 75 m/s) passes Vs/(5 h) = 15 Hz with 1 m sublayers (G-05).
+FREQ,1,4,20,40,60,80,100,120,140,160,180
+FREQ,1,200,240,280,320,360,400,440,480,520,560
+* SITE: half-space = L 3, control point at the top of TOPL layer 1 (the free surface)
+SITE,0,1,0,20,3,1,0,1,4096,1,0,0.005,8192,1
+WAVE,2,1,1,1,0
+HOUSE,9.81,0,0,2,0,0,0,0,0
+*
+* ======================================================================================
+* 1. EQUAKE: spectrum-compatible motion
+* ======================================================================================
+* EQUAKE,<accopt>,<nrfreq>,<rand>,<damp>,<dur>,<corr>,<seeds>
+*   random phases (0), 27 target points, seed 11975, 5 % damping, 20 s, one seed trial
+EQUAKE,0,27,11975,0.05,20,0,1
+EQTIT,RG 1.60 horizontal, 5 %, anchored to 0.30 g
+RSIN,1,../data/rg160h_030g.rsi
+RSOUT,1,rg160h_eq.rso
+ACCOUT,1,rg160h_eq.acc
+AOPT,1,0,0,0,0,0,0,0,0,0,0,0,0,0
+CHECK
+AFWRITE
+RUNEQUAKE
+*
+* ======================================================================================
+* 2. SOIL: equivalent-linear site response (rock outcrop input)
+* ======================================================================================
+* Modulus-reduction and damping curves (DYNP labels Sand, Clay, Rock of SHAKE91)
+INP,../sassi/data/dynp_library.pre
+* SPRO,<sublayer>,<L property>,<curve label>: sublayers 1-10 sand, 11-22 clay, 23 = half-space
+* (the last SPRO row is the half-space; without a label it stays linear)
+VAR,SANDL,1,2,3,4,5,6,7,8,9,10
+VAR,CLAYL,11,12,13,14,15,16,17,18,19,20,21,22
+FOREACH,SANDL,SPRO,@SANDL[#],1,Sand
+FOREACH,CLAYL,SPRO,@CLAYL[#],2,Clay
+SPRO,23,3
+* SOIL,<nrval>,<grav>,<header>,<outcrop>,<save>,<iter>,<ratio>,<gravmult>,<cof>
+*   4000 values after 1 header line (the dt line of the EQUAKE file), outcrop input,
+*   save FILE88, 8 iterations, effective strain = 0.65 x maximum strain
+SOIL,4000,9.81,1,1,1,8,0.65,1,0
+* SOILX,<indir>,<mult>,<max>,<cl>: horizontal input, factor 1, input at the top of sublayer 23
+SOILX,0,1,0,23
+THFILE,rg160h_eq.acc
+THTIT,RG 1.60 spectrum-compatible rock outcrop motion (EQUAKE)
+* Outputs: surface acceleration history (SACC opt 2 -> ACC001.TH), rock outcrop maximum,
+* 5 % spectra at the surface and of the rock outcrop, strains in sublayer 5 (sand) and 15
+* (clay), and the surface / base (within) amplification: SAF001W_023W.TFU and .RS ratios
+SACC,1,2,0
+SACC,23,1,1
+SRS,1,1,0
+SRS,23,1,1
+SSTR,5,1,0,1,1
+SSTR,15,1,0,1,1
+SSAF,1,1,0,0,23,0.48828125,surface / base (within)
+DAMP,0.05
+AOPT,0,1,0,0,0,0,0,0,0,0,0,0,0,0
+CHECK
+AFWRITE
+RUNSOIL
+*
+* ======================================================================================
+* 3. SITE with the strain-compatible properties (FILE88)
+* ======================================================================================
+* SITEX,<soilmode>: 1 = Non-Linear Soil, SITE reads FILE88 written by SOIL
+SITEX,1
+AOPT,0,0,0,1,0,0,0,0,0,0,0,0,0,0
+CHECK
+AFWRITE
+RUNSITE
+* For an SSI run the control motion would now be the SOIL surface motion:
+*     THFILE,ACC001.TH      (MOTION <fopt> 0: first line dt, then one value per line)
+WRITE

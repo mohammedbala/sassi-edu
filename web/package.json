@@ -1,0 +1,12 @@
+{
+  "name": "sassi-edu-web-test",
+  "private": true,
+  "description": "Node test of the SASSI-EDU browser version: the built bundle in Pyodide (npm install; node test_pyodide.mjs)",
+  "type": "module",
+  "scripts": {
+    "test": "node test_pyodide.mjs"
+  },
+  "dependencies": {
+    "pyodide": "314.0.7"
+  }
+}

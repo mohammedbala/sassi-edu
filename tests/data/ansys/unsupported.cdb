@@ -1,0 +1,90 @@
+/COM,ANSYS RELEASE 2021 R1           BUILD 21.1      UP20201109       10:17:56
+/PREP7
+/NOPR
+/TITLE,SASSI-EDU sample with unsupported items
+*IF,_CDRDOFF,EQ,1,THEN     !if solid model was read in
+_CDRDOFF=             !reset flag, numoffs already performed
+*ELSE              !offset database for the following FE model
+NUMOFF,NODE,       5
+NUMOFF,ELEM,       4
+NUMOFF,MAT ,       1
+NUMOFF,TYPE,       4
+*ENDIF
+*SET,_BUTTON ,  0.000000000000
+*SET,_RETURN ,  0.000000000000
+*SET,_STATUS ,  0.000000000000
+*SET,_UIQR   ,  1.000000000000
+DOF,DELETE
+ET,       1,154
+ET,       2,188
+ET,       3,14
+KEYOPT,       3, 2,        8
+ET,       4,181
+RLBLOCK,       1,       3,       3,       7
+(2i8,6g16.9)
+(7g16.9)
+       3       3  10.0000000     0.500000000      0.00000000    
+NBLOCK,6,SOLID,         5,         5
+(3i9,6e21.13e3)
+        1        0        0
+        2        0        0 1.0000000000000E+000
+        3        0        0 1.0000000000000E+000 1.0000000000000E+000
+        4        0        0 0.0000000000000E+000 1.0000000000000E+000
+        5        0        0 2.0000000000000E+000
+N,R5.3,LOC,       -1,
+EBLOCK,19,SOLID,         4,         4
+(19i9)
+        1        1        1        1        0        0        0        0        4        0        1        1        2        3        4
+        1        2        1        7        0        0        0        0        3        0        2        2        5        3
+        1        3        3        1        0        0        0        0        2        0        3        1        2
+        3        4        1        8        0        0        0        0        4        0        4        1        2        3        4
+       -1
+EXTOPT,ATTR,      0,      0,      0
+EXTOPT,ESIZE,  0,  0.0000    
+EXTOPT,ACLEAR,      0
+TREF,  0.00000000    
+IRLF,  0
+BFUNIF,TEMP,_TINY
+ACEL,  0.00000000    ,  0.00000000    ,  0.00000000    
+OMEGA,  0.00000000    ,  0.00000000    ,  0.00000000    ,  0
+DOMEGA,  0.00000000    ,  0.00000000    ,  0.00000000    
+CGLOC,  0.00000000    ,  0.00000000    ,  0.00000000    
+CGOMEGA,  0.00000000    ,  0.00000000    ,  0.00000000    
+DCGOMG,  0.00000000    ,  0.00000000    ,  0.00000000    
+ 
+KUSE,     0
+TIME,  0.00000000    
+ALPHAD, 0.500000000    
+BETAD,  0.00000000    
+DMPRAT,  0.00000000    
+DMPSTR,  0.00000000    
+CRPLIM, 0.100000000    ,   0
+CRPLIM,  0.00000000    ,   1
+NCNV,     1,  0.00000000    ,     0,  0.00000000    ,  0.00000000    
+NEQIT,     0
+ 
+ERESX,DEFA
+/GO
+MPTEMP,R5.0, 1, 1,  0.00000000    ,
+MPDATA,R5.0, 1,EX  ,       1, 1,      200000000    ,
+MPTEMP,R5.0, 1, 1,  0.00000000    ,
+MPDATA,R5.0, 1,DENS,       1, 1,     7.85000000    ,
+MPTEMP,R5.0, 1, 1,  0.00000000    ,
+MPDATA,R5.0, 1,DAMP,       1, 1, 0.200000000E-02    ,
+TB,BISO,1,1,2,
+TBTEMP,0
+TBDATA,,250000,1000,,,,
+SECTYPE,       7,BEAM,I,ibeam,   0
+SECOFFSET, CENT
+SECDATA,0.2,0.2,0.4,0.02,0.02,0.01,0,0,0,0,0,0
+SECTYPE,       8,SHELL,          ,          
+SECDATA,  0.100000000    ,       3,  0.00000000    ,           3
+SECOFFSET,TOP
+/NOPR
+D,       1,UX  , 0.100000000E-01,  0.00000000    
+D,       1,TEMP,  0.00000000    ,  0.00000000    
+D,       2,UZ  ,  0.00000000    ,  0.00000000    
+/GO
+CE,       1,  0.00000000    ,       1,UX  ,  1.00000000    ,       2,UX  , -1.00000000    
+F,       3,FZ  , -1000.00000    
+FINISH

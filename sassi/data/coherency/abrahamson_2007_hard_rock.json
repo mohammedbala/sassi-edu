@@ -1,0 +1,135 @@
+{
+  "model": 5,
+  "name": "Abrahamson (2007) hard-rock plane-wave coherency",
+  "short": "Abrahamson 2007 hard rock",
+  "verified": true,
+  "applicability": "Hard-rock sites, surface and embedded foundations; all magnitudes and distances; separations 0-150 m (EPRI 1015110 Section 8). Recommended by EPRI 1015110 Section 7 also for embedded foundations of 10 m or more and (conservatively) for soil and soft-rock sites.",
+  "units": {
+    "frequency": "Hz",
+    "separation": "m"
+  },
+  "validated_range_m": [
+    0.0,
+    150.0
+  ],
+  "formula_max_m": 150.0,
+  "second_factor_uses_fc": false,
+  "equation": "gamma_pw(f, xi) = [1 + (f tanh(a3 xi) / (a1 fc(xi)))^n1(xi)]^(-1/2) * [1 + (f tanh(a3 xi) / a2)^n2]^(-1/2)",
+  "expression_kinds": {
+    "const": "c",
+    "lnq": "c0 + c1 ln(xi + 1) + c2 [ln(xi + 1) - c3]^2"
+  },
+  "components": {
+    "horizontal": {
+      "a1": {
+        "const": 1.0
+      },
+      "a2": {
+        "const": 40.0
+      },
+      "a3": {
+        "const": 0.4
+      },
+      "n1": {
+        "lnq": [
+          3.8,
+          -0.04,
+          0.0105,
+          3.6
+        ]
+      },
+      "n2": {
+        "const": 16.4
+      },
+      "fc": {
+        "lnq": [
+          27.9,
+          -4.82,
+          1.24,
+          3.6
+        ]
+      }
+    },
+    "vertical": {
+      "a1": {
+        "const": 1.0
+      },
+      "a2": {
+        "const": 200.0
+      },
+      "a3": {
+        "const": 0.4
+      },
+      "n1": {
+        "lnq": [
+          2.03,
+          0.41,
+          -0.078,
+          3.6
+        ]
+      },
+      "n2": {
+        "const": 10.0
+      },
+      "fc": {
+        "lnq": [
+          29.2,
+          -5.2,
+          1.45,
+          3.6
+        ]
+      }
+    }
+  },
+  "source": {
+    "primary": "N. A. Abrahamson (2007). Program on Technology Innovation: Effects of Spatial Incoherence on Seismic Ground Motions. EPRI 1015110, Electric Power Research Institute, Palo Alto, CA, and U.S. DOE, December 2007 (NRC ADAMS ML090960409). This is the report cited by the ACS SASSI manual (reference 4) for Models 5 and 6.",
+    "equation": "Chapter 6 'Hard-Rock Coherency Model', Equation 6-1, report page 6-1 (PDF page 79).",
+    "tables": "Table 6-1 'Plane-Wave Coherency Model Coefficients for the Horizontal Component' (page 6-1) and Table 6-2 '... for the Vertical Component' (page 6-2).",
+    "also": "Identical equation and coefficients in the draft report 'Hard-Rock Coherency Functions Based on the Pinyon Flat Array Data', N. A. Abrahamson, July 5, 2007 (NRC ADAMS ML072190359), Equation 3-1 (page 17) and the two coefficient tables on page 18; this is the coherency function accepted by NRC DC/COL-ISG-01 (May 2008, ADAMS ML081330698), Section 2.0.",
+    "transcription_note": "The tables print n1 and fc as 'c0 + c1*ln(xi+1) + c2[ln((xi+1)-3.6]^2' with an unbalanced parenthesis; it is read as c2*[ln(xi+1) - 3.6]^2, which reproduces Figure 6-2 within 0.002 and the 10 m curve of Figure 6-1 up to 20 Hz within 0.004 (see figure_note and published_points).",
+    "retrieved": "2026-10-02 from www.nrc.gov (ADAMS public documents)",
+    "figure_note": "Figure 6-2 (vertical) reproduces the Table 6-2 formula within 0.002 at every digitized point. Figure 6-1 (horizontal) agrees with Table 6-1 within 0.004 for the 10 m curve up to 20 Hz but lies below the tabulated formula elsewhere (10 m: 0.472 vs 0.482 at 25 Hz and 0.349 vs 0.364 at 30 Hz; 25 m: 0.361 vs 0.381 at 20 Hz), i.e. the plotted horizontal curves are slightly less coherent than the table. SASSI-EDU implements the tables (the normative coefficients accepted by DC/COL-ISG-01); the horizontal unit-test point is the 10 m / 20 Hz value where table and figure agree."
+  },
+  "published_points": [
+    {
+      "component": "horizontal",
+      "xi_m": 10.0,
+      "f_hz": 20.0,
+      "gamma": 0.637,
+      "tol": 0.01,
+      "from": "EPRI 1015110 Figure 6-1, curve 'Hor-10m', digitized from the published figure rendered at 300 dpi (gridline-calibrated; reading accuracy about 0.005)"
+    },
+    {
+      "component": "vertical",
+      "xi_m": 10.0,
+      "f_hz": 20.0,
+      "gamma": 0.675,
+      "tol": 0.01,
+      "from": "EPRI 1015110 Figure 6-2, curve 'Vert-10m', digitized from the published figure rendered at 300 dpi (gridline-calibrated; reading accuracy about 0.005)"
+    },
+    {
+      "component": "vertical",
+      "xi_m": 10.0,
+      "f_hz": 30.0,
+      "gamma": 0.4545,
+      "tol": 0.01,
+      "from": "EPRI 1015110 Figure 6-2, curve 'Vert-10m', digitized from the published figure rendered at 300 dpi (gridline-calibrated; reading accuracy about 0.005)"
+    },
+    {
+      "component": "vertical",
+      "xi_m": 25.0,
+      "f_hz": 30.0,
+      "gamma": 0.222,
+      "tol": 0.01,
+      "from": "EPRI 1015110 Figure 6-2, curve 'Vert-25m', digitized from the published figure rendered at 300 dpi (gridline-calibrated; reading accuracy about 0.005)"
+    },
+    {
+      "component": "vertical",
+      "xi_m": 50.0,
+      "f_hz": 20.0,
+      "gamma": 0.226,
+      "tol": 0.01,
+      "from": "EPRI 1015110 Figure 6-2, curve 'Vert-50m', digitized from the published figure rendered at 300 dpi (gridline-calibrated; reading accuracy about 0.005)"
+    }
+  ]
+}

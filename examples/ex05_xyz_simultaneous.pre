@@ -1,0 +1,185 @@
+* ======================================================================================
+* SASSI-EDU tutorial example 5: X, Y and Z input in one ANALYS run (simultaneous cases)
+* ======================================================================================
+* What you learn
+*   - the three-component seismic workflow of ACS SASSI (requirements 2.4, manual 1.5.4):
+*       SITE run 1: vertically incident SV wave, control motion along x'  -> FCOPY FILE1 FILE1X
+*       SITE run 2: vertically incident SH wave, control motion along y'  -> FCOPY FILE1 FILE1Y
+*       SITE run 3: vertically incident P wave,  control motion along z'  -> FCOPY FILE1 FILE1Z
+*     POINT and HOUSE once, then ANALYS <simul> = 1 solves the three cases with ONE impedance
+*     and ONE factorisation per frequency and writes FILE8X, FILE8Y, FILE8Z;
+*   - MOTION once per direction (EDUOPT,TFFILE,FILE8X ...) with the motion of that direction
+*     (here the horizontal motion for X and Y and 2/3 of it for Z, a common simplification);
+*   - an eccentric roof mass couples the directions: the X input also produces Y translation
+*     of the roof mass and torsion of the stick top.  MOTION names its files by node and DOF
+*     only (00030TR_Y.TFU is "node 30, Y" whatever the input direction), so the X-run files of
+*     the coupled response are copied to X2Y_00030TR_Y.* and X2Y_00027R_ZZ.* before the Y run
+*     writes its own (direct) 00030TR_Y.*;
+*   - RELDISP with the FREE-FIELD reference (no RELFILE): the drift of the roof relative to the
+*     ground in the Y direction.  The last SITE run was the P wave (SITE <cm> = 2), but with
+*     ANALYS <simul> = 1 AFWRITE takes the direction of the case from the file name FILE8Y
+*     (y'), and MOTION / RELDISP read it back from FILE8Y itself.
+* The three directional responses are combined afterwards by the user (SRSS or 100-40-40);
+* this is post-processing outside the SASSI modules.
+*
+* The structure: a 12 m x 12 m basemat (SHELL, 1.5 m) on the layered site of example 1, a
+* two-storey stick (4 m storeys) clamped to the mat by a rigid spider, and a 300 t roof mass
+* 2.24 m off the stick axis (node 30 at x = 2, y = 1), tied to the stick top by a rigid link.
+*
+* How to run (the working directory must be the examples directory, see examples/README.md):
+*     cd examples
+*     ../.venv/bin/sassi run ex05_xyz_simultaneous.pre
+*   or from the repository root:  .venv/bin/sassi --cwd examples run ex05_xyz_simultaneous.pre
+* Results: examples/ex05/.
+*
+* Units: m, kN, t, s.  Gravity 9.81 m/s2.
+* ======================================================================================
+MDL,ex05,ex05
+TIT,Ex05 - eccentric two-storey stick, X + Y + Z input with ANALYS simul = 1
+*
+* ---------------------------------------------------------------------- site (as example 1)
+L,1,0.5,19.0,600,300,0.05,0.05
+L,2,1.0,20.0,1000,500,0.04,0.04
+L,3,1.0,21.0,2000,1000,0.02,0.02
+TOPL,1,1,1,1,1,1,1,1,1,1
+TOPL,2,2,2,2,2,2,2,2,2,2
+TOPL,2,2
+* dt 0.005 s, NFFT 8192: df = 0.0244 Hz; 19 frequencies 0.1 .. 15 Hz
+FREQ,1,4,20,41,61,82,102,123,143,164,184
+FREQ,1,205,246,287,328,369,410,492,573,614
+*
+* ---------------------------------------------------------------------- structure
+* basemat nodes 1..25 (5 x 5 grid, 3 m spacing), centre node 13
+N,1,-6,-6,0
+N,5,6,-6,0
+FILL,1,5
+NGEN,4,5,1,5,1,0,3,0
+* stick nodes 26 (z = 4) and 27 (z = 8); K nodes 28, 29 beside the storeys (+X side)
+N,26,0,0,4
+N,27,0,0,8
+N,28,6,0,2
+N,29,6,0,6
+* eccentric roof mass node 30 and the K node 31 of the rigid links
+N,30,2,1,8
+N,31,0,0,2
+M,1,3.0E8,0.2,24.0,0.05,0.05,1
+M,2,3.0E7,0.2,0.0,0.05,0.05,1
+M,3,3.0E10,0.2,0.0,0.0,0.0,1
+R,1,10.0,5.0,5.0,10.0,5.0,5.0
+R,2,9.0,7.5,7.5,11.4,6.75,6.75
+* group 1: basemat shells (drilling rotations: FIXROT below)
+GROUP,1,SHELL
+MACT,1
+E,1,1,2,7,6
+EGEN,3,1,1
+EGEN,3,5,1,4
+THICK,1,16,1,1.5
+* group 2: the stick
+GROUP,2,BEAMS
+MACT,2
+RACT,1
+E,1,13,26,28
+E,2,26,27,29
+* group 3: rigid spider at the stick base (centre 13 to its 8 neighbours) and the rigid arm
+* from the stick top (27) to the eccentric roof mass (30)
+GROUP,3,BEAMS
+MACT,3
+RACT,2
+VAR,SPIDER,7,8,9,12,14,17,18,19
+FOREACH,SPIDER,E,#,13,@SPIDER[#],31
+E,9,27,30,31
+* Shell drilling rotations (ROTZ of the mat): FIXROT fixes them only at the nodes connected to
+* shells alone.  The stick base 13 and the spider ends keep ROTZ (the beams stiffen it), so the
+* torsion of the foundation is resisted by the soil, as it must be in a torsion example.
+FIXROT
+* storey masses 300 t (weights 2943 kN): floor 1 on the stick, roof at the eccentric node
+MT,26,2943,2943,2943
+MT,30,2943,2943,2943
+* rotary inertia of each 12 m x 12 m floor slab (MR, also in weight units: I x g):
+*   about Z (torsion)   I = m (a2 + b2)/12 = 300 x 288/12 = 7200 t m2  -> 70632
+*   about X and Y       I = m a2/12        = 300 x 144/12 = 3600 t m2  -> 35316
+MR,26,35316,35316,70632
+MR,30,35316,35316,70632
+INT,1,25,1,1
+POINT,0,0,2.7
+HOUSE,9.81,0,0,2,0,0,0,0,0
+*
+* ======================================================================================
+* 1. Three SITE runs -> FILE1X, FILE1Y, FILE1Z
+* ======================================================================================
+* SITE,<opmode>,<mode1>,<fstep>,<nl>,<hs>,<mode2>,<wopt>,<freq1>,<freq2>,<cl>,<cm>,<delt>,<nft>,<freq>
+AOPT,0,0,0,1,0,0,0,0,0,0,0,0,0,0
+* run 1: SV wave (in-plane family, wopt 0), control motion along x' (cm 0)
+SITE,0,1,0,20,3,1,0,1,4096,1,0,0.005,8192,1
+WAVE,2,1,1,1,0
+CHECK
+AFWRITE
+RUNSITE
+FCOPY,FILE1,FILE1X
+* run 2: SH wave (anti-plane family, wopt 1), control motion along y' (cm 1).  FILE2 (Mode 1)
+* holds both the Rayleigh and the Love modes, so Mode 1 is switched off: SITE Mode 2 alone
+* reuses the FILE2 of run 1.
+SITE,0,0,0,20,3,1,1,1,4096,1,1,0.005,8192,1
+WAVE,2,0
+WAVE,4,1,1,1,0
+AFWRITE
+RUNSITE
+FCOPY,FILE1,FILE1Y
+* run 3: P wave (in-plane family, wopt 0), control motion along z' (cm 2)
+SITE,0,0,0,20,3,1,0,1,4096,1,2,0.005,8192,1
+WAVE,4,0
+WAVE,3,1,1,1,0
+AFWRITE
+RUNSITE
+FCOPY,FILE1,FILE1Z
+*
+* ======================================================================================
+* 2. POINT, HOUSE and ANALYS with <simul> = 1 (FILE1X/Y/Z -> FILE8X/Y/Z)
+* ======================================================================================
+* ANALYS,<opmode>,<type>,<mode>,<save>,<prnt>,<fopt>,<ang>,<xc>,<yc>,<zc>,<impe>,<simul>
+ANALYS,0,0,0,0,1,0,0,0,0,0,0,1
+AOPT,0,0,0,1,1,1,0,0,1,0,0,0,0,0
+AFWRITE
+RUNPOINT
+RUNHOUSE
+RUNANALYS
+*
+* ======================================================================================
+* 3. MOTION per direction (and RELDISP for Y)
+* ======================================================================================
+DAMP,0.05
+THFILE,../data/rg160h_030g.acc
+THTIT,RG 1.60 horizontal spectrum-compatible motion (EQUAKE, seed 11975)
+AOPT,0,0,0,0,0,0,0,0,0,0,1,0,0,0
+* ---- X input: X response of mat centre, floor and roof mass; coupled Y response of the roof
+*      mass and torsion of the stick top (TF and 5 % spectrum), kept under X2Y_ names
+MOTION,0,0,0,20,0,0.1,100,301,1,0,1,0,0,0,0,1,0,0,1
+EDUOPT,TFFILE,FILE8X
+NOUT,1,1,1,0,0,1,1,13,26,27,30
+NOUT,2,1,0,0,0,1,1,30
+NOUT,6,1,0,0,0,0,1,27
+AFWRITE
+RUNMOTION
+FCOPY,00030TR_Y.TFU,X2Y_00030TR_Y.TFU
+FCOPY,00030TR_Y.TFI,X2Y_00030TR_Y.TFI
+FCOPY,00030TR_Y01.RS,X2Y_00030TR_Y01.RS
+FCOPY,00027R_ZZ.TFU,X2Y_00027R_ZZ.TFU
+* ---- Y input: Y response, and the roof drift relative to the free field (RELDISP)
+EDUOPT,TFFILE,FILE8Y
+NOUT,0
+NOUT,2,1,1,0,0,1,1,13,26,27,30
+RELD,1,0,0
+RDND,27,0,1,0,0,0,0
+AOPT,0,0,0,0,0,0,0,0,0,0,1,0,1,0
+AFWRITE
+RUNMOTION
+RUNRELDISP
+* ---- Z input: vertical response, vertical motion = 2/3 of the horizontal one (MOTION <mult>)
+EDUOPT,TFFILE,FILE8Z
+NOUT,0
+NOUT,3,1,1,0,0,1,1,13,26,27,30
+MOTION,0,0,0,20,0,0.1,100,301,0.6667,0,1,0,0,0,0,1,0,0,1
+AOPT,0,0,0,0,0,0,0,0,0,0,1,0,0,0
+AFWRITE
+RUNMOTION
+WRITE

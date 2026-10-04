@@ -1,0 +1,16 @@
+# SASSI-EDU repository: what is never committed
+# (the web build never bundles reference/, docs/spec/, docs/internal/, tests/ or examples/sassi-course/ either:
+#  web/build.py checks it)
+.venv/
+__pycache__/
+*.egg-info/
+.pytest_cache/
+.DS_Store
+# the static site and the Node test packages (web/build.py, npm install in web/)
+web/site/
+web/node_modules/
+# the ACS SASSI manual text (copyrighted; local reference only)
+reference/acs-sassi.txt
+# course and example workspaces of local GUI runs
+examples/sassi-course/
+sassi-course/

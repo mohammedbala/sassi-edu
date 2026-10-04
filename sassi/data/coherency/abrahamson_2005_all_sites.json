@@ -1,0 +1,121 @@
+{
+  "model": 3,
+  "name": "Abrahamson (2005) all-site plane-wave coherency (surface foundations)",
+  "short": "Abrahamson 2005 all sites",
+  "verified": true,
+  "applicability": "All site conditions except severe topography, all magnitudes and distances (EPRI 1012968 Chapter 4); derived for frequencies up to 20 Hz (extrapolation to higher frequencies considered reasonable by the author); residuals checked for separations of 0-150 m. The 2007 EPRI validation studies (EPRI TR-1015111) used this isotropic model (ACS SASSI manual, Section 6.5.4).",
+  "units": {
+    "frequency": "Hz",
+    "separation": "m"
+  },
+  "validated_range_m": [
+    0.0,
+    150.0
+  ],
+  "formula_max_m": 4000.0,
+  "second_factor_uses_fc": true,
+  "equation": "gamma_pw(f, xi) = [1 + (f tanh(a3 xi) / (a1 fc(xi)))^n1]^(-1/2) * [1 + (f tanh(a3 xi) / (a2 fc(xi)))^n2(xi)]^(-1/2)",
+  "expression_kinds": {
+    "const": "c",
+    "ln_shift": "c0 + c1 ln(xi + c2)",
+    "ln_inv": "c0 + c1 ln(c2 / (xi + 1) + c3)",
+    "exp_lnq": "exp(c0 + c1 ln(xi + 1) + c2 [ln(xi + 1) - c3]^2)"
+  },
+  "components": {
+    "horizontal": {
+      "a1": {
+        "const": 1.647
+      },
+      "a2": {
+        "const": 1.01
+      },
+      "a3": {
+        "const": 0.4
+      },
+      "n1": {
+        "const": 7.02
+      },
+      "n2": {
+        "ln_shift": [
+          5.1,
+          -0.51,
+          10.0
+        ]
+      },
+      "fc": {
+        "ln_inv": [
+          -1.886,
+          2.221,
+          4000.0,
+          1.5
+        ]
+      }
+    },
+    "vertical": {
+      "a1": {
+        "const": 3.15
+      },
+      "a2": {
+        "const": 1.0
+      },
+      "a3": {
+        "const": 0.4
+      },
+      "n1": {
+        "const": 4.95
+      },
+      "n2": {
+        "const": 1.685
+      },
+      "fc": {
+        "exp_lnq": [
+          2.43,
+          -0.025,
+          -0.048,
+          0.0
+        ]
+      }
+    }
+  },
+  "source": {
+    "primary": "N. A. Abrahamson (2005/2006). Program on Technology Innovation: Spatial Coherency Models for Soil-Structure Interaction. EPRI 1012968, Electric Power Research Institute, Palo Alto, CA, and U.S. DOE; Technical Update, January 2006 (NRC ADAMS ML060400268 and ML090160186). Cited by the ACS SASSI manual as reference 2 (Abrahamson 2005, EPRI 1012968, December).",
+    "equation": "Equation 3-1 (plane-wave coherency), report page 3-5.",
+    "tables": "Table 3-4 'Plane-Wave Coherency Model Coefficients for the Horizontal Component' and Table 3-5 '... for the Vertical Component', report page 3-6. The slowness s = 0.0005 to 0.00025 s/m of the tables belongs to the unlagged form (Equation 3-2) and is not used: SASSI-EDU applies wave passage through WPASS (Line D).",
+    "also": "The same equation and coefficients are the 'Initial Coherency Model' of EPRI 1015110 (December 2007, ADAMS ML090960409), Equation 5-2 (page 5-8) and Tables 5-2 and 5-3 (page 5-9), plotted in Figure 5-4.",
+    "retrieved": "2026-10-02 from www.nrc.gov (ADAMS public documents)"
+  },
+  "published_points": [
+    {
+      "component": "horizontal",
+      "xi_m": 10.0,
+      "f_hz": 15.0,
+      "gamma": 0.471,
+      "tol": 0.01,
+      "from": "EPRI 1015110 Figure 5-4, curve '10m (H)', digitized from the published figure rendered at 300 dpi (gridline-calibrated; reading accuracy about 0.005)"
+    },
+    {
+      "component": "horizontal",
+      "xi_m": 10.0,
+      "f_hz": 20.0,
+      "gamma": 0.21,
+      "tol": 0.01,
+      "from": "EPRI 1015110 Figure 5-4, curve '10m (H)', digitized from the published figure rendered at 300 dpi (gridline-calibrated; reading accuracy about 0.005)"
+    },
+    {
+      "component": "vertical",
+      "xi_m": 10.0,
+      "f_hz": 15.0,
+      "gamma": 0.495,
+      "tol": 0.01,
+      "from": "EPRI 1015110 Figure 5-4, curve '10m (Z)', digitized from the published figure rendered at 300 dpi (gridline-calibrated; reading accuracy about 0.005)"
+    },
+    {
+      "component": "vertical",
+      "xi_m": 10.0,
+      "f_hz": 20.0,
+      "gamma": 0.373,
+      "tol": 0.01,
+      "from": "EPRI 1015110 Figure 5-4, curve '10m (Z)', digitized from the published figure rendered at 300 dpi (gridline-calibrated; reading accuracy about 0.005)"
+    }
+  ]
+}

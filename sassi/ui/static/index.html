@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="sassi-token" content="{{TOKEN}}">
+<title>SASSI-EDU User Interface</title>
+<link rel="stylesheet" href="static/katex/katex.min.css">
+<link rel="stylesheet" href="static/styles.css">
+</head>
+<body>
+<div id="app">
+  <header>
+    <div id="titlebar"><span id="title-text">SASSI-EDU User Interface (ACS SASSI V3 methodology)</span><span class="model-badge" id="model-badge"></span></div>
+    <nav id="menubar" aria-label="Main menu"></nav>
+    <div id="toolbar-main" class="toolbar" role="toolbar" aria-label="Main toolbar"></div>
+    <div id="toolbar-plot" class="toolbar" role="toolbar" aria-label="3D plot toolbar"></div>
+  </header>
+  <main>
+    <div id="workarea">
+      <div id="tabbar" role="tablist"></div>
+      <div id="tabcontent"></div>
+    </div>
+    <div id="dock-resizer" hidden title="drag to resize the lesson panel (double-click: default width)"></div>
+    <aside id="lessondock" hidden aria-label="Lesson"></aside>
+  </main>
+  <footer>
+    <div id="cmd-hint" class="cmd-hint" hidden aria-live="polite"></div>
+    <div id="cmdentry"><label for="cmd">Command Entry</label><input id="cmd" type="text" autocomplete="off" spellcheck="false" placeholder="type a command, e.g. N,1,0,0,0  -- Up/Down recall, Enter submits"><button id="cmd-help" class="btn small" type="button" title="Explain the command being typed: live argument hint on/off (click again with text for the full explanation)" aria-label="Explain the command being typed" aria-pressed="false">?</button></div>
+    <div id="statusbar"><span id="status-text">Ready</span><span id="status-model"></span><progress id="status-progress" max="1" value="0"></progress><button id="status-cancel" class="btn small" title="Terminate the running module">Cancel</button></div>
+  </footer>
+</div>
+<div id="modal-root"></div>
+<script src="static/plotly.min.js"></script>
+<script src="static/katex/katex.min.js"></script>
+<script src="static/app.js"></script>
+<script src="static/dialogs.js"></script>
+<script src="static/plots.js"></script>
+<script src="static/learn.js"></script>
+<script src="static/main.js"></script>
+</body>
+</html>

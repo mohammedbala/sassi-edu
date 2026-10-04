@@ -1,0 +1,15 @@
+{
+  "model": 1,
+  "name": "Luco and Wong (1986) coherency function",
+  "short": "Luco-Wong 1986",
+  "verified": true,
+  "form": "luco_wong",
+  "equation": "gamma(omega, D) = exp[-(gamma_c omega D / Vs)^2], omega = 2 pi f in rad/s, D = horizontal separation, Vs = representative shear-wave velocity (INCOH <alpha>), gamma_c = dimensionless coherence parameter per motion component (INCOH <gammax>, <gammay>, <gammaz>)",
+  "parameters": "No fixed coefficients: gamma_c and Vs are user input. Typical gamma_c 0.10-0.30 (ACS SASSI manual Section 6.5.4, Error 58 for gamma_c < 0.1); Luco and Wong suggest gamma_c / Vs between 2e-4 and 3e-4 s/m.",
+  "source": {
+    "primary": "J. E. Luco and H. L. Wong (1986). Response of a Rigid Foundation to a Spatially Random Ground Motion. Earthquake Engineering and Structural Dynamics, 14, 891-908 (ACS SASSI manual reference 55).",
+    "form_confirmed_from": "EPRI/NRC public meeting presentation 'Session 6: CLASSI Approach to Incoherency' (J. Johnson / S. Short, 2007, NRC ADAMS ML072620217), slide 6 'Coherency Ground Motion Function (vertically incident waves)': exp[-(gamma omega |r1 - r2| / Vs)^2], gamma dimensionless, omega in rad/s; guidance Vs * 2e-4 s/m <= gamma <= Vs * 3e-4 s/m.",
+    "decision": "requirements D-INC-05 (omega in rad/s)",
+    "retrieved": "2026-10-02 from www.nrc.gov (ADAMS public documents)"
+  }
+}

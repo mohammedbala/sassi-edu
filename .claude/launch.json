@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "sassi-gui",
+      "runtimeExecutable": "/Users/mohammedbala/Documents/sassi/.venv/bin/sassi-gui",
+      "runtimeArgs": ["--no-browser", "--port", "8765", "--model-dir", "/var/folders/t1/m8tm0vb57_z_zrn7v326knmh0000gn/T//sassi_ex"],
+      "port": 8765
+    }
+  ]
+}
