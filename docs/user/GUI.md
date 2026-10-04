@@ -355,7 +355,7 @@ BBCGEN for the curves; Help > Option NON). **Modules > NONLINEAR** runs `RUNNONL
 
 | Plot | Drawn as | Interaction |
 |---|---|---|
-| Element (MODELPLOT) | Plotly `mesh3d` faces for SOLID / SHELL / PLANE, lines for BEAMS, SPRING and GENERAL, element colours by group / material / property (ElemPalette), red interaction nodes, mass markers (X red, Y green, Z blue) | toolbar toggles; orthographic orbit with the mouse; a click on a node or face prints its number in the Command History |
+| Element (MODELPLOT) | Plotly `mesh3d` faces for SOLID / SHELL / PLANE, lines for BEAMS, SPRING and GENERAL, element colours by group / material / property (ElemPalette), red interaction nodes, mass markers (X red, Y green, Z blue) | toolbar toggles; mouse: drag to rotate (turntable about the vertical Z axis), wheel to zoom, right-drag to pan; a click on a node or face prints its number in the Command History |
 | Node (NODEPLOT) | element-connected nodes: black, interaction red, fixed DOF green square, mass, selected blue square | `NODESEL`, Window Options hide/show |
 | Cut (CUTPLOT) | wireframe of the model with the cut elements filled red | any model number |
 | Spectrum / Time History | one line per line object (SpecLines / THLines colours), legend, log axes, minor grids, markers, stippling; the axes span the data extent unless PLOTRANGE sets them | Graph Plot Options (Windows Settings) |
@@ -364,9 +364,14 @@ BBCGEN for the curves; Help > Option NON). **Modules > NONLINEAR** runs `RUNNONL
 | Bubble / Contour / Vector / Deformed | animated frames from `PROCFRAME` stores: jet colour bar, bubble sizes, X/Y/Z vectors, `x' = x + Scale u` | Pause/Start, `−`/`+` frame steps and the slider while paused, Window Options |
 
 The 3D view follows the plot's camera: rotation, zoom and pan of `CNGVIEW` and the rotation centre of
-`CNGCENTER`. The view is orthographic, and zoom 1 fits the model around the rotation centre, as in the
-`CAPTUREPLOT` image. Mouse rotation is a display action and is not recorded; any view command (Change
-View, Reset View, Change Centre) redraws the plot's own view.
+`CNGCENTER`. The view is orthographic, and zoom 1 fits the whole axis box (model, axes and tick labels,
+with a 10 % margin) around the rotation centre. With the mouse, a drag rotates the scene as a turntable
+about the vertical (global Z) axis, so the model stays upright; a view rolled about the viewing axis or
+looking straight along Z rotates freely instead. The wheel zooms. Mouse rotation and zoom are display
+actions and are not recorded: they are kept when the window or the panels are resized, when a toggle
+re-draws the plot (labels, colours, shrink ...) and between animation frames, and any view command
+(Change View, Reset View, Change Centre / `CNGVIEW`, `RSTVIEW`, `CNGCENTER`, `RSTCENTER`) replaces them by
+the commanded view.
 
 ### 6.1 Line Selection (Plot > Spectrum TFU-TFI / Time History)
 
@@ -792,9 +797,17 @@ typed, it opens the full explanation. Nothing is executed by an explanation.
 
 ### 13.5 Examples gallery and Model > Open Example...
 
-One card per tutorial example (`examples/*.pre`): title and *What you learn* (from the comment header of
-the `.pre`), topic, modules and run time (from `examples/README.md`), the physics or model paragraph, and:
+One card per tutorial example (`examples/*.pre`): a picture of the model, title and *What you learn* (from
+the comment header of the `.pre`), topic, modules and run time (from `examples/README.md`), the physics or
+model paragraph, and:
 
+* **the picture** (the default isometric view: element colours by group, interaction nodes red, a few lumped
+  masses as dark diamonds; example 4, which has no structure, shows its soil column): a click copies the
+  example into a fresh workspace as **Load into workspace** does, then submits its model commands (the `.pre`
+  without `CHECK`, `AFWRITE`, `RUN<MODULE>`, `WRITE`, `FCOPY` ..., up to the first change of model: no module
+  runs) and `MODELPLOT` -- `LAYERPLOT` for example 4 -- so the 3D model view opens in a second and the Command
+  History rebuilds the model. The pictures are `sassi/ui/static/examples/<name>.png` (480 x 300 px), written by
+  `python -m sassi.ui.thumbnails` (run it again after changing an example);
 * **Open guided lesson** (or **Lesson n** when several lessons use the example);
 * **Load into workspace**: copies the example (with `data/` and its support files) into a fresh folder
   `<course root>/examples/<name>/`, submits `CD` there and a fresh model, and opens the `.pre` in the File

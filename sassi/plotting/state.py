@@ -288,6 +288,8 @@ class View3D:
     paused: bool = False          # PAUSE (animations): False = running
     direction: str = "X"          # vector plot Output Direction X / Y / Z / ALL (Window Options)
     show_undeformed: bool = False  # deformed plot overlay (Window Options)
+    view_rev: int = 0             # +1 at every CNGVIEW / RSTVIEW / CNGCENTER / RSTCENTER: the browser then
+                                  # replaces a view rotated or zoomed with the mouse by the commanded one
 
     def copy(self) -> "View3D":
         d = asdict(self)
@@ -699,6 +701,7 @@ def model_scene(model, color_by: int = 1, show_dof: Sequence[int] = (), show_mas
     faces: List[List[int]] = []
     face_elem: List[int] = []
     face_key: List[Tuple[int, ...]] = []
+    face_sig: List[Tuple[int, ...]] = []
     edges: List[Tuple[int, int]] = []
     edge_elem: List[int] = []
     points: List[int] = []
@@ -720,18 +723,21 @@ def model_scene(model, color_by: int = 1, show_dof: Sequence[int] = (), show_mas
             full = list(e.nodes) + [0] * (8 - len(e.nodes))
             if len(e.nodes) < 8 or any(n == 0 for n in full[:8]):
                 continue
+            sig = tuple(sorted(set(full[:8])))      # coincident solids (backfill on excavated soil) share it
             for fc in HEX_FACES:
                 f = _cycle_unique([full[i] for i in fc])
                 if len(f) >= 3:
                     faces.append([index[n] for n in f])
                     face_elem.append(k)
                     face_key.append(tuple(sorted(f)))
+                    face_sig.append(sig)
         elif g.type in FACE_TYPES:
             f = _cycle_unique(nn[:4])
             if len(f) >= 3:
                 faces.append([index[n] for n in f])
                 face_elem.append(k)
                 face_key.append(())          # plates are always drawn
+                face_sig.append(())
             elif len(f) == 2:
                 edges.append((index[f[0]], index[f[1]]))
                 edge_elem.append(k)
@@ -742,11 +748,18 @@ def model_scene(model, color_by: int = 1, show_dof: Sequence[int] = (), show_mas
             else:
                 points.append(index[nn[0]])
                 point_elem.append(k)
-    counts: Dict[Tuple[int, ...], int] = {}
-    for fk in face_key:
+    # a solid face is on the boundary unless solids with *different* nodes share it (two neighbours);
+    # solids on the same nodes (e.g. backfill elements on the excavated-soil elements) are one solid for
+    # the picture: their faces are drawn once, by the last of them (the backfill or structure element is
+    # usually defined after the excavated soil, so its group colour shows)
+    sigs: Dict[Tuple[int, ...], set] = {}
+    last: Dict[Tuple[int, ...], int] = {}
+    for r, fk in enumerate(face_key):
         if fk:
-            counts[fk] = counts.get(fk, 0) + 1
-    boundary = np.array([(not fk) or counts.get(fk, 0) == 1 for fk in face_key], dtype=bool)
+            sigs.setdefault(fk, set()).add(face_sig[r])
+            last[fk] = r
+    boundary = np.array([(not fk) or (len(sigs[fk]) == 1 and last[fk] == r) for r, fk in enumerate(face_key)],
+                        dtype=bool)
     F = np.full((len(faces), 4), -1, dtype=np.int64)
     for r, f in enumerate(faces):
         F[r, :len(f)] = f[:4]

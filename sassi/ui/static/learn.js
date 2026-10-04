@@ -8,7 +8,8 @@
  *  * the command explainer (GET /api/explain): a popover from lesson lines, Command History lines and the
  *    "?" of Command Entry, which also gives a live hint of the argument under the cursor;
  *  * Model > Open Example... and the gallery buttons (copy an example into a fresh workspace, CD there,
- *    open it in the File Editor or run it with INP).
+ *    open it in the File Editor or run it with INP); the picture of a card builds the model there without
+ *    module runs and opens the 3D model view.
  *
  * Rule L17: every step, setup and action submits command text through S.command (POST /api/command), so the
  * Command History of a lesson replays as a .pre file.  Progress (steps completed) is kept per browser in
@@ -469,16 +470,30 @@
   }
   function examplesPanel() {
     const sec = el("section", {class: "learn-sec", id: "learn-examples"}, el("h2", {text: "Examples"}),
-      el("p", {text: "Seven complete models, each commented line by line. Load one into a fresh workspace to read it in the File Editor (and run it with Run (INP)), or run it all at once and explore the results (File > Results Browser, Plot > Spectrum). When a lesson is built on the example, the guided lesson is the best way in."}));
+      el("p", {text: "Seven complete models, each commented line by line. Click a picture to build the model in a fresh workspace and turn it around in the 3D view. Load one into a fresh workspace to read it in the File Editor (and run it with Run (INP)), or run it all at once and explore the results (File > Results Browser, Plot > Spectrum). When a lesson is built on the example, the guided lesson is the best way in."}));
     const grid = el("div", {class: "xcards"});
     for (const x of (L.examples || [])) grid.appendChild(exampleCard(x));
     if (!(L.examples || []).length) grid.appendChild(el("p", {class: "empty", text: "No examples found."}));
     sec.appendChild(grid);
     return sec;
   }
+  /** The preview picture of an example card (python -m sassi.ui.thumbnails); a click shows the model in the
+   *  3D view (the soil layers for an example without a structure).  A missing picture removes the band. */
+  function exampleThumb(x) {
+    if (!x.thumb) return null;
+    const layers = x.view === "LAYERPLOT";
+    const label = x.number ? `example ${x.number}` : x.name;
+    return el("button", {class: "xthumb", type: "button", "data-hint": layers ? "Open the layer plot" : "Open in 3D view",
+      title: `Show ${layers ? "the soil layers" : "the model"} of ${label}: copy it into a fresh workspace folder, build the model (no module runs) and open ${x.view || "MODELPLOT"}`,
+      onclick: () => { closeExamplesDialog(); L.showExampleModel(x.name); }},
+    el("img", {loading: "lazy", decoding: "async", width: 480, height: 300, src: x.thumb,
+      alt: `${layers ? "Soil layer column" : "3D model"} of ${label}: ${x.title}`,
+      onerror: (ev) => { const b = ev.target.closest(".xthumb"); if (b) b.remove(); }}));
+  }
   function exampleCard(x, compact) {
     const lessonsHere = (x.lessons || []).filter((l) => L.findLesson(l.id));
     return el("article", {class: "xcard"},
+      exampleThumb(x),
       el("div", {class: "xhead"}, el("span", {class: "xnum", text: x.number ? `Example ${x.number}` : x.name}), el("h4", {text: x.title})),
       el("div", {class: "xmeta"}, el("code", {text: x.file}), x.runtime ? ` · run time ${x.runtime}` : "", x.results ? ` · results in ${x.results}/` : ""),
       x.topic ? el("p", {class: "xtopic", text: x.topic}) : null,
@@ -522,6 +537,19 @@
     if (!ok) { S.local("WARNING", `Example ${name}: stopped at an error (see the Command History)`); return; }
     if (!run) await S.openEditor(r.pre);
     else S.status(`Example ${name} done -- File > Results Browser shows its results`);
+  };
+  /** The picture of an example card: copy it into a fresh workspace, CD there, fresh model, then its model
+   *  commands (without CHECK, AFWRITE, RUN<MODULE> ...) and MODELPLOT -- LAYERPLOT for an example without a
+   *  structure -- all as command text (L17), so the Command History rebuilds the model. */
+  L.showExampleModel = async function (name) {
+    let r;
+    try { r = await prepareWithConfirm(`/api/examples/${enc(name)}/prepare`, {model: true}, `Example ${name}`); }
+    catch (e) { S.local("ERROR", `Example ${name}: ${e.message}`); D().alert("Example", e.message); return; }
+    if (!r) return;
+    S.local("LOCAL", `Example ${name}: workspace ${r.workspace}; building the model (no module runs), then ${r.view}`);
+    const ok = await L.runLines(r.commands);
+    if (!ok) { S.local("WARNING", `Example ${name}: stopped at an error (see the Command History)`); return; }
+    S.status(`Example ${name}: ${r.view === "LAYERPLOT" ? "soil layers" : "model"} shown -- Load into workspace or Run all to analyse it`);
   };
   L.askExplain = async function () {
     const line = await D().ask("Explain a command", "Command line (e.g. NGEN,3,5,1,5,1,0,0,10)", "");

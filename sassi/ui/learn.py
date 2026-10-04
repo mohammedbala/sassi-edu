@@ -33,7 +33,8 @@ import shutil
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
-from ..prep.lexer import join_command
+from ..prep.lexer import is_comment, join_command, split_head
+from ..prep.registry import load_commands, lookup
 from . import lessons as L
 from .files import file_info
 from .markdown import render
@@ -319,8 +320,72 @@ def examples(examples_dir: Path, lessons: Sequence[L.Lesson]) -> List[Dict[str, 
                     "topic": r.get("topic", ""), "modules": r.get("modules", ""), "runtime": r.get("runtime", ""),
                     "lines": sum(1 for ln in text.splitlines() if ln.strip() and not ln.lstrip().startswith("*")),
                     "lessons": [{"id": les.id, "title": les.title, "part": les.part}
-                                for les in lessons if les.example == p.stem]})
+                                for les in lessons if les.example == p.stem],
+                    "view": example_view_command(example_model_lines(text)),
+                    "thumb": f"{THUMB_URL}/{p.stem}.png"})
     return out
+
+
+# --------------------------------------------------------------------------------------
+# the model part of an example: its preview picture (sassi.ui.thumbnails) and the picture's
+# "show the model" action (POST /api/examples/<name>/prepare {"model": true})
+# --------------------------------------------------------------------------------------
+#: URL (relative to the page) of the preview pictures ``<name>.png`` (sassi/ui/static/examples/)
+THUMB_URL = "static/examples"
+#: commands that check, write, copy, list or run instead of building the model (with every RUN<MODULE>)
+NOT_MODEL = frozenset({"AFWRBAT", "AFWRITE", "CHECK", "COMBXYZSTRAIN", "COMBXYZTHD", "FCOPY", "NLSSIITER",
+                       "NLSSIRESET", "NONLINBAT", "NONLINITER", "NONLINRESET", "NONLINSAVE", "NONLINTHD",
+                       "PINLIST", "PLIST", "SAVE", "WRITE"})
+#: commands that switch to another model: the model part ends before them (example 2 goes on with copies)
+MODEL_SWITCH = frozenset({"ACTM", "CPMODEL", "DMODEL"})
+#: commands that create elements (also as the command of a FOREACH): such an example has a 3D model
+ELEMENT_COMMANDS = frozenset({"E", "EGEN", "MERGE", "MERGEGROUP", "MERGESOIL", "SOILMESH", "CONVERT", "ANSYS"})
+
+
+def _command_name(line: str) -> str:
+    load_commands()
+    head = split_head(line)[0]
+    spec = lookup(head) if "@" not in head and "#" not in head else None
+    return spec.name if spec is not None else head.strip().upper()
+
+
+def _foreach_command(line: str) -> str:
+    """The command a ``FOREACH,<var>,<command>,...`` line runs ('' when it is not a FOREACH)."""
+    parts = split_head(line)[1].split(",", 1)
+    return parts[1].strip() if len(parts) > 1 else ""
+
+
+def example_model_lines(text: str) -> List[str]:
+    """The commands of an example that build its model: the lines of the ``.pre`` without comments, without
+    RUN<MODULE> and :data:`NOT_MODEL` (CHECK, AFWRITE, WRITE, FCOPY ...), without a FOREACH whose command
+    is a variable (``FOREACH,NLX,@NLX[#]``: a list of module runs in examples 6 and 7), up to the first
+    command of :data:`MODEL_SWITCH`.  No module runs, so the model is built in a fraction of a second."""
+    out: List[str] = []
+    for raw in text.splitlines():
+        ln = raw.strip()
+        if not ln or is_comment(ln):
+            continue
+        name = _command_name(ln)
+        if name in MODEL_SWITCH:
+            break
+        if (name.startswith("RUN") and len(name) > 3) or name in NOT_MODEL:
+            continue
+        if name == "FOREACH" and _foreach_command(ln).startswith("@"):
+            continue
+        out.append(ln)
+    return out
+
+
+def example_view_command(model_lines: Sequence[str]) -> str:
+    """The plot of an example's preview: ``MODELPLOT`` when its model part creates elements, else
+    ``LAYERPLOT`` (a free-field example: the soil layers)."""
+    for ln in model_lines:
+        name = _command_name(ln)
+        if name == "FOREACH":
+            name = _command_name(_foreach_command(ln))
+        if name in ELEMENT_COMMANDS:
+            return "MODELPLOT"
+    return "LAYERPLOT"
 
 
 # ======================================================================================

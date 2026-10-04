@@ -256,6 +256,19 @@ def test_site_page_references_exist(site):
     assert (out / ".nojekyll").is_file() and (out / "docs/verification/figures/vp_margins.png").is_file()
 
 
+def test_site_ships_the_example_pictures(site):
+    """The gallery pictures (sassi/ui/static/examples/*.png, a subfolder of the front end) are files of the site
+    at the URL the gallery gives them (learn.THUMB_URL, relative to the page), byte for byte."""
+    from sassi.ui import learn
+    out, summary = site
+    pics = sorted((STATIC / "examples").glob("*.png"))
+    assert len(pics) == len(list((ROOT / "examples").glob("*.pre")))
+    for p in pics:
+        name = f"{learn.THUMB_URL}/{p.name}"
+        assert name in summary["files"] and (out / name).read_bytes() == p.read_bytes(), name
+    assert not [f for f in summary["files"] if f.startswith("static/examples/") and not f.endswith(".png")]
+
+
 def test_build_refuses_to_empty_other_folders(tmp_path):
     b = _load_build()
     (tmp_path / "mine.txt").write_text("keep")

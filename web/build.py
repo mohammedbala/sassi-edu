@@ -9,7 +9,8 @@ The site (see ``web/README.md`` and ``docs/internal/web_version.md``)::
 
     index.html                  sassi/ui/static/index.html without the session token, with web/boot.js
     .nojekyll                   GitHub Pages: serve the files as they are
-    static/                     the GUI front end (app.js, dialogs.js, plots.js, learn.js, styles.css, katex/)
+    static/                     the GUI front end (app.js, dialogs.js, plots.js, learn.js, styles.css, katex/,
+                                examples/ -- the gallery pictures); every file of sassi/ui/static, subfolders too
     static/plotly.min.js        Plotly.js of the installed plotly package
     web/boot.js, web/worker.js  the loading overlay and transport; the Web Worker running Pyodide
     web/sassi-edu.zip           what Python needs: the sassi package, README.md, examples/ and the public

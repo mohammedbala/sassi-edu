@@ -11,6 +11,7 @@ from pathlib import Path
 
 import pytest
 
+from sassi.plotting.state import plot_state
 from sassi.ui import learn
 from sassi.ui import lessons as L
 from sassi.ui.api import GuiSession
@@ -478,6 +479,31 @@ def test_load_and_run_example_workspaces(S, tmp_path):
     assert r["commands"][-1] == "INP,ex03_forced_vibration.pre"
     for bad in ("nosuch", "..", "ex01_surface_stick.pre"):
         assert call(S, "POST", f"/api/examples/{bad}/prepare", {"confirm": True})[0] == 404
+
+
+def test_example_picture_builds_the_model_and_opens_its_view(S):
+    """The picture of a gallery card: the gallery names it and its view; prepare {"model": true} returns the CD,
+    the fresh model, the model part of the example (no CHECK / AFWRITE / RUN<MODULE>) and MODELPLOT, run by the
+    player as command text (L17); an example without a structure opens LAYERPLOT."""
+    st, r = call(S, "GET", "/api/examples")
+    ex = {x["name"]: x for x in r["examples"]}
+    assert ex["ex01_surface_stick"]["thumb"] == "static/examples/ex01_surface_stick.png"
+    assert ex["ex01_surface_stick"]["view"] == "MODELPLOT" and ex["ex04_site_response"]["view"] == "LAYERPLOT"
+    st, r = call(S, "POST", "/api/examples/ex01_surface_stick/prepare", {"model": True})
+    assert st == 200 and r["view"] == "MODELPLOT"
+    ws = Path(r["workspace"])
+    assert r["commands"][:2] == [f"CD,{ws}", "DMODEL,0"] and r["commands"][2] == "MDL,ex01,ex01"
+    assert r["commands"][-1] == "MODELPLOT" and "INP,ex01_surface_stick.pre" not in r["commands"]
+    assert not [c for c in r["commands"] if c.upper().startswith(("RUN", "AFWRITE", "CHECK", "WRITE"))]
+    run_like_the_player(S, r["commands"])
+    assert S.jobs.running() is None and S.interp.model.name == "ex01"
+    plot = plot_state(S.interp).active_plot
+    assert plot.kind == "MODELPLOT" and sum(len(g.elements) for g in S.interp.model.groups.values()) == 76
+    assert not (ws / "ex01").exists() or not any((ws / "ex01").iterdir())        # nothing was written or run
+    st, r = call(S, "POST", "/api/examples/ex04_site_response/prepare", {"model": True, "confirm": True})
+    assert st == 200 and r["view"] == "LAYERPLOT" and r["commands"][-1] == "LAYERPLOT"
+    run_like_the_player(S, r["commands"])
+    assert plot_state(S.interp).active_plot.kind == "LAYERPLOT"
 
 
 def test_example_support_files():

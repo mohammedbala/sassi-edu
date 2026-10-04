@@ -721,6 +721,7 @@ def cmd_cngview(c):
     for attr, val in zip(("rx", "ry", "rz", "px", "py", "zoom"), vals):
         if val is not None:
             setattr(v, attr, float(val))
+    v.view_rev += 1
     _done(c, plot, "CNGVIEW", "3D")
 
 
@@ -731,6 +732,7 @@ def cmd_rstview(c):
     if v is None:
         return
     v.reset_view()
+    v.view_rev += 1
     _done(c, plot, "RSTVIEW", "3D")
 
 
@@ -741,6 +743,7 @@ def cmd_cngcenter(c):
     if v is None:
         return
     v.center = [c.float(k, required=True) for k in (1, 2, 3)]
+    v.view_rev += 1
     _done(c, plot, "CNGCENTER", "3D")
 
 
@@ -751,6 +754,7 @@ def cmd_rstcenter(c):
     if v is None:
         return
     v.center = None
+    v.view_rev += 1
     _done(c, plot, "RSTCENTER", "3D")
 
 

@@ -58,8 +58,9 @@ Routes (``route(method, path, query, body)``; all answers are JSON)::
     POST /api/lessons/<id>/action       {"verb", "args"} a step action -> command text or a GUI request
     POST /api/lessons/<id>/progress     {"step"} a step has run in the current workspace
     GET  /api/examples                  the examples gallery (examples/*.pre headers + README rows)
-    POST /api/examples/<name>/prepare   {"run", "confirm"} fresh <course root>/examples/<name>/; returns the
-                                        commands (CD, fresh model[, INP]) and the copied .pre
+    POST /api/examples/<name>/prepare   {"run", "model", "confirm"} fresh <course root>/examples/<name>/; returns
+                                        the commands (CD, fresh model[, INP]) and the copied .pre; "model":
+                                        the model part of the example and MODELPLOT / LAYERPLOT ("view")
     GET  /api/explain?line=&cursor=     the command explainer (name, syntax, tier, status, arguments)
     GET  /api/course/workspaces         the course workspaces on disk with their size
     POST /api/course/workspaces/delete  {"names"?} delete course workspaces not in use (Learn > Free Disk Space)
@@ -1041,8 +1042,10 @@ class GuiSession:
         return {"examples": learn.examples(Path(self.examples_dir), good), "root": str(self.course_root())}
 
     def example_prepare(self, name: str, body: Dict[str, Any]) -> Dict[str, Any]:
-        """``POST /api/examples/<name>/prepare {"run", "confirm"}``: copy the example into a fresh workspace;
-        returns the commands (CD there, fresh model, and ``INP`` when ``run``) and the copied ``.pre``."""
+        """``POST /api/examples/<name>/prepare {"run", "model", "confirm"}``: copy the example into a fresh
+        workspace; returns the commands (CD there, fresh model, and ``INP`` when ``run``; with ``model`` the
+        model part of the example and its view command, :func:`sassi.ui.learn.example_model_lines`) and the
+        copied ``.pre``."""
         self._refuse_while_running(f"load example {name}")
         unsaved = self._unsaved_outside_course()
         if unsaved and not body.get("confirm"):
@@ -1054,9 +1057,19 @@ class GuiSession:
             raise ApiError(exc.status, str(exc)) from None
         with self.locked():
             lines = [learn.cd_line(ws)] + learn.fresh_model_lines(list(self.interp.models), self.interp.active_model)
+        out: Dict[str, Any] = {"ok": True, "example": name, "workspace": str(ws), "pre": str(pre)}
         if body.get("run"):
             lines.append(join_command("INP", [pre.name]))
-        return {"ok": True, "example": name, "workspace": str(ws), "pre": str(pre), "commands": lines}
+        elif body.get("model"):
+            # the picture of the gallery card: build the model without module runs, then show it
+            try:
+                model = learn.example_model_lines(pre.read_text(encoding="utf-8", errors="replace"))
+            except OSError as exc:
+                raise ApiError(500, f"cannot read {pre}: {exc}") from None
+            out["view"] = learn.example_view_command(model)
+            lines += model + [out["view"]]
+        out["commands"] = lines
+        return out
 
     def _in_use_paths(self) -> List[Optional[Path]]:
         with self.locked():

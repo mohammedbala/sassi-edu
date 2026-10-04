@@ -87,9 +87,16 @@
     if (!div || !div.data) return;
     try {
       Plotly.Plots.resize(div);
-      // 3D: the orthographic fit depends on the width / height of the plot (sceneGeometry)
+      // 3D: the orthographic fit depends on the width / height of the plot (sceneGeometry) -- unless the
+      // learner has rotated or zoomed the view with the mouse: then the view is kept as it is
       const d = t.data;
-      if (d && (d.family === "3d" || d.family === "anim") && d.camera) Plotly.relayout(div, {scene: sceneLayout(d, null, d.family === "anim", div).scene});
+      if (d && (d.family === "3d" || d.family === "anim") && d.camera && !t.userView) {
+        t.ownRelayout = true;
+        const lay = sceneLayout(d, null, d.family === "anim", div);
+        t.fitAspectX = lay.scene.aspectratio.x;
+        Promise.resolve(Plotly.relayout(div, {scene: lay.scene}))
+          .finally(() => { t.ownRelayout = false; });
+      }
     } catch (e) { /* hidden tab */ }
   }
   window.addEventListener("resize", () => { const t = S.activeTab; if (t && t.plotId) resize(t); });
@@ -253,9 +260,35 @@
     const W = (div && div.clientWidth) || 800, H = (div && div.clientHeight) || 600;
     const ex = d.camera.extent || [-1, 1, -1, 1];
     const half = d.camera.half || Math.max((ex[1] - ex[0]) / 2, (ex[3] - ex[2]) / 2, 1e-9);
-    const lam = Math.min(1, W / H) / Math.max(half, 1e-12);
+    let lam = Math.min(1, W / H) / Math.max(half, 1e-12);
+    // Fit the whole axis box (with the tick labels) rather than the model alone: the half extents of
+    // the box corners about the rotation centre along the screen axes, 10 % margin, times the zoom.
+    const B = d.camera.basis, c = d.camera.center;
+    if (B && c) {
+      let hx = 1e-12, hy = 1e-12;
+      for (const x of r[0]) for (const y of r[1]) for (const z of r[2]) {
+        const q = [x - c[0], y - c[1], z - c[2]];
+        hx = Math.max(hx, Math.abs(q[0] * B[0][0] + q[1] * B[0][1] + q[2] * B[0][2]));
+        hy = Math.max(hy, Math.abs(q[0] * B[1][0] + q[1] * B[1][1] + q[2] * B[1][2]));
+      }
+      const zoom = Number(d.view && d.view.zoom) > 0 ? Number(d.view.zoom) : 1;
+      lam = 0.9 * zoom * Math.min((W / H) / hx, 1 / hy);
+    }
     return {ranges: r, mid: r.map(([lo, hi]) => 0.5 * (lo + hi)), lam,
       aspect: {x: (r[0][1] - r[0][0]) * lam, y: (r[1][1] - r[1][0]) * lam, z: (r[2][1] - r[2][0]) * lam}};
+  }
+  /** Mouse rotation that keeps the model upright: when the view has no roll (its screen "up" is the
+   *  projection of global Z) the camera's up vector is global Z and the scene rotates as a turntable
+   *  about it; a rolled view (CNGVIEW about the view axis) or a view along Z keeps its own up vector and
+   *  free (orbit) rotation. */
+  function viewUp(B) {
+    const dir = B[2], up = B[1];
+    const zp = [-dir[2] * dir[0], -dir[2] * dir[1], 1 - dir[2] * dir[2]];
+    const n = Math.hypot(zp[0], zp[1], zp[2]);
+    if (n > 0.15 && (zp[0] * up[0] + zp[1] * up[1] + zp[2] * up[2]) / n > 0.999) {
+      return {up: {x: 0, y: 0, z: 1}, dragmode: "turntable"};
+    }
+    return {up: {x: up[0], y: up[1], z: up[2]}, dragmode: "orbit"};
   }
   /** Plotly camera of a 3D plot: rotation (basis rows right / up / toward the viewer), the point
    *  looked at = rotation centre (CNGCENTER, else the box centre: camera.center) shifted by the pan
@@ -267,18 +300,35 @@
     const n = look.map((x, i) => (x - g.mid[i]) * g.lam);
     // the eye only gives the direction in an orthographic view; keep it outside the plot box
     const k = 2 + Math.hypot(g.aspect.x, g.aspect.y, g.aspect.z) + Math.hypot(n[0], n[1], n[2]);
-    return {eye: {x: n[0] + B[2][0] * k, y: n[1] + B[2][1] * k, z: n[2] + B[2][2] * k}, up: {x: B[1][0], y: B[1][1], z: B[1][2]},
+    return {eye: {x: n[0] + B[2][0] * k, y: n[1] + B[2][1] * k, z: n[2] + B[2][2] * k}, up: viewUp(B).up,
       center: {x: n[0], y: n[1], z: n[2]}, projection: {type: "orthographic"}};
+  }
+  /** sceneLayout keeping the learner's mouse view across re-renders of the same commanded view: a toggle
+   *  such as NODENUM or the next animation frame re-renders the plot, and the rotation (the live camera)
+   *  and the orthographic zoom (the aspect ratio) would otherwise go back to the commanded view.  Plotly's
+   *  uirevision does not do it reliably (it compares camera values that differ in the last digits). */
+  function layoutKeepingZoom(t, d, extra, fixed, div) {
+    const lay = sceneLayout(d, extra, fixed, div);
+    const a = lay.scene.aspectratio, fl = div && div._fullLayout && div._fullLayout.scene;
+    const v = d.view || {};
+    const key = JSON.stringify([v.rx, v.ry, v.rz, v.zoom, v.px, v.py, v.center, v.view_rev]);
+    if (t.userView && t.viewKey === key && fl && fl.aspectratio && t.fitAspectX) {
+      const f = fl.aspectratio.x / t.fitAspectX;
+      if (isFinite(f) && f > 0) lay.scene.aspectratio = {x: a.x * f, y: a.y * f, z: a.z * f};
+      try { if (fl._scene && fl._scene.getCamera) lay.scene.camera = fl._scene.getCamera(); } catch (e) { /* keep the commanded camera */ }
+    }
+    t.fitAspectX = a.x;
+    return lay;
   }
   function sceneLayout(d, extra, fixed, div) {
     const v = d.view;
     d._geo = sceneGeometry(d, fixed, div);
     const g = d._geo;
-    const key = JSON.stringify([v.rx, v.ry, v.rz, v.zoom, v.px, v.py, v.center]);
+    const key = JSON.stringify([v.rx, v.ry, v.rz, v.zoom, v.px, v.py, v.center, v.view_rev]);
     const ax = (t, r) => ({title: {text: t}, showbackground: false, gridcolor: "#e6e6e6", zerolinecolor: "#ccc", showspikes: false,
       range: r, autorange: false});
     const scene = {aspectmode: "manual", aspectratio: g.aspect, camera: cameraOf(d), xaxis: ax("X", g.ranges[0]), yaxis: ax("Y", g.ranges[1]),
-      zaxis: ax("Z", g.ranges[2]), uirevision: key, dragmode: "orbit"};
+      zaxis: ax("Z", g.ranges[2]), uirevision: key, dragmode: viewUp(d.camera.basis).dragmode};
     return Object.assign({
       margin: {l: 0, r: 0, t: d.title ? 30 : 6, b: 0}, title: {text: S.esc(d.title || ""), font: {size: 14}},
       showlegend: false, paper_bgcolor: "#fff", uirevision: key, scene,
@@ -400,8 +450,21 @@
     const txt = `view rX ${v.rx} rY ${v.ry} rZ ${v.rz}  pan ${v.px} ${v.py}  zoom ${v.zoom}\ncentre ${(d.camera.center || []).map((c) => S.fmt(c, 4)).join(", ")}` + (extra ? "\n" + extra : "");
     t.host.appendChild(el("div", {class: "debug-box", text: txt}));
   }
+  /** A rotation / zoom with the mouse marks the view as the learner's: resize keeps it (see resize).  A
+   *  new view from the server (CNGVIEW, RSTVIEW, CNGCENTER: another view key) clears the mark. */
+  function trackView(t, div) {
+    const v = (t.data && t.data.view) || {};
+    const key = JSON.stringify([v.rx, v.ry, v.rz, v.zoom, v.px, v.py, v.center, v.view_rev]);
+    if (t.viewKey !== key) { t.viewKey = key; t.userView = false; }
+    if (!div || div._sassiView) return;
+    div._sassiView = true;
+    div.on("plotly_relayout", (ev) => {
+      if (!t.ownRelayout && ev && Object.keys(ev).some((k) => k.startsWith("scene.camera") || k.startsWith("scene.aspectratio"))) t.userView = true;
+    });
+  }
   function attachClick(t) {
     const div = t.plotDiv;
+    trackView(t, div);
     if (div._sassiClick) return;
     div._sassiClick = true;
     div.on("plotly_click", (ev) => {
@@ -443,7 +506,7 @@
     }
     traces.push(...labelTraces(d, sc));
     const div = plotDiv(t);
-    Plotly.react(div, traces, sceneLayout(d, null, false, div), PLOT_CONFIG);
+    Plotly.react(div, traces, layoutKeepingZoom(t, d, null, false, div), PLOT_CONFIG);
     attachClick(t);
     debugBox(t, d);
   }
@@ -541,7 +604,8 @@
       slider.value = k;
       label.textContent = `frame ${fk} (${k + 1}/${frames.length}) ${fr.label || ""}`;
       const div = plotDiv(t);
-      Plotly.react(div, animTraces(d, fr), sceneLayout(d, null, true, div), PLOT_CONFIG);
+      Plotly.react(div, animTraces(d, fr), layoutKeepingZoom(t, d, null, true, div), PLOT_CONFIG);
+      trackView(t, div);
       debugBox(t, d, `frame ${fk}  ${fr.label || ""}  ${d.kind}  ${a.buffer_dir}`);
     };
     slider.addEventListener("input", () => show(Number(slider.value)));

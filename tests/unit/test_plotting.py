@@ -512,3 +512,18 @@ def test_manual_graphing_macro_end_to_end(tmp_path):
     from sassi.plotting.lines import read_spec_file
     x, ys = read_spec_file(tmp_path / "Node17srss.rs", 1)
     assert np.allclose(ys[0], np.sqrt(sum(st.lines[k].y ** 2 for k in (1, 2, 3))))
+
+
+def test_view_commands_count_view_revisions(model_ui):
+    """Every view command increments view_rev (also RSTVIEW of an unchanged view), so the browser replaces a
+    view rotated or zoomed with the mouse by the commanded one; display toggles do not."""
+    ui = model_ui
+    assert ui.execute("MODELPLOT")
+    v = plot_state(ui).active_plot.view
+    assert v.view_rev == 0
+    for k, line in enumerate(["CNGVIEW,10,20,30", "RSTVIEW", "RSTVIEW", "CNGCENTER,1,2,3", "RSTCENTER"], start=1):
+        assert ui.execute(line)
+        assert v.view_rev == k, line
+    for line in ("NODENUM,1", "ELENUM,1", "WIREFRAME,1", "SHRINK"):
+        assert ui.execute(line)
+    assert v.view_rev == 5 and v.to_dict()["view_rev"] == 5

@@ -32,6 +32,10 @@ It prints the size of the site (about 7.7 MB: Plotly.js 4.8 MB, the Python bundl
 also download Pyodide, NumPy and SciPy from cdn.jsdelivr.net at their first visit (23 MB compressed,
 32 MB unpacked), which their browser then caches: about 27 MB in all.
 
+The front end `sassi/ui/static/` is copied with its subfolders: `katex/` and `examples/`, the pictures of
+the examples gallery (seven PNGs, about 40 kB, written by `python -m sassi.ui.thumbnails`; regenerate them
+after changing an example).
+
 The build never bundles `reference/` (the ACS SASSI manual text), `docs/spec/`, `docs/internal/`,
 `tests/`, `examples/sassi-course/` (your local course runs) or virtual environments; it stops with an
 error if one of them would be written. `tests/unit/test_web.py` checks the bundle as well.

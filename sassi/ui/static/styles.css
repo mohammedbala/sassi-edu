@@ -513,6 +513,14 @@ button.linkish { border: 0; background: none; color: var(--learn-accent); cursor
 .xbtns { display: flex; flex-wrap: wrap; gap: 6px; margin-top: auto; padding-top: 6px; }
 .xdlg { width: 820px; max-width: 100%; }
 .xcards-dlg { grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); }
+/* example picture (sassi/ui/static/examples/*.png, 480 x 300 px shown at 240 x 150: 2x density); background = its own */
+.xthumb { position: relative; display: flex; align-items: center; justify-content: center; height: 150px; margin: -10px -12px 4px; padding: 0; border: 0; border-bottom: 1px solid var(--border-2); border-radius: 5px 5px 0 0; background: #f3f6fa; cursor: pointer; overflow: hidden; }
+.xthumb img { display: block; height: 100%; width: auto; max-width: 100%; object-fit: contain; }
+.xthumb::after { content: attr(data-hint); position: absolute; right: 8px; bottom: 7px; font-size: 11px; font-weight: 600; color: #fff; background: var(--learn-accent); border-radius: 3px; padding: 2px 7px; opacity: 0; transition: opacity .12s; pointer-events: none; }
+.xthumb:hover::after, .xthumb:focus-visible::after { opacity: .92; }
+.xthumb:focus-visible { outline: 2px solid var(--learn-accent); outline-offset: -2px; }
+.xcards-dlg .xthumb { height: 120px; }
+@media (prefers-reduced-motion: reduce) { .xthumb::after { transition: none; } }
 .learn-tips ul { margin: 0; padding-left: 20px; line-height: 1.55; }
 @media (max-width: 760px) {
   .learn-page { padding: 8px; }

@@ -235,6 +235,15 @@ class Handler(BaseHTTPRequestHandler):
             ctype = KATEX_TYPES.get(p.suffix.lower(), "application/octet-stream")
             self._send(200, p.read_bytes(), ctype, {"Cache-Control": "max-age=86400"})
             return
+        m = re.match(r"^/static/examples/([A-Za-z0-9][A-Za-z0-9_\-]*\.png)$", path)
+        if m:
+            # preview pictures of the examples gallery (python -m sassi.ui.thumbnails)
+            p = STATIC_DIR / "examples" / m.group(1)
+            if not p.is_file():
+                self._json(404, {"error": "not found"})
+                return
+            self._send(200, p.read_bytes(), "image/png")
+            return
         if path.startswith("/static/"):
             name = path[len("/static/"):]
             if not name or "/" in name or "\\" in name or name.startswith("."):
