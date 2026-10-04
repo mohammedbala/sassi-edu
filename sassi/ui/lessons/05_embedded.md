@@ -27,6 +27,13 @@ with
 * the structure: the FE model, basement included;
 * the excavated soil: an FE model with the free-field properties.
 
+```figure
+substructuring case=embedded
+The three parts for this lesson's box, one at a time. The excavated soil is meshed only to be
+subtracted; with every one of its nodes an interaction node (FV) the equation is exact, and the
+reduced sets of steps 7 to 9 drop some of these nodes.
+```
+
 Embedment brings in two effects the surface mat of lessons 1 and 4 did not have: **kinematic
 interaction** (the basement cannot follow a free-field motion that varies with depth) and the choice
 of **interaction nodes**, which governs both the cost and the accuracy. In this lesson you build
@@ -375,11 +382,14 @@ RUNANALYS
 RUNMOTION
 RUNSTRESS
 WRITE
+* the steady-state motion at 6.0 Hz, 24 frames over one period (compared with FI-FSIN in the next step)
+HARMFRAME,FILE8,6.0,HARM6
 ```
 
 ```action
 plot-spectrum: ex02/00138TR_X.TFU, ex02/00013TR_X.TFU
 plot-spectrum: ex02/00140TR_Z.TFU, ex02/00136TR_Z.TFU
+animate: ex02/HARM6 | deformed 0.3 | FV at 6.0 Hz
 open-listing: SITE
 open-listing: ANALYS
 open-listing: STRESS
@@ -397,6 +407,13 @@ histories of the two bending moments. Results:
 * the roof edges move vertically in opposite directions, up to 0.24 at 20 Hz: the box **rocks**
   under a horizontal, vertically incident wave;
 * the bending moment MYY of the wall panel 74 reaches 20.9 kN m/m (STRESS listing).
+
+`HARMFRAME,FILE8,6.0,HARM6` writes the steady-state motion of every node at 6.006 Hz (the computed
+frequency closest to 6 Hz), per unit harmonic control motion, in 24 frames over one period. The
+animation draws it 0.3 m per unit of control motion: the box translates almost as a rigid body, the
+roof centre at 0.85 and the base-slab centre at 0.74, nearly in phase with the control motion (3°
+and 5° ahead of it), and hardly rocks (roof edges 0.03). The drawing includes the excavated soil
+inside the box (groups 1-5), whose nodes it shares.
 
 ### Why it matters
 Unlike the surface stick, this stiff, light box amplifies nothing: it follows the ground at low
@@ -441,6 +458,8 @@ RUNANALYS
 RUNMOTION
 RUNSTRESS
 WRITE
+* the steady-state motion at 6.0 Hz, as for FV
+HARMFRAME,FILE8,6.0,HARM6
 ```
 
 ```action
@@ -448,6 +467,8 @@ plot-nodes
 plot-spectrum: ex02/00138TR_X.TFU, ex02_fsin/00138TR_X.TFU
 plot-spectrum: ex02/00140TR_Z.TFU, ex02_fsin/00140TR_Z.TFU
 plot-history: ex02/SHELL_006_00074_MYY.THS, ex02_fsin/SHELL_006_00074_MYY.THS
+animate: ex02/HARM6 | deformed 0.3 | FV at 6.0 Hz
+animate: ex02_fsin/HARM6 | deformed 0.3 | FI-FSIN at 6.0 Hz
 open-file: ex02_fsin/ex02fsin.err
 ```
 
@@ -464,6 +485,14 @@ depth have not changed. Compared with FV (computed points):
 | roof X transfer function at 6.0 Hz | 0.85 | **1.34** (+58 %) |
 | roof-edge vertical transfer function at 6.0 Hz | 0.029 | **0.58** |
 | wall panel 74, moment MYY | 20.9 kN m/m | **43.0 kN m/m** |
+
+`HARMFRAME` writes the FI-FSIN motion at 6.006 Hz as it did for FV. Play the two animations (same
+scale, 0.3 m per unit of control motion). In FV the box translates as a nearly rigid body. In FI-FSIN
+the walls and the base slab, held by the interaction nodes, move at most 1.38 times the control
+motion, but the non-interaction nodes vibrate in a mode of their own: the roof slab see-saws about its
+centre line x = 0, its interior nodes moving vertically by up to 15.6 (nodes 137 and 139, in opposite
+directions), and the soil inside the box sways by up to 4.1 (node 113). This is the spurious
+sub-system of the Technical basis below, made visible.
 
 ### Why it matters
 FI-FSIN creates a resonance near 6 Hz that does not exist: the roof motion is overestimated by
@@ -606,6 +635,13 @@ generated, FFV, is the one that runs (`HOUSE` `<imp>` = 1 records the method). T
 FV within 0.44 % for the roof X transfer function and 1.5 % for the roof-edge vertical one; the wall
 moment is 21.0 kN m/m.
 
+```figure
+interaction-sets method=ffv
+The four sets of this step on the excavation mesh, with the counts INTCOUNT reports. The dense
+impedance grows with the square of the number of interaction nodes and the solution time with its
+cube.
+```
+
 ### Why it matters
 On this small box ANALYS solves every set in about half a second, so the cost argument is invisible;
 the memory and time scale as $N_{\text{int}}^2$ and $N_{\text{int}}^3$, so on a basement with tens
@@ -650,12 +686,15 @@ AFWRITE
 RUNHOUSE
 RUNANALYS
 RUNMOTION
+* the foundation input motion at 12 Hz, 24 frames over one period
+HARMFRAME,FILE8,12,HARM12
 ```
 
 ```action
 plot-spectrum: ex02_massless/00013TR_X.TFU, ex02/00013TR_X.TFU, ex02_massless/00138TR_X.TFU
 plot-spectrum: ex02_massless/00140TR_Z.TFU, ex02/00140TR_Z.TFU
 plot-spectrum: ex02_massless/00013TR_X01.RS, ex02/00013TR_X01.RS | log
+animate: ex02_massless/HARM12 | deformed 3 | Massless box at 12 Hz
 ```
 
 ### What this does
@@ -666,6 +705,13 @@ gives 0.81, 0.41, 0.29 and 0.45 at the base slab: here inertia changes little, b
 is a light (612 t, less than the 968 t of soil it replaces), very stiff box with no superstructure.
 A real building on this basement would add its inertia, and the difference would be larger.
 
+`HARMFRAME,FILE8,12,HARM12` writes the motion of the massless box at 12.01 Hz, where the free field
+at the base level (5 m deep) moves only 0.10 while the ground surface moves 1. The animation (3 m per
+unit of control motion) shows the foundation input motion: the box neither follows the surface nor
+the base level. The base slab moves 0.29 and the roof 0.52, 63° and 34° ahead of the control motion
+(top and bottom do not move together), and the roof edges move up and down by ±0.10: translation and
+rocking from the free field alone, without any inertia of the box.
+
 ### Why it matters
 The motion of the massless foundation is the **foundation input motion**: the motion your
 structure actually receives from the ground, before its own inertia acts. For this box it is well
@@ -675,6 +721,14 @@ soil sites have lower high-frequency ISRS than a fixed-base analysis driven by t
 predicts. Recall lesson 1: for a surface mat under vertically incident waves the same analysis gave
 exactly the free-field motion. A massless-foundation model is also what the manual suggests for
 validating reduced interaction sets against FV.
+
+```figure
+kinematic-inertial case=embedded r=0.2
+The split for the embedded box: the massless run of this step is problem 1, and its foundation
+input motion (translation and rocking) drives problem 2. $D/\lambda$ is the embedment over the
+shear wavelength, $f/(50\,\text{Hz})$ for 5 m of sand at 250 m/s: the larger it is, the more the box
+averages a free field that varies over its depth.
+```
 
 ### Technical basis
 With zero structural mass the equation keeps the excavated-soil terms,

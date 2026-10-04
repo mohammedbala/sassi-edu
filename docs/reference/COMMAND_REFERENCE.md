@@ -31,13 +31,13 @@ Every command of the ACS SASSI V3 manual and of the SASSI-EDU dialect is listed 
 | [3.4.O Option NON and nonlinear soil](#34o-option-non-and-nonlinear-soil) | 32 | 29 | 0 | 3 |
 | [3.4.P Binary databases](#34p-binary-databases) | 15 | 0 | 1 | 14 |
 | [3.4.Q Thick shell](#34q-thick-shell) | 2 | 2 | 0 | 0 |
-| [3.4.R Extension commands of SASSI-EDU](#34r-extension-commands-of-sassi-edu) | 38 | 38 | 0 | 0 |
-| **Total** | 362 | 339 | 1 | 22 |
+| [3.4.R Extension commands of SASSI-EDU](#34r-extension-commands-of-sassi-edu) | 39 | 39 | 0 | 0 |
+| **Total** | 363 | 340 | 1 | 22 |
 
 | Tier | Commands | Implemented |
 |---|---:|---:|
 | P0 | 161 | 160 |
-| P1 | 123 | 123 |
+| P1 | 124 | 124 |
 | P2 | 78 | 56 |
 
 ## 3.4.A Session, files, models and global options
@@ -462,6 +462,7 @@ Every command of the ACS SASSI V3 manual and of the SASSI-EDU dialect is listed 
 | **EDUOPT** | `EDUOPT,<key>,<value>` | - | P0 | yes | Algorithm switch of requirements section 7; a blank value resets the key. |
 | **FCOPY** | `FCOPY,<src>,<dst>` | - | P0 | yes | Copy a file of the model directory (e.g. FILE1 -> FILE1X, FILE8 -> FILE81). |
 | **FMOVE** | `FMOVE,<src>,<dst>` | - | P0 | yes | Rename a file of the model directory (e.g. FILE8 -> FILE82). |
+| **HARMFRAME** | `HARMFRAME,<Src>,<Freq>,<OutDir>,[NFrames],[Ref]` | - | P1 | yes | Steady-state harmonic frames u = Re(H e^{iwt}) of every node over one period at the computed frequency closest to &lt;Freq> (SASSI-EDU extension; PROCFRAME and DEFORMPLOT animate them). |
 | **HOUSEX** | `HOUSEX,<optimize>,<supmode>,<nsim>,<nlssi>,<ansys>` | - | P0 | yes | HOUSE dialog fields without an argument (node optimizer, Linear/Quadratic superposition, stochastic simulations, non-linear soil SSI, ANSYS model input). |
 | **LGFILE** | `LGFILE,<key>,<name>` | - | P2 | yes | A file or path box of the LOADGEN dialogs (keys SSIPATH HOUSE DISP DISPROT ACC ACCROT ANSYSPATH LUMPED MASTER APDL APDLDYN GROUND); &lt;name> is the rest of the line, blank = default. |
 | **LGLIST** | `LGLIST,[STATIC\|DYNAMIC]` | - | P2 | yes | List the LOADGEN (Option A) settings and the deck RUNLOADGEN would write. |

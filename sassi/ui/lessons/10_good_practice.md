@@ -206,6 +206,14 @@ flag a TFI peak at $f_p$ when
 with $A_I(f_p)$ the interpolated amplitude at the peak, $A_\text{ref}$ the larger computed amplitude
 of the two bracketing SSI frequencies and tol the tolerance in percent (`<tol %>`).
 
+```figure
+freq-interpolation set=coarse modes=2
+This experiment with a stand-in transfer function. On the coarse set no computed point is near
+3.49 Hz, yet the two-degree-of-freedom interpolant recovers the peak, and CRITFREQ flags it because
+no computed value supports it; add the flagged frequency and the flag clears. With three modes the
+interpolant misses the close mode, and it takes a few rounds.
+```
+
 ```action
 plot-spectrum: ex01c/COARSE_00085TR_X.TFU, ex01c/COARSE_00085TR_X.TFI
 explain: FREQ,1,4,41,82,123,164,205,287,369,492,655

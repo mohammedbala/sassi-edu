@@ -14,6 +14,10 @@ spec 09 sections 2.4, 2.11, 2.12, 2.24; D-FIL-03).
 * FRAMESEL,<tol>,<Acc>,<Var>: 1-based frame numbers of the local maxima / minima of an acceleration
   history with ``|a| >= tol/100 max|a|`` -> ``<Var>`` (frame k = time (k-1) dt, D-STR-08).
 * MODFRAMES,<cols>,<framelist>: rewrite the second header number (columns) of every frame of a list.
+* HARMFRAME,<Src>,<Freq>,<OutDir>,[NFrames],[Ref] (SASSI-EDU extension): the steady-state harmonic
+  motion of every node at one computed (SSI) frequency, ``u(t) = Re(H(f) e^{iwt})`` over one period, as
+  frames ``HARM_<wt deg>_<k>`` (node, X, Y, Z) for PROCFRAME and DEFORMPLOT.  Source: a FILE8-type
+  file of ANALYS / COMBIN or the ``TFU`` restart frames of MOTION (Restart for TF).
 
 (REMOVEFREQ, the third frequency-refinement tool, is implemented with the other extension
 commands in :mod:`sassi.prep.commands.extensions`.)
@@ -21,12 +25,14 @@ commands in :mod:`sassi.prep.commands.extensions`.)
 from __future__ import annotations
 
 import re
+import zipfile
 from pathlib import Path
 
 import numpy as np
 
 from ...plotting.lines import critfreq, framesel, numeric_rows
-from ...plotting.state import combine_frames, modframes_text, read_frame, read_frame_list, write_frame
+from ...plotting.state import (HARM_TAG, combine_frames, frame_name_info, harmonic_frame_name, harmonic_frames,
+                               modframes_text, read_frame, read_frame_list, write_frame)
 from ..interpreter import Variable
 from ..registry import CommandError
 from .plotting import plot_command
@@ -163,3 +169,157 @@ def cmd_modframes(c):
             f.write_text(new, encoding="utf-8")
             changed += 1
     c.confirm(f"{changed} of {len(files)} frame header(s) rewritten with {cols} columns")
+
+
+# ======================================================================================
+# HARMFRAME (SASSI-EDU extension): steady-state harmonic frames at one SSI frequency
+# ======================================================================================
+#: frames per period accepted by HARMFRAME
+HARM_FRAMES_MIN, HARM_FRAMES_MAX, HARM_FRAMES_DEFAULT = 4, 360, 24
+
+
+def _harm_from_file8(path: Path, freq: float):
+    """(SSI frequencies, index q, description, nodes, H (n, 3) at f_q, meta) of a FILE8-type file."""
+    from ...modules.base import ModuleError
+    from ...modules.motion import read_file8
+    try:
+        f8 = read_file8(path, path.name)
+    except ModuleError as exc:
+        raise CommandError(str(exc)) from None
+    fnum = np.asarray(f8["fnum"], dtype=np.int64)
+    f_ssi = fnum * float(f8.meta["df"])
+    q = int(np.argmin(np.abs(f_ssi - freq)))
+    eq_node = np.asarray(f8["eq_node"], dtype=np.int64)
+    eq_dof = np.asarray(f8["eq_dof"], dtype=np.int64)
+    trans = np.nonzero(eq_dof <= 3)[0]
+    nodes = np.array(sorted(set(int(n) for n in eq_node[trans])), dtype=np.int64)
+    pos = {int(n): r for r, n in enumerate(nodes)}
+    Hq = np.asarray(f8["H"])[q]
+    H = np.zeros((len(nodes), 3), dtype=complex)
+    for col in trans:
+        H[pos[int(eq_node[col])], int(eq_dof[col]) - 1] = Hq[col]
+    return f_ssi, q, f"{path.name} frequency number {int(fnum[q])}", nodes, H, f8.meta
+
+
+def _harm_from_tfu(path: Path, freq: float):
+    """The same from the TFU restart frames of MOTION (``TFU_<f>_<n>``: node, Re/Im of X, Y, Z)."""
+    cands = [(frame_name_info(f.name)["value"], f) for f in read_frame_list(path)]
+    cands = [(v, f) for v, f in cands if v is not None]
+    if not cands:
+        raise CommandError(f"{path.name}: no frame file named <tag>_<frequency>_<n> (MOTION Restart for TF writes "
+                           f"TFU/TFU_<f>_<n>); a FILE8-type file is read directly")
+    f_ssi = np.array([v for v, _ in cands], dtype=float)
+    q = int(np.argmin(np.abs(f_ssi - freq)))
+    fr = read_frame(cands[q][1])
+    if fr.values.shape[1] != 6:
+        raise CommandError(f"{cands[q][1].name}: {fr.values.shape[1]} data columns; TFU frames hold 6 (Re, Im of X, "
+                           f"Y, Z)")
+    H = fr.values[:, 0::2] + 1j * fr.values[:, 1::2]
+    order = np.argsort(f_ssi, kind="stable")
+    return f_ssi[order], int(np.nonzero(order == q)[0][0]), f"TFU frame {cands[q][1].name}", fr.nodes, H, None
+
+
+def _model_numbering(c, src: Path, nodes: np.ndarray):
+    """FILE8 node numbers -> model numbers when HOUSE renumbered the model (``<model>.map`` beside the
+    source): DEFORMPLOT draws the frames on the model, which keeps its own numbering."""
+    name = c.model.name
+    folder = src.parent
+    mp = folder / f"{name}.map" if name else None
+    if mp is None or not mp.is_file():
+        return nodes, ""
+    from ...core.renumber import read_map
+    try:
+        new_old = {int(n): int(o) for o, n in read_map(mp).items()}
+    except (OSError, ValueError) as exc:
+        c.warn(f"HOUSE optimizer map {mp.name} unreadable ({exc}): frame nodes keep the FILE8 numbers")
+        return nodes, ""
+    out = np.array([new_old.get(int(n), int(n)) for n in nodes], dtype=np.int64)
+    changed = int(np.sum(out != nodes))
+    return out, (f"; {changed} node number(s) translated to the model numbering ({mp.name})" if changed else "")
+
+
+@plot_command("HARMFRAME", max_args=5)
+def cmd_harmframe(c):
+    """HARMFRAME,<Src>,<Freq>,<OutDir>,[NFrames],[Ref]: steady-state harmonic frames u = Re(H e^{iwt}) of
+    every node over one period at the computed frequency closest to <Freq> (SASSI-EDU extension; PROCFRAME
+    and DEFORMPLOT animate them).
+
+    ``<Src>``: a FILE8-type file (FILE8, FILE8X, FILE81 ...) or the TFU frame folder (or list file) of
+    MOTION Restart for TF.  ``<Freq>`` in Hz: the closest SSI frequency is used and reported.
+    ``<OutDir>``: folder of the frames (created; earlier HARM frames in it are replaced).  ``<NFrames>``:
+    frames per period (default 24, 4..360).  ``<Ref>``: blank = total motion per unit control motion;
+    0 = relative to the free field (the control motion: unit amplitude, zero phase, in the input
+    direction, as RELDISP without RELFILE); n = relative to node n (its X, Y, Z motion subtracted).
+    """
+    if not c.given(1) or not c.given(3):
+        raise CommandError("<Src> (FILE8-type file or TFU frame folder) and <OutDir> (frame folder) are required")
+    src = c.input_path(c.str(1))
+    freq = c.float(2, required=True, what="Freq")
+    if not freq > 0:
+        raise CommandError("<Freq> must be > 0 Hz")
+    out = c.output_path(c.str(3))
+    nfr = c.int(4, default=HARM_FRAMES_DEFAULT)
+    if not HARM_FRAMES_MIN <= nfr <= HARM_FRAMES_MAX:
+        raise CommandError(f"<NFrames> must be within {HARM_FRAMES_MIN}..{HARM_FRAMES_MAX} (frames per period)")
+    ref = c.int(5) if c.given(5) else None
+    if ref is not None and ref < 0:
+        raise CommandError("<Ref> must be blank (total motion), 0 (free field) or a node number")
+    file8 = src.is_file() and zipfile.is_zipfile(src)
+    f_ssi, q, what, nodes, H, meta = (_harm_from_file8 if file8 else _harm_from_tfu)(src, float(freq))
+    if not len(nodes):
+        raise CommandError(f"{src.name}: no translational degree of freedom")
+    nodes, renum = _model_numbering(c, src, nodes)
+    fq = float(f_ssi[q])
+    if freq < f_ssi.min() * (1 - 1e-9) or freq > f_ssi.max() * (1 + 1e-9):
+        c.warn(f"{freq:g} Hz is outside the computed range {f_ssi.min():.4g}..{f_ssi.max():.4g} Hz: the nearest "
+               f"computed frequency {fq:.4g} Hz is used")
+    elif abs(fq - freq) > 0.05 * freq:
+        c.warn(f"the closest computed frequency {fq:.4g} Hz is more than 5 % from {freq:g} Hz (add an SSI frequency "
+               f"there to animate it)")
+    # ---------------------------------------------------------------- reference motion
+    if ref is None:
+        refname = "total motion"
+    elif ref == 0:
+        if meta is None:
+            raise CommandError("<Ref> = 0 (free field) needs a FILE8-type source (control direction); use a node "
+                               "number or blank with TFU frames")
+        if int(meta.get("type", 0)) != 0:
+            refname = "total motion (foundation vibration: no free-field motion, the free-field reference is 0)"
+        else:
+            from ...core.interp import rigid_body_anchor
+            cm, ang = int(meta.get("cm", 0)), float(meta.get("ang", 0.0))
+            H = H - np.array([rigid_body_anchor(d, cm, ang) for d in (1, 2, 3)], dtype=complex)[None, :]
+            refname = f"relative to the free field (unit control motion in {('x', 'y', 'z')[cm]}')"
+    else:
+        hit = np.nonzero(nodes == ref)[0]
+        if not len(hit):
+            raise CommandError(f"reference node {ref} has no translational DOF in {src.name}")
+        H = H - H[hit[0]][None, :]
+        refname = f"relative to node {ref}"
+    # ---------------------------------------------------------------- frames
+    phases, U = harmonic_frames(H, nfr)
+    out.mkdir(parents=True, exist_ok=True)
+    for old in out.glob(f"{HARM_TAG}_*"):
+        if old.is_file():
+            old.unlink()
+    others = [p.name for p in out.iterdir() if p.is_file() and not p.name.startswith(".")]
+    if others:
+        c.warn(f"{out.name} holds other files ({others[0]} ...): PROCFRAME of the folder would mix them with the "
+               f"harmonic frames; use a folder of its own")
+    try:
+        for k in range(nfr):
+            write_frame(out / harmonic_frame_name(float(phases[k]), k + 1), nodes, U[k])
+    except OSError as exc:
+        raise CommandError(f"cannot write the frames in {out}: {exc}") from None
+    amp = np.abs(H)
+    r, d = np.unravel_index(int(np.argmax(amp)), amp.shape)
+    c.info(f"HARMFRAME: {fq:.6g} Hz ({what}), the computed frequency closest to {freq:g} Hz among {len(f_ssi)}; "
+           f"period {1.0 / fq:.4g} s; {refname}{renum}")
+    try:
+        shown = out.resolve().relative_to(Path(c.interp.cwd).resolve()).as_posix()
+    except ValueError:
+        shown = str(out)
+    deg = int(round(float(np.degrees(np.angle(H[r, d]))))) + 0          # + 0: no "-0"
+    c.confirm(f"{nfr} frames over one period (wt = 0..{phases[-1]:g} deg) in {shown} ({len(nodes)} nodes, X Y Z); "
+              f"largest amplitude {amp[r, d]:.4g} at node {int(nodes[r])} {'XYZ'[d]} (phase {deg} deg): PROCFRAME "
+              f"the folder, then DEFORMPLOT")

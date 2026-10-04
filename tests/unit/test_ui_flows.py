@@ -270,7 +270,7 @@ def test_converters_with_output_pre_file(S, tmp_path):
     cmd(S, f"CONVERT,SSI,2,{hou},{tmp_path / 'from_hou.pre'}")
     assert (tmp_path / "from_hou.pre").is_file()
     assert S.interp.models[2].counts()["nodes"] == S.interp.models[0].counts()["nodes"] == 90
-    cdb = ROOT / "tests" / "data" / "ansys" / "beam188_cantilever.cdb"
+    cdb = ROOT / "sassi" / "data" / "ansys" / "beam188_cantilever.cdb"
     if cdb.is_file():
         cmd(S, "ACTM,3", f"CONVERT,ANSYS,,{cdb},9.81,{tmp_path / 'beam.pre'}")         # blank = active (3)
         assert S.interp.models[3].counts()["elements"] > 0 and (tmp_path / "beam.pre").is_file()

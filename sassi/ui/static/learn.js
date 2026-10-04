@@ -862,7 +862,7 @@
     }
     return bar;
   }
-  const NEEDS_RUN = ["plot-model", "plot-nodes", "plot-layers", "plot-soilprops", "plot-spectrum", "plot-history", "open-file", "open-listing"];
+  const NEEDS_RUN = ["plot-model", "plot-nodes", "plot-layers", "plot-soilprops", "plot-spectrum", "plot-history", "open-file", "open-listing", "animate"];
   async function doAction(st, k, a, anchor) {
     if (NEEDS_RUN.includes(a.verb) && st.commands.length && !P.ran.has(k)) {
       const yes = await D().confirm("Run the step first?", `"${a.label}" shows what step ${k} produces, and the step has not run in this workspace yet.`, "Run the step, then show", "Show anyway");
@@ -920,6 +920,8 @@
       });
       ph.replaceWith(box);
     });
+    // concept figures (```figure blocks): static/figures.js draws them; the caption is server-rendered HTML
+    if (S.Figures) S.Figures.fill(root, blocks, (b) => html("doc lesson-md lfig-caption", b.caption_html), `${P.id}/${stepKey}`);
   }
   const ST_ICON = {running: "▶", job: "⟳", ok: "✓", error: "✗", skipped: "–"};
   function paintLines() {

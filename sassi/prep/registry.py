@@ -441,6 +441,7 @@ EDUOPT         -   P0 indexed key=word
 FCOPY          -   P0 action
 FMOVE          -   P0 action
 REMOVEFREQ     -   P1 action
+HARMFRAME      -   P1 action
 COMBXYZSTRAIN  -   P1 action
 BUILDFILE77    -   P1 action
 COMBXYZTHD     -   P2 action

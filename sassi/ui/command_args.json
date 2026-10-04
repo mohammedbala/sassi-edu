@@ -1302,6 +1302,39 @@
    }
   ]
  },
+ "DEFORMPLOT": {
+  "summary": "Animates the deformed shape of the active model from a processed frame store: every frame node is drawn at x + Scale u (the first three data columns; the real parts for complex TFU frames).",
+  "configures": "Plots",
+  "source": "spec 10 §4.5; requirements 5.8",
+  "notes": "Without arguments the GUI opens Load Frame Data; in batch mode that is an error. Missing arguments are taken from the SASSIani.xml entry of the store, with a warning. Nodes without frame data are drawn undeformed. WINDOWSETTINGS,UNDEFORMED,1 shows the undeformed shape as well.",
+  "args": [
+   {
+    "pos": 1,
+    "name": "BufferDir",
+    "meaning": "processed frame store written by PROCFRAME"
+   },
+   {
+    "pos": 2,
+    "name": "MnF",
+    "meaning": "first frame of the animation"
+   },
+   {
+    "pos": 3,
+    "name": "MxF",
+    "meaning": "last frame of the animation"
+   },
+   {
+    "pos": 4,
+    "name": "ST",
+    "meaning": "stride: every ST-th frame is shown"
+   },
+   {
+    "pos": 5,
+    "name": "Scale",
+    "meaning": "magnification of the displacements (model length per unit of the frame data)"
+   }
+  ]
+ },
  "DELL": {
   "summary": "Deletes soil layers m1 to m2.",
   "configures": "Model: soil layers",
@@ -2573,6 +2606,46 @@
     "pos": 2,
     "name": "title",
     "meaning": "free-text title: the rest of the line, commas kept"
+   }
+  ]
+ },
+ "HARMFRAME": {
+  "summary": "Writes the steady-state harmonic motion of every node at one computed (SSI) frequency as animation frames: u(t) = Re(H(f) e^(iwt)) over one period, for PROCFRAME and DEFORMPLOT (SASSI-EDU extension).",
+  "configures": "Plots",
+  "source": "requirements §3.4.R; spec 10 §4.5; handler docstring",
+  "notes": "The frames are named HARM_<wt in degrees>_<k> and hold node, X, Y, Z. Transfer functions are per unit control motion (seismic) or per unit load (vibration). With the HOUSE optimizer the FILE8 node numbers are translated back to the model numbering (<model>.map beside the source).",
+  "args": [
+   {
+    "pos": 1,
+    "name": "Src",
+    "meaning": "transfer-function source: a FILE8-type file of ANALYS or COMBIN (FILE8, FILE8X, FILE81 ...) or the TFU frame folder (or list file) written by MOTION with Restart for TF"
+   },
+   {
+    "pos": 2,
+    "name": "Freq",
+    "meaning": "frequency in Hz; the computed SSI frequency closest to it is used and reported (a warning when it is more than 5 % away or outside the computed range)"
+   },
+   {
+    "pos": 3,
+    "name": "OutDir",
+    "meaning": "folder of the frames (created; earlier HARM frames in it are replaced); relative to the model folder"
+   },
+   {
+    "pos": 4,
+    "name": "NFrames",
+    "meaning": "frames per period, 4 to 360",
+    "default": "24"
+   },
+   {
+    "pos": 5,
+    "name": "Ref",
+    "meaning": "reference motion subtracted from every node",
+    "default": "blank",
+    "values": {
+     "blank": "total motion (per unit control motion)",
+     "0": "relative to the free field: the unit control motion, zero phase, in the input direction (as RELDISP without RELFILE; FILE8 sources only)",
+     "n": "relative to node n (its X, Y, Z motion)"
+    }
    }
   ]
  },

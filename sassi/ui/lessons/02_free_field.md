@@ -399,6 +399,14 @@ rigid-base transfer function of the 17 m column
 and outcrop motions"; [User Guide §7.3](docs/user/USER_GUIDE.md#73-half-space-or-rigid-base) and
 [§7.4](docs/user/USER_GUIDE.md#74-wave-field-and-control-point-site-options)).
 
+```figure
+soil-column f=7.3
+The column of this lesson solved exactly, per unit motion at the surface. Near 7.3 Hz the surface
+moves 2.2 times the rock outcrop but 17 times the within motion at 17 m, the numbers of the two
+SOIL runs. Raise the rock velocity towards a rigid base and the outcrop curve climbs towards the
+within curve: less and less energy leaves through the base.
+```
+
 ### Try this
 Run SITE with a rigid base at 17 m (`<nl>` = 0) in a copy of the model and compare its Mode 2 table
 with the half-space run: the amplitudes at the interfaces are identical (at 7.0 Hz the motion at

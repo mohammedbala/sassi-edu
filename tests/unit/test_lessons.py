@@ -138,3 +138,20 @@ def test_lesson_formulas_typeset_with_katex(lesson):
     from pathlib import Path
     errs = mathcheck.check_text(Path(lesson.path).read_text(encoding="utf-8"), lesson.id)
     assert errs == [], "\n".join(errs)
+
+
+DOC_FILES = sorted(p for p in (L.PROJECT_ROOT / "docs").rglob("*.md")) + [L.PROJECT_ROOT / "examples" / "README.md"]
+
+
+@pytest.mark.parametrize("path", DOC_FILES, ids=[str(p.relative_to(L.PROJECT_ROOT)) for p in DOC_FILES])
+def test_document_formulas_typeset_with_katex(path):
+    """The Help pages (local GUI and the web version) typeset the LaTeX of the documents with the same KaTeX."""
+    from sassi.ui import mathcheck
+    from sassi.ui.markdown import math_spans
+    text = path.read_text(encoding="utf-8")
+    if not math_spans(text):
+        return
+    if mathcheck.node_path() is None:
+        pytest.skip("Node.js is not installed (the GUI's KaTeX check runs in Node)")
+    errs = mathcheck.check_text(text, str(path.relative_to(L.PROJECT_ROOT)))
+    assert errs == [], "\n".join(errs[:20])

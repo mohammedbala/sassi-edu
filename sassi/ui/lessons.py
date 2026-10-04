@@ -37,18 +37,43 @@ SECTION_KEYS = {
 ACTION_VERBS = {
     "plot-model": False, "plot-nodes": False, "plot-layers": False, "plot-soilprops": False,
     "plot-spectrum": True, "plot-history": True, "open-file": True, "open-listing": False,
-    "open-dialog": False, "open-doc": False, "explain": False,
+    "open-dialog": False, "open-doc": False, "explain": False, "animate": True,
 }
+#: ``animate`` plot kinds -> (animation command, PROCFRAME <anitype> sorting tag)
+ANIMATE_KINDS = {"deformed": ("DEFORMPLOT", 3), "vector": ("VECTORPLOT", 1), "bubble": ("BUBBLEPLOT", 0),
+                 "contour": ("CONTOURPLOT", 2)}
+#: ``animate`` views -> CNGVIEW rotations (rx, ry, rz) in degrees: front = X right, Z up (seen from -Y);
+#: side = Y right, Z up (seen from +X); top = X right, Y up; iso = the default isometric view
+ANIMATE_VIEWS = {"front": (-90, 0, 0), "side": (-90, 0, -90), "top": (0, 0, 0), "iso": (-60, 0, -45)}
+#: suffix of the frame store PROCFRAME writes for a frame folder (``ex01/HARM`` -> ``ex01/HARM_ani``)
+ANIMATE_STORE_SUFFIX = "_ani"
 RUN_BLOCKS = ("sassi",)
 SHOW_BLOCKS = ("sassi-show",)
 SETUP_BLOCKS = ("sassi-setup",)
+FIGURE_BLOCKS = ("figure",)
+#: concept figures of the ```` ```figure ```` blocks (drawn by ``sassi/ui/static/figures.js``, which registers
+#: the same names): name -> its parameters, each ``"num"`` or the tuple of allowed values
+FIGURES: Dict[str, Dict[str, Any]] = {
+    "fixed-base-vs-ssi": {"f": "num", "s": "num"},
+    "kinematic-inertial": {"case": ("surface", "embedded"), "r": "num"},
+    "substructuring": {"case": ("surface", "embedded"), "stage": "num"},
+    "soil-column": {"f": "num", "vhs": "num", "damp": "num"},
+    "impedance-ellipse": {"f": "num", "c": "num"},
+    "tf-to-isrs": {"f0": "num", "beta": "num"},
+    "interaction-sets": {"method": ("fv", "fsin", "evbn", "ffv")},
+    "wave-types": {"fp": "num"},
+    "isrs-broadening": {"b": "num", "cases": ("1", "3")},
+    "hysteresis": {"mode": ("soil", "panel"), "a": "num"},
+    "freq-interpolation": {"modes": ("2", "3"), "set": ("lesson", "coarse")},
+}
+FIGURE_PARAM_RE = re.compile(r"^([a-z][a-z0-9_]*)=([A-Za-z0-9_.+-]+)$")
 FENCE_RE = re.compile(r"^(`{3,})\s*([\w-]*)\s*(.*)$")
 ID_RE = re.compile(r"^[0-9a-z][0-9a-z-]*$")
 
 
 @dataclass
 class Block:
-    """A fenced block (``kind`` = 'sassi', 'sassi-show', 'sassi-setup', 'action' or 'code')."""
+    """A fenced block (``kind`` = 'sassi', 'sassi-show', 'sassi-setup', 'action', 'figure' or 'code')."""
     kind: str
     lang: str
     text: str
@@ -168,7 +193,7 @@ def _split_blocks(text: str) -> Tuple[str, List[Block]]:
             while i < len(lines) and not lines[i].strip().startswith(fence):
                 body.append(lines[i])
                 i += 1
-            kind = lang if lang in RUN_BLOCKS + SHOW_BLOCKS + SETUP_BLOCKS + ("action",) else "code"
+            kind = lang if lang in RUN_BLOCKS + SHOW_BLOCKS + SETUP_BLOCKS + FIGURE_BLOCKS + ("action",) else "code"
             blocks.append(Block(kind, lang, "\n".join(body)))
         i += 1
     return text, blocks
@@ -250,6 +275,48 @@ def lesson_by_id(lesson_id: str, directory: PathLike = LESSON_DIR) -> Lesson:
         if lesson.id == lesson_id:
             return lesson
     raise KeyError(f"no lesson '{lesson_id}'")
+
+
+@dataclass
+class Figure:
+    """A ```` ```figure ```` block: first line ``<name> [key=value ...]``, the following lines its caption
+    (Markdown); ``problems`` lists what :data:`FIGURES` does not accept."""
+    name: str
+    params: Dict[str, str]
+    caption: str
+    problems: List[str] = field(default_factory=list)
+
+
+def parse_figure(text: str) -> Figure:
+    """Parse the body of a ```` ```figure ```` block and check it against :data:`FIGURES`."""
+    lines = text.replace("\r\n", "\n").split("\n")
+    while lines and not lines[0].strip():
+        lines.pop(0)
+    head = lines[0].split() if lines else []
+    fig = Figure(head[0] if head else "", {}, "\n".join(lines[1:]).strip("\n"))
+    spec = FIGURES.get(fig.name)
+    if not fig.name:
+        fig.problems.append("figure block without a figure name")
+    elif spec is None:
+        fig.problems.append(f"unknown figure '{fig.name}' (known: {', '.join(sorted(FIGURES))})")
+    for tok in head[1:]:
+        m = FIGURE_PARAM_RE.match(tok)
+        if not m:
+            fig.problems.append(f"figure {fig.name}: '{tok}' is not key=value")
+            continue
+        key, val = m.groups()
+        fig.params[key] = val
+        kind = None if spec is None else spec.get(key)
+        if spec is not None and kind is None:
+            fig.problems.append(f"figure {fig.name}: unknown parameter '{key}'")
+        elif kind == "num":
+            try:
+                float(val)
+            except ValueError:
+                fig.problems.append(f"figure {fig.name}: {key}={val} is not a number")
+        elif isinstance(kind, tuple) and val not in kind:
+            fig.problems.append(f"figure {fig.name}: {key} must be one of {', '.join(kind)}")
+    return fig
 
 
 def strip_blocks(markdown: str, kinds: Iterable[str] = ("action", "sassi-setup")) -> str:
@@ -357,6 +424,97 @@ def _action_files(args: str) -> List[str]:
     return [f.strip() for f in files.split(",") if f.strip()]
 
 
+@dataclass
+class AnimateSpec:
+    """Arguments of an ``animate`` action:
+    ``<folder> [| <kind> [<scale or col>] [<stride>] [<view>]] [| <title>]``."""
+    path: str                       # frame folder or frame store, relative to the lesson workspace
+    kind: str = "deformed"          # deformed | vector | bubble | contour
+    scale: Optional[float] = None   # deformed / vector: Scale (None = automatic)
+    col: int = 1                    # bubble / contour: data column
+    stride: int = 1
+    title: str = ""
+    view: str = ""                  # '' (the default isometric view) or a key of ANIMATE_VIEWS
+
+
+def parse_animate(args: str) -> AnimateSpec:
+    """Parse the arguments of an ``animate`` action (ValueError with the reason when malformed)."""
+    parts = [p.strip() for p in (args or "").split("|")]
+    path = parts[0] if parts else ""
+    if not path or "," in path:
+        raise ValueError("animate needs one frame folder or frame store: animate: <folder> | <kind> [scale] [stride]")
+    if len(parts) > 3:
+        raise ValueError("animate takes at most two '|' parts (plot kind and options, title)")
+    spec = AnimateSpec(path=path, title=parts[2] if len(parts) > 2 else "")
+    words = parts[1].split() if len(parts) > 1 else []
+    views = [w for w in words[1:] if w.lower() in ANIMATE_VIEWS]
+    if len(views) > 1:
+        raise ValueError(f"animate: one view only ({', '.join(views)})")
+    if views:
+        spec.view = views[0].lower()
+        words = [w for w in words if w is not views[0]]
+    if words:
+        spec.kind = words[0].lower()
+    if spec.kind not in ANIMATE_KINDS:
+        raise ValueError(f"animate: plot kind '{spec.kind}' must be one of {', '.join(ANIMATE_KINDS)}")
+    if len(words) > 3:
+        raise ValueError("animate: at most two numbers after the plot kind ([scale or column] [stride])")
+    if len(words) > 1 and words[1].lower() not in ("auto", "-"):
+        try:
+            if spec.kind in ("deformed", "vector"):
+                spec.scale = float(words[1])
+                ok = spec.scale > 0
+            else:
+                spec.col = int(words[1])
+                ok = spec.col >= 1
+        except ValueError:
+            ok = False
+        if not ok:
+            raise ValueError(f"animate: '{words[1]}' must be a positive "
+                             + ("scale" if spec.kind in ("deformed", "vector") else "column number") + " or auto")
+    if len(words) > 2:
+        try:
+            spec.stride = int(words[2])
+        except ValueError:
+            spec.stride = 0
+        if spec.stride < 1:
+            raise ValueError(f"animate: stride '{words[2]}' must be an integer >= 1")
+    return spec
+
+
+def _check_animate(ui, ws: Path, where: str, args: str, rep: "RunReport") -> None:
+    """Headless check of an ``animate`` action: its frame folder (or store) exists after the step, and the
+    commands the button submits (PROCFRAME, the animation command, WINDOWSETTINGS) run without error.  The
+    animation database goes to the workspace and no image is rendered."""
+    from ..plotting.state import plot_state
+    from ..prep import Kind
+    from . import learn
+    try:
+        spec = parse_animate(args)
+    except ValueError as exc:
+        rep.errors.append((where, f"animate: {args}", str(exc)))
+        return
+    if not (ws / spec.path).is_dir():
+        rep.missing.append((where, spec.path))
+        return
+    st = plot_state(ui)
+    saved = st.auto_render, st.ani_db_path
+    st.auto_render, st.ani_db_path = False, ws / "SASSIani.xml"
+    try:
+        try:
+            res = learn.resolve_action("animate", args, ws, ui, list(st.lines), None)
+        except learn.LearnError as exc:
+            rep.errors.append((where, f"animate: {args}", str(exc)))
+            return
+        for ln in res.get("lines", []):
+            before = len(ui.sink.texts(Kind.ERROR))
+            ui.execute(ln)
+            for e in ui.sink.texts(Kind.ERROR)[before:]:
+                rep.errors.append((where, ln, e))
+    finally:
+        st.auto_render, st.ani_db_path = saved
+
+
 def run_lesson_headless(lesson: Lesson, root: PathLike, examples_dir: PathLike = EXAMPLES_DIR) -> RunReport:
     """Run the lesson like a learner pressing every 'Run step' in order (setup first); collect errors
     and action files that do not exist after their step."""
@@ -382,6 +540,8 @@ def run_lesson_headless(lesson: Lesson, root: PathLike, examples_dir: PathLike =
                 p = Path(m.path or ws) / f"{m.name}_{args.strip().upper()}.out"
                 if not p.is_file():
                     rep.missing.append((where, str(p)))
+            elif verb == "animate":
+                _check_animate(ui, ws, where, args, rep)
             elif ACTION_VERBS.get(verb):
                 for f in _action_files(args):
                     if not (ws / f).is_file():
@@ -401,9 +561,14 @@ def validate_lesson(lesson: Lesson) -> List[str]:
         problems.append(f"example '{lesson.example}' not found in examples/")
     for step in lesson.steps:
         where = f"step {step.index} ({step.title})"
-        for verb, _ in step.actions:
+        for verb, args in step.actions:
             if verb not in ACTION_VERBS:
                 problems.append(f"{where}: unknown action verb '{verb}'")
+            elif verb == "animate":
+                try:
+                    parse_animate(args)
+                except ValueError as exc:
+                    problems.append(f"{where}: {exc}")
         for ln in step.commands:
             s = ln.strip()
             if s.startswith("*"):
@@ -418,4 +583,10 @@ def validate_lesson(lesson: Lesson) -> List[str]:
             path = target.split("#", 1)[0]
             if path and not (PROJECT_ROOT / path).exists():
                 problems.append(f"{where}: link target '{path}' does not exist (paths are relative to the repository root)")
+    # concept figures (```figure blocks): known name and parameters (the figure registry FIGURES)
+    figs = [("introduction", b) for b in _split_blocks(lesson.intro)[1]]
+    figs += [(f"step {s.index} ({s.title})", b) for s in lesson.steps for b in s.blocks]
+    for where, b in figs:
+        if b.kind == "figure":
+            problems.extend(f"{where}: {p}" for p in parse_figure(b.text).problems)
     return problems

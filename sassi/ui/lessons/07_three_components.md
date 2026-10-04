@@ -211,6 +211,14 @@ direction. [Theory §6.1](docs/theory/THEORY_MANUAL.md#61-vertically-propagating
 [§6.2](docs/theory/THEORY_MANUAL.md#62-normalisation-to-the-control-point);
 [User Guide §10.1](docs/user/USER_GUIDE.md#101-simultaneous-cases).
 
+```figure
+wave-types fp=4
+The three wave fields of this step in a uniform column of the lesson's sand. Each pulse travels
+vertically and doubles at the free surface; only the particle motion differs: $x$ for SV, $y$ for
+SH, $z$ for P, which travels twice as fast here ($V_p = 2V_s$). Every point of a horizontal plane
+moves in phase, which is why these waves give no torsional input (Check yourself).
+```
+
 ### Check yourself
 With these vertically propagating waves, does a doubly symmetric building (no eccentricity) twist?
 
@@ -292,6 +300,8 @@ RUNMOTION
 * MOTION names files by node and direction only: keep this run's files under X_ names
 VAR,R30,00030TR_X01.RS,00030TR_Y01.RS,00030TR_Z01.RS,00030TR_X.TFU,00030TR_Y.TFU,00030TR_Z.TFU,00027R_ZZ.TFU
 FOREACH,R30,FCOPY,@R30[#],X_@R30[#]
+* the steady-state motion under the X input at 5.0 Hz, 24 frames over one period
+HARMFRAME,FILE8X,5.0,HARM_X5
 ```
 
 ### What this does
@@ -301,6 +311,12 @@ FOREACH,R30,FCOPY,@R30[#],X_@R30[#]
   `NOUT,6,...,27` the rotation about Z (torsion) of the stick top.
 * `00030TR_Y01.RS` means "node 30, translation Y, damping 1" whatever the input direction, so the
   next run would overwrite it: `FOREACH ... FCOPY` keeps copies with the prefix `X_`.
+* `HARMFRAME,FILE8X,5.0,HARM_X5` writes the steady-state motion of every node under a harmonic X
+  input of unit amplitude at 5.005 Hz (24 frames over one period). In the animation (0.3 m per unit of
+  control motion) the roof mass does not move along X only: X 5.00 (39° behind the control motion),
+  Y 1.85 (72° ahead of it) and Z 1.25. Out of phase, X and Y make it run round an ellipse in plan, and
+  the rigid arm swings about the stick top (Y 1.22): the stick twists. Turn the view with the mouse
+  to look at it from above.
 
 ### Why it matters
 The X input moves the roof mass mostly in X (transfer function peak 5.00 at 5.0 Hz, 1.000 at
@@ -322,6 +338,7 @@ for nuclear ISRS per SRP 3.7.1
 ```action
 plot-spectrum: ex05/X_00030TR_X01.RS, ex05/X_00030TR_Y01.RS, ex05/X_00030TR_Z01.RS | log
 plot-spectrum: ex05/X_00030TR_Y.TFU, ex05/X_00027R_ZZ.TFU
+animate: ex05/HARM_X5 | deformed 0.3 | X input at 5.0 Hz
 open-listing: MOTION
 ```
 
@@ -507,6 +524,14 @@ outside the manual, ±15 % for ASCE 4 ISRS practice and a frequency-dependent br
 manual warns that fewer than 301 spectrum frequencies reduce the accuracy of the broadening (EDU-15
 warns). [User Guide §11.5](docs/user/USER_GUIDE.md#115-line-mathematics-and-spectrum-broadening);
 verified by [VP-48](docs/verification/VERIFICATION_MANUAL.md#vp-48) (T-B1 to T-B3).
+
+```figure
+isrs-broadening b=0.15 cases=1
+`BROADEN` as a picture: the envelope of the sources is taken first, then every peak becomes a
+plateau from $f_p(1-b)$ to $f_p(1+b)$ and the flanks move outwards. In this step the SRSS peak at
+5.01 Hz becomes a plateau from 4.26 to 5.76 Hz ($b = 15\,\%$); switch the figure to three soil
+cases to see the envelope come first.
+```
 
 ### In ANSYS terms
 The same as the ISRS post-processing you do after an ANSYS transient run (or a spectrum-to-spectrum

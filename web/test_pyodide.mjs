@@ -110,6 +110,7 @@ for (const ln of r.payload.commands) check(post("/api/command", {lines: [ln]}).p
 const lesson = get(`/api/lessons/${LESSON}`).payload;
 const jobs = [];
 let plotsDrawn = 0;
+let animations = 0;
 for (const step of lesson.steps) {
   const ts = now();
   for (const ln of step.commands) {
@@ -140,6 +141,13 @@ for (const step of lesson.steps) {
       const st = get("/api/plots").payload;
       const pd = get(`/api/plot/${st.active}`);
       check(pd.status === 200 && pd.payload && Object.keys(pd.payload).length > 0, `plot data of ${a.verb}`);
+      if (pd.status === 200 && pd.payload.family === "anim") {      // an animation: the player fetches every frame
+        const fr = pd.payload.animation.frames;
+        const f2 = get(`/api/plot/${st.active}?frame=${fr[Math.min(1, fr.length - 1)]}`);
+        check(f2.status === 200 && f2.payload.label && (f2.payload.xyz || f2.payload.value || f2.payload.vectors),
+              `animation frame of ${a.verb} ${a.args}`);
+        animations++;
+      }
       plotsDrawn++;
     } else if (act.kind === "file") {
       const f = get("/api/file?name=" + encodeURIComponent(act.path));
@@ -182,7 +190,8 @@ json.dumps({"id": les.id, "ok": rep.ok, "s": round(time.time() - t, 1),
   }
 }
 
-const result = {ok: failures.length === 0, failures, timings, jobs, plots: plotsDrawn, pushes: pushes.length,
+check(animations > 0, "lesson 01 animations (animate actions) drawn");
+const result = {ok: failures.length === 0, failures, timings, jobs, plots: plotsDrawn, animations, pushes: pushes.length,
                 event_pushes: evPushes, headless};
 console.log("RESULT " + JSON.stringify(result));
 process.exit(failures.length ? 1 : 0);

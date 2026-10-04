@@ -323,7 +323,7 @@ ETYPE comes back resolved for SOLID/PLANE. Legacy SASSI2000 fixed-format decks a
 
 * **VP-A1** (`sassi/verify/problems/vp_ansys.py`, `pytest tests/verification/test_vp_ansys.py`, or
   `VERIFY,VP-A1`). A 20 m steel cantilever, BEAM188 RECT 0.2 (y) × 0.4 (z), is converted from
-  `tests/data/ansys/beam188_cantilever.cdb` (K node) and from `beam188_default_orientation.cdb`
+  `sassi/data/ansys/beam188_cantilever.cdb` (K node) and from `beam188_default_orientation.cdb`
   (no K node). Checks:
   * the first 8 fixed-base frequencies equal those of the native SASSI-EDU model to 1e-8;
   * Euler–Bernoulli frequencies in both bending planes to 1 % (the difference is Timoshenko shear,

@@ -58,7 +58,8 @@ History shows each one. This file holds 80 commands:
   ($V_s = 500\,\text{m/s}$) over weathered rock ($V_s = 1000\,\text{m/s}$).
 * `FREQ` and `SITE` define the 22 analysis frequencies between 0.1 and 20 Hz.
 * `N`, `E` and their generators build the structure: a 1.5 m SHELL mat (81 nodes, ten times
-  stiffer than concrete, so practically rigid), a four-storey BEAMS stick with 1000 t per floor,
+  stiffer than concrete: stiff, but not rigid, as lesson 4 shows), a four-storey BEAMS stick with
+  1000 t per floor,
   and a rigid "spider" of beams that clamps the stick to the mat.
 * `INT,1,81,1,1` makes the 81 mat nodes **interaction nodes**: the nodes where the soil acts.
 * the module options (`POINT`, `HOUSE`, `ANALYS`, `MOTION`, `STRESS`, `RELD` ...), then `CHECK`,
@@ -87,6 +88,13 @@ where
   and dashpots (imaginary part) (POINT + ANALYS);
 * $U'_f$ the free-field motion at the interaction nodes (SITE);
 * $U$ the total motion of every node per unit control motion (FILE8).
+
+```figure
+substructuring case=surface
+The three parts of Eq. 2.1 for this model. The free field is the layered site of SITE and POINT,
+which the structure sees only through $X_{ff}$ and $U'_f$ at the 81 interaction nodes; a surface mat
+replaces no soil, so $K^*_e = M_e = 0$.
+```
 
 The verification problem VP-E1 runs this very example and checks that the decks written by the
 interpreter are exactly the intended ones (FILE8 identical to 1e-12)
@@ -165,13 +173,17 @@ frequency. MOTION turns them into histories and spectra.
 ```sassi
 * the analysis frequencies: frequency numbers n and f = n x df
 LFREQ
+* the steady-state motion of every node at the SSI frequency: 24 frames over one period
+HARMFRAME,FILE8,3.49,HARM_SSI
 ```
 
 ```action
 plot-spectrum: ex01/00085TR_X.TFU, ex01/00085TR_X.TFI, ex01/00041TR_X.TFI
 plot-spectrum: ex01/00085TR_X02.RS, ex01/00084TR_X02.RS, ex01/00041TR_X02.RS | log
+animate: ex01/HARM_SSI | deformed 0.2 front | SSI system at 3.49 Hz
 open-listing: MOTION
 explain: NOUT,1,1,1,0,0,1,1,41,82-85
+explain: HARMFRAME,FILE8,3.49,HARM_SSI
 ```
 
 ### What this does
@@ -192,6 +204,16 @@ the mat centre. From the results:
   accelerations of the ISRS; MOTION listing, "Maximum requested response") grow from 0.36 g at the
   mat to 1.29 g at the roof, for a control motion with a peak of 0.324 g.
 
+`HARMFRAME,FILE8,3.49,HARM_SSI` turns the transfer functions of every node at 3.49 Hz into the
+steady-state motion under a harmonic control motion of unit amplitude, $u(t) = \operatorname{Re}\left[H\,e^{i\omega t}\right]$,
+sampled in 24 frames over one period (folder `ex01/HARM_SSI`; it prints the frequency it used, the
+computed one closest to the request). The **Animate** button stores the frames (`PROCFRAME`) and plays
+them on the model (`DEFORMPLOT`, displacements drawn 0.2 m per unit of control motion, the undeformed
+model in grey, seen from the front: `CNGVIEW`). You see the soil-structure mode: the roof swings 13.1 times the ground motion,
+87° (a quarter period) behind it; the mat slides 1.51 times the ground motion, 50° behind it, and
+rocks, its edges 10 m from the centre moving up and down by 1.59. The ground itself, which moves with
+amplitude 1 in phase with frame 1, is not drawn.
+
 ### Why it matters
 The transfer function is where SSI shows itself most clearly: its peak frequency is the SSI
 frequency that your ISRS peaks will sit on, and its peak height reflects the system damping. A
@@ -210,6 +232,15 @@ a(t) = \operatorname{IFFT}\left[H(f)\,A(f)\right]
 with $A(f)$ the FFT of the control acceleration (in g), then computes the response spectrum of
 $a(t)$ (Nigam-Jennings integration)
 ([Theory §11](docs/theory/THEORY_MANUAL.md#11-convolution-response-spectra-relative-displacements-and-stresses)).
+
+```figure
+tf-to-isrs f0=3.5 beta=0.05
+What MOTION does for a floor: the control motion is multiplied by $H(f)$ frequency by frequency,
+the floor motion is transformed back, and every oscillator of the spectrum keeps its largest
+absolute acceleration. The default mode (3.5 Hz, 5 %) stands for the roof mode of this run; move
+$f_0$ and the ISRS peak follows it.
+```
+
 The low-frequency check is VP-41, the interpolation VP-28, the convolution VP-29 and the response
 spectra VP-30 ([Verification Manual](docs/verification/VERIFICATION_MANUAL.md#vp-28)).
 
@@ -251,12 +282,16 @@ RUNPOINT
 RUNHOUSE
 RUNANALYS
 RUNMOTION
+* the fixed-base stick at its first mode
+HARMFRAME,FILE8,5.0,HARM_FB
 ```
 
 ```action
 plot-spectrum: ex01/00085TR_X.TFI, ex01_fixed/00085TR_X.TFI
 plot-spectrum: ex01/00085TR_X02.RS, ex01_fixed/00085TR_X02.RS | log
 plot-spectrum: ex01/00041TR_X02.RS, ex01_fixed/00041TR_X02.RS | log
+animate: ex01_fixed/HARM_FB | deformed 0.2 front | Fixed base at 5.0 Hz
+animate: ex01/HARM_SSI | deformed 0.2 front | SSI system at 3.49 Hz
 ```
 
 ### What this does
@@ -276,6 +311,13 @@ The comparison (computed values, 5 % ISRS):
 | roof peak acceleration (ZPA) | 1.18 g | 1.29 g |
 | mat ISRS peak, 5 % | 1.01 g at 2.6 Hz (the free field) | 1.39 g at 3.2 Hz |
 | mat peak acceleration (ZPA) | 0.324 g | 0.360 g |
+
+`HARMFRAME,FILE8,5.0,HARM_FB` writes the steady-state motion of the fixed-base model at 5.005 Hz,
+the computed frequency of its first-mode peak. Play the two animations one after the other (same
+scale, one tab each): on the rigid site the mat moves exactly with the ground (1.00, in phase, no
+rocking: its edges move vertically by 0.002) and the stick bends in its first mode, the roof at
+13.4, 92° behind the ground. On the soil the same stick sits on a mat that slides (1.51) and rocks
+(±1.59 at the edges), and the whole system vibrates at 3.49 Hz instead of 5.0 Hz.
 
 ### Why it matters
 SSI lowered the frequency of the first mode by 30 %, from 5.0 Hz to 3.5 Hz. Every ISRS peak
@@ -301,6 +343,15 @@ half-power width of the SSI peak (in the interpolated `.TFI`) corresponds to abo
 well (5.2 %, against 5.0 % on the rigid site): the soil adds damping, but the structure's own 5 %
 counts less once the period lengthens, because a smaller share of the system's deformation energy is
 in the structure. Lesson 4 takes this apart with the foundation springs and dashpots.
+
+```figure
+fixed-base-vs-ssi f=3.5
+The stick of this example reduced to its first mode, on a fixed base and on the springs and
+dashpots of its mat. The springs move the peak from 5.04 Hz to about 3.9 Hz (SASSI's full model
+gives 3.49 Hz because the real mat also bends; lesson 4) while the system damping stays near 5 %: on this layered site little energy
+radiates at that frequency, so the wave fronts stay faint. Raise the soil velocities and the peak
+moves back towards the fixed-base one.
+```
 
 ### In ANSYS terms
 This run is your usual fixed-base model: base nodes clamped, acceleration applied at the base,
@@ -369,6 +420,15 @@ springs. For an **embedded** structure (lesson 5) the massless foundation no lon
 field (the free-field motion varies with depth), and the foundation input motion is reduced at
 higher frequencies. Inclined or incoherent waves also create kinematic effects for surface mats;
 those are advanced topics.
+
+```figure
+kinematic-inertial case=surface
+A linear SSI response splits exactly into a kinematic problem (no masses: the foundation input
+motion $U_k$) and an inertial one (the masses on the soil springs and dashpots, shaken by $U_k$).
+For this surface mat under vertically incident waves $U_k$ is the free-field motion, as the
+massless run shows, so all of the change you saw is inertial; switch to the embedded box for the
+case of lesson 5.
+```
 
 ### Technical basis
 With zero mass the SSI equation becomes $\left[K^*_s + X_{ff}\right] U = X_{ff}\,U'_f$. With

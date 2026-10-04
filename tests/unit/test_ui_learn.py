@@ -424,7 +424,8 @@ def test_action_path_safety_and_errors(S, verb, args, status):
 def test_every_contract_verb_is_resolved(S):
     _ws_with_results(S)
     args = {"plot-soilprops": "Sand", "plot-spectrum": "res/a01.RS", "plot-history": "res/a.ACC", "open-file": "res/a01.RS",
-            "open-dialog": "ANALYSIS", "open-doc": "docs/index.md", "explain": "N,1", "open-listing": None}
+            "open-dialog": "ANALYSIS", "open-doc": "docs/index.md", "explain": "N,1", "open-listing": None,
+            "animate": None}                 # needs frames: tests/unit/test_lesson_animate.py
     for verb in L.ACTION_VERBS:
         if args.get(verb, "") is None:
             continue

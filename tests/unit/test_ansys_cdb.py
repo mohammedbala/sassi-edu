@@ -1,7 +1,7 @@
 """CONVERT,ANSYS: the ``.cdb`` reader and the ANSYS -> SASSI-EDU mapping (requirements 3.4.K,
 D-ANS-01..05, D-ANS-07; spec 04 sections 11.1-11.6).
 
-The sample files in ``tests/data/ansys`` are hand-written in the exact CDWRITE layout (ANSYS
+The sample files in ``sassi/data/ansys`` are hand-written in the exact CDWRITE layout (ANSYS
 2021 R1 style: NBLOCK ``(3i9,6e21.13e3)`` with trailing zero coordinates omitted, EBLOCK ``(19i9)``
 with continuation lines, RLBLOCK ``(2i8,6g16.9)`` / ``(7g16.9)``, MPTEMP/MPDATA R5.0 records,
 CMBLOCK ``(8i10)`` ranges, SECTYPE/SECDATA/SECBLOCK/SECOFFSET).
@@ -19,7 +19,7 @@ from sassi.io.ansys_cdb import (BeamProps, ansys_beam_axes, convert_cdb, element
                                 split_fixed)
 from sassi.verify.problems.vp_ansys import assemble_model, fixed_base_frequencies, tip_deflection
 
-DATA = Path(__file__).resolve().parents[1] / "data" / "ansys"
+DATA = Path(__file__).resolve().parents[2] / "sassi" / "data" / "ansys"
 
 
 def _conv(name, g=9.81, damp=0.05):

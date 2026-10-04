@@ -36,7 +36,7 @@ import numpy as np
 from sassi.elements import (ElemRecord, assemble, build_dofmap, material_from_M, natural_frequencies)
 from sassi.verify import VPResult, problem
 
-DATA = Path(__file__).resolve().parents[3] / "tests" / "data" / "ansys"
+DATA = Path(__file__).resolve().parents[2] / "data" / "ansys"      # sassi/data/ansys (package data)
 
 #: cantilever of VP-A1 (SI units): length, elements, RECT B x H, steel
 L_CANT, NE_CANT, B_RECT, H_RECT = 20.0, 20, 0.2, 0.4
@@ -187,7 +187,7 @@ def vpa1(workdir):
     missing = [f for f in ("beam188_cantilever.cdb", "beam188_default_orientation.cdb") if not (DATA / f).exists()]
     if missing:
         r.require("sample .cdb files present", False, note=f"missing {missing} in {DATA}")
-        r.notes.append(f"VP-A1 needs the sample files {missing} of tests/data/ansys (source checkout)")
+        r.notes.append(f"VP-A1 needs the sample files {missing} of sassi/data/ansys")
         return r
     native = native_cantilever()
     f_nat = fixed_base_frequencies(native)

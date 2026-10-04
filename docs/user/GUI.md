@@ -420,6 +420,12 @@ The dialog of spec 06 section 5.2:
    RELDISP tab **Restart For Frame Generation** (relative displacements, folder `THD/`); STRESS tab
    Restart for Nodal Stress / Soil Pressure Contours. Then AFWRITE and run the module. A shorter
    MOTION *Total Duration to be Plotted* gives fewer history frames.
+   **Steady-state motion at one frequency** (SASSI-EDU extension): `HARMFRAME,<FILE8>,<f>,<folder>`
+   writes the harmonic motion of every node at the computed frequency closest to *f*,
+   u(t) = Re(H e^{iωt}) per unit control motion, as 24 frames over one period (`HARM_<ωt°>_<k>`; also
+   from the `TFU/` frames; `[NFrames]`, and `[Ref]` 0 relative to the free field or a node number).
+   It is the clearest picture of an SSI mode: the structure deforming while the foundation slides
+   and rocks. No module rerun is needed: FILE8 holds every node.
 2. **Plot > Process Animation Frame List**: List File Name = the frame folder (**Folder** button) or a
    list file; Frame Storage Dir (created); a description; the plot type. `PROCFRAME` writes the frame
    store (`frame_*.npy`, `index.json`) and the `SASSIani.xml` entry.
@@ -681,6 +687,29 @@ the GUI serves itself (`sassi/ui/static/katex`, no internet connection needed). 
 typeset shows its LaTeX source with a red outline (the error is its tooltip);
 `tests/unit/test_lessons.py` checks every formula of the course with the same KaTeX in Node.js.
 
+**Concept figures** sit in the lesson text where they teach: a framed drawing with a title, sliders and
+buttons for the parameter it is about, a line of computed values, its formulas and a caption. They are
+computed in the browser from the formulas they show (`sassi/ui/static/figures.js`, no server request and
+no command in the Command History), with defaults from the lesson's model; what is illustrative is
+labelled in the figure's note. Animated figures have **Play / Pause**; they pause while scrolled out of
+view and start paused when the system asks for reduced motion. On some charts a click or a drag sets the
+frequency (or, in lesson 10, adds a computed frequency). The settings of a figure are kept while the
+lesson stays open.
+
+| Lesson, step | Figure | Computed from |
+|---|---|---|
+| 1, step 1; 5, introduction | free field + structure − excavated soil = SSI system, built up term by term | manual Eq. 2.1 (schematic) |
+| 1, step 3 | control motion → H(f) → floor motion → oscillators → ISRS, building up as the record plays | IFFT[H A]; Nigam-Jennings oscillators |
+| 1, step 4; 4, step 9 | a one-mode stick on a fixed base and on sway-rocking springs and dashpots, with wave fronts for the radiated energy and \|H(f)\| of both | 3-DOF steady state with the lesson 4 impedance of the mat |
+| 1, step 5; 5, step 10 | SSI = kinematic interaction + inertial interaction | the exact superposition of the two problems (schematic drawing) |
+| 2, step 6 | shear wave in the layered column: displacement profile, outcrop and within amplification | exact layer solution (SHAKE recursion, complex modulus) |
+| 3, step 7 | spring and dashpot under harmonic motion: phase lag and force-displacement ellipse | K(ω) = k + iωc, E_D = πcωU², ξ = ωc/2k |
+| 5, step 9 | the FV, FI-FSIN, FI-EVBN and FFV interaction nodes on the excavation mesh | the INTGEN sets (150, 105, 114, 132 nodes) |
+| 7, step 3 | vertically propagating SV, SH and P waves (X, Y, Z input) | incident + reflected pulse in a half-space |
+| 7, step 8 | envelope of soil cases and ±b peak broadening | BROADEN window maximum |
+| 9, steps 1 and 8 | backbone, Masing loop, secant stiffness and ξ = E_D/(4πE_S) against the amplitude | hyperbolic soil / BBCGEN panel backbone, Masing rule |
+| 10, step 3 | computed and interpolated transfer function, CRITFREQ flags, adding the flagged frequency | MOTION interpolation option 1, CRITFREQ |
+
 * **Header**: part, lesson number and time, the title, a progress bar and one pill per page: **i** the
   introduction, **1 ... n** the steps. A green pill with ✓ is a completed step; a pill underlined in
   green has run in the current workspace. **⟲** resets the lesson.
@@ -730,6 +759,7 @@ lesson keep theirs); a lesson recreates its workspace the next time it is opened
 | Open Options > Analysis > *TAB* | the Options dialog at that tab | |
 | Read: *document* | the Help tab at the section | |
 | Explain *command* | the command explainer | |
+| Animate: *title* | stores the frames a step wrote (a `HARMFRAME` folder or restart frames) in `<folder>_ani` and plays them on the active model, undeformed shape in grey; the scale is the lesson's (the same for animations to compare) or 15 % of the model size for the largest displacement | `PROCFRAME,<folder>,<folder>_ani,<title>,3`, `DEFORMPLOT,<folder>_ani,1,<N>,<stride>,<scale>`, `WINDOWSETTINGS,UNDEFORMED,1`, `CNGVIEW,-90,0,0` (a front view, when the lesson asks for one), `WINDOWSETTINGS,TITLE,<title>` (or `VECTORPLOT` / `BUBBLEPLOT` / `CONTOURPLOT`) |
 
 A button that shows results of a step that has not run in this workspace yet asks whether to run the step
 first. File names are relative to the lesson workspace and may not leave it.

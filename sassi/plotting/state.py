@@ -1114,6 +1114,34 @@ def frame_name_info(name: str) -> Dict[str, Any]:
             "comp": m.group("comp")}
 
 
+#: tag of the steady-state harmonic frames written by HARMFRAME (value field = phase angle wt in degrees)
+HARM_TAG = "HARM"
+
+
+def harmonic_frame_name(phase_deg: float, k: int) -> str:
+    """``HARM_<phase>_<k>`` (Table 3.2 pattern; the value field is the phase angle wt in degrees)."""
+    return f"{HARM_TAG}_{phase_deg:05.1f}_{k:05d}"
+
+
+def harmonic_frames(H: np.ndarray, nframes: int) -> Tuple[np.ndarray, np.ndarray]:
+    """Steady-state harmonic motion over one period (HARMFRAME, SASSI-EDU extension).
+
+    ``H`` (n, 3) complex: the transfer functions of X, Y, Z of n nodes at one frequency (per unit control
+    motion, time factor ``e^{i w t}`` as in the convolution ``a(t) = IFFT[H A]``).  Frame k (1-based) is the
+    displacement at ``wt = phi_k = 2 pi (k - 1) / N``:
+
+        u_k = Re(H e^{i phi_k}) = Re(H) cos(phi_k) - Im(H) sin(phi_k)
+
+    so a DOF with ``H = |H| e^{i theta}`` moves as ``|H| cos(wt + theta)`` while the control motion moves as
+    ``cos(wt)``.  Returns ``(phases in degrees (N,), U (N, n, 3))``."""
+    if int(nframes) < 1:
+        raise PlotError("the number of frames must be >= 1")
+    H = np.asarray(H, dtype=complex).reshape(-1, 3)
+    phi = 2.0 * np.pi * np.arange(int(nframes)) / int(nframes)
+    U = np.real(H[None, :, :] * np.exp(1j * phi)[:, None, None])
+    return np.degrees(phi), U
+
+
 # ======================================================================================
 # Frame store (PROCFRAME; requirements 5.8) and SASSIani.xml (D-UI-15)
 # ======================================================================================
@@ -1250,6 +1278,8 @@ class FrameStore:
         tag, val = e.get("tag", ""), e.get("value")
         if val is None:
             return f"frame {k}: {e.get('name', '')}"
+        if str(tag).upper() == HARM_TAG:
+            return f"frame {k}: ωt = {val:g}°"
         unit = "Hz" if str(tag).upper().startswith(("TFU", "RS")) else "s"
         return f"frame {k}: {tag} {val:g} {unit}"
 

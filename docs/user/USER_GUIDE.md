@@ -1058,6 +1058,22 @@ available as commands: `MODELPLOT`, `NODEPLOT`, `LAYERPLOT`, `SOILPROPPLOT,<labe
 `CAPTUREPLOT,<file.png>`. Line objects are created by `READSPEC` (spectrum files) and `READTH`
 (histories).
 
+Animations play frame files on the model: the restart frames of MOTION, RELDISP and STRESS, or the
+steady-state motion at one SSI frequency that `HARMFRAME` (SASSI-EDU extension) writes from FILE8,
+u(t) = Re(H e^{iωt}) per unit control motion over one period:
+
+```
+* the SSI mode of example 1: every node at 3.49 Hz, 24 frames, drawn 0.2 m per unit of control motion
+HARMFRAME,FILE8,3.49,HARM_SSI
+PROCFRAME,HARM_SSI,HARM_SSI_ani,SSI system at 3.49 Hz,3
+DEFORMPLOT,HARM_SSI_ani,1,24,1,0.2
+WINDOWSETTINGS,UNDEFORMED,1
+```
+
+`HARMFRAME,<Src>,<Freq>,<OutDir>,[NFrames],[Ref]` uses the computed frequency closest to `<Freq>` and
+prints it; `<Ref>` 0 gives the motion relative to the free field, a node number the motion relative to
+that node ([GUI §6.3](GUI.md#63-animations-requirements-58)).
+
 ### 11.5 Line mathematics and spectrum broadening
 
 Line operations work on the union of the abscissas of their sources:

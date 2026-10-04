@@ -460,6 +460,14 @@ FOUNDAMP is the damping ratio $c\,\omega/(2k)$ of a `COMBIN14` spring-dashpot pa
 frequency. A 60 % "damping ratio" is not a typo: the radiation damping of a foundation in
 translation is often far above any structural damping.
 
+```figure
+impedance-ellipse f=5
+One `COMBIN14` pair at one frequency: under $u = U\sin\omega t$ the force leads the displacement by
+$\varphi$, and the loop it traces encloses the energy the dashpot dissipates per cycle. With the
+sliding values of this lesson ($c = \rho V_s A$) the damping ratio at 5 Hz is 0.32; FOUNDAMP gives
+0.37 there, with the 2 % material damping and the softened spring.
+```
+
 ### Check yourself
 A tall reactor building on this site responds mainly in rocking at about 2 Hz; a squat, heavy
 building responds mainly in sliding at the same frequency. Which one gets more help from the soil

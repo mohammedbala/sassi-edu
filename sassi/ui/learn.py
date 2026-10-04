@@ -6,7 +6,9 @@
   sections) is rendered with the safe renderer of the Help pages (:mod:`sassi.ui.markdown`: raw HTML never
   passes).  Fenced ``sassi`` / ``sassi-show`` / ``sassi-setup`` blocks become placeholders
   (``<div class="lesson-block" data-block="k">``) that the browser fills with the interactive command
-  block (explain affordance, run status); ``action`` blocks become buttons; the answer of "Check
+  block (explain affordance, run status); ``figure`` blocks become ``<div class="lesson-figure">``
+  placeholders that ``static/figures.js`` fills with the concept figure (its caption rendered here);
+  ``action`` blocks become buttons; the answer of "Check
   yourself" is split off (:func:`sassi.ui.lessons.split_answer`).  Links to ``docs/...`` (repository-root
   paths) open in the Help tab.
 * **Workspaces** -- a lesson runs in ``<course root>/<lesson id>/``, an example in
@@ -48,6 +50,8 @@ SECTION_TITLES = {"what": "What this does", "why": "Why it matters", "basis": "T
                   "ansys": "In ANSYS terms", "try": "Try this", "check": "Check yourself"}
 _PLACE = "XSASSIBLOCK{}X"
 _PLACE_RE = re.compile(r"<p>XSASSIBLOCK(\d+)X</p>")
+_FIG = "XSASSIFIGURE{}X"
+_FIG_RE = re.compile(r"<p>XSASSIFIGURE(\d+)X</p>")
 
 
 class LearnError(ValueError):
@@ -366,10 +370,14 @@ def _fence_pass(md: str, start: int, keep_setup: bool = False) -> Tuple[str, Lis
             while j < len(lines) and not lines[j].strip().startswith(fence):
                 body.append(lines[j])
                 j += 1
-            kind = lang if lang in L.RUN_BLOCKS + L.SHOW_BLOCKS + L.SETUP_BLOCKS + ("action",) else "code"
+            kind = lang if lang in L.RUN_BLOCKS + L.SHOW_BLOCKS + L.SETUP_BLOCKS + L.FIGURE_BLOCKS + ("action",) else "code"
             blk = {"k": k, "kind": kind, "lang": lang, "lines": [ln.rstrip() for ln in body if ln.strip()]}
             blocks.append(blk)
-            if kind in ("sassi", "sassi-show") or (kind == "sassi-setup" and keep_setup):
+            if kind == "figure":                 # concept figure: placeholder, mounted by static/figures.js
+                fig = L.parse_figure("\n".join(body))
+                blk.update(figure=fig.name, params=fig.params, caption=fig.caption)
+                out.extend(["", _FIG.format(k), ""])
+            elif kind in ("sassi", "sassi-show") or (kind == "sassi-setup" and keep_setup):
                 out.extend(["", _PLACE.format(k), ""])
             elif kind == "code":
                 out.extend(lines[i:j + 1])
@@ -391,7 +399,12 @@ class _Renderer:
         if not md.strip():
             return ""
         html = render(md, link=self.link, image=self.image).html
+        html = _FIG_RE.sub(lambda m: f'<div class="lesson-figure" data-figure-block="{m.group(1)}"></div>', html)
         return _PLACE_RE.sub(lambda m: f'<div class="lesson-block" data-block="{m.group(1)}"></div>', html)
+
+    def figures(self, blocks: Sequence[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """The ```figure blocks of ``blocks`` with their caption rendered (``caption_html``)."""
+        return [dict(b, caption_html=self(b["caption"])) for b in blocks if b["kind"] == "figure"]
 
 
 def _line_names(files: Sequence[str]) -> List[str]:
@@ -423,7 +436,19 @@ def action_label(verb: str, args: str) -> str:
                                         "WRITE": "Options > Write", "CHECK": "Options > Check"}.get(a.upper(), a)),
         "open-doc": "Read: " + (a.split("#", 1)[0].rsplit("/", 1)[-1] + (" §" + a.split("#", 1)[1] if "#" in a else "")),
         "explain": f"Explain {a}",
+        "animate": _animate_label(a),
     }.get(verb, f"{verb} {a}".strip())
+
+
+def _animate_label(args: str) -> str:
+    """``Animate: <title>``, or ``Animate <folder> (<kind>)`` without a title."""
+    try:
+        spec = L.parse_animate(args)
+    except ValueError:
+        return f"Animate {args}".strip()
+    if spec.title:
+        return f"Animate: {spec.title}"
+    return f"Animate {posixpath.normpath(spec.path.replace(chr(92), '/'))} ({spec.kind})"
 
 
 def _doc_label(args: str, helpdocs) -> str:
@@ -444,7 +469,7 @@ def render_lesson(lesson: L.Lesson, helpdocs) -> Dict[str, Any]:
     d = lesson.to_dict(full=False)
     intro_md, intro_blocks = _fence_pass(lesson.intro, 0, keep_setup=True)
     d["intro_html"] = R(intro_md)
-    d["intro_blocks"] = [b for b in intro_blocks if b["kind"] in ("sassi", "sassi-show", "sassi-setup")]
+    d["intro_blocks"] = [b for b in intro_blocks if b["kind"] in ("sassi", "sassi-show", "sassi-setup")] + R.figures(intro_blocks)
     d["setup"] = list(lesson.setup)
     steps = []
     for st in lesson.steps:
@@ -464,7 +489,7 @@ def render_lesson(lesson: L.Lesson, helpdocs) -> Dict[str, Any]:
                 item["html"] = R(smd)
             sections.append(item)
         steps.append({"index": st.index, "title": st.title, "narrative_html": R(narr_md), "sections": sections,
-                      "blocks": [b for b in blocks if b["kind"] in ("sassi", "sassi-show")],
+                      "blocks": [b for b in blocks if b["kind"] in ("sassi", "sassi-show")] + R.figures(blocks),
                       "commands": st.commands,
                       "actions": [{"verb": v, "args": a, "label": _doc_label(a, helpdocs) if v == "open-doc" else action_label(v, a),
                                    "known": v in L.ACTION_VERBS} for v, a in st.actions]})
@@ -591,4 +616,143 @@ def resolve_action(verb: str, args: str, ws: Path, interp, lines_in_memory: Sequ
         if not a:
             raise LearnError("explain needs a command line")
         return {"kind": "explain", "line": a}
+    if verb == "animate":
+        return {"kind": "commands", "lines": animate_lines(a, ws, interp)}
     raise LearnError(f"unknown action {verb!r}")       # pragma: no cover
+
+
+# ======================================================================================
+# animate: frame folder or frame store -> PROCFRAME + DEFORMPLOT / VECTORPLOT / BUBBLEPLOT / CONTOURPLOT
+# ======================================================================================
+#: frames read to size an animation (automatic scale, colour range); more are sampled evenly
+ANIMATE_SAMPLE = 400
+#: automatic scale: the largest displacement is drawn as this fraction of the model size
+ANIMATE_EXTENT = 0.15
+
+
+def _in_spell(interp, p: Path) -> str:
+    """Spelling of an existing ``p`` for an input argument: relative to the working directory (``..``
+    allowed) when the interpreter resolves it to ``p``, else absolute."""
+    try:
+        rel = os.path.relpath(str(p), str(interp.cwd))
+        if Path(interp.resolve_path(rel)).resolve() == p.resolve():
+            return rel.replace(os.sep, "/")
+    except Exception:            # noqa: BLE001 -- any doubt: the absolute path
+        pass
+    return str(p)
+
+
+def _out_spell(interp, p: Path) -> str:
+    """Spelling of ``p`` for an output argument (relative to the model folder, else the working directory,
+    as ``output_path`` resolves it); the same text then resolves to ``p`` as an input."""
+    m = interp.model
+    base = Path(m.path) if m.path else Path(interp.cwd)
+    try:
+        rel = os.path.relpath(str(p), str(base))
+        if (base / rel).resolve() == p.resolve() and Path(interp.resolve_path(rel, must_exist=False)).resolve() == \
+                p.resolve():
+            return rel.replace(os.sep, "/")
+    except Exception:            # noqa: BLE001
+        pass
+    return str(p)
+
+
+def _frames_summary(folder: Path) -> Dict[str, Any]:
+    """``{"nframes", "ncols", "absmax": per data column, "min", "max"}`` of a frame folder or a frame store."""
+    import numpy as np
+    from ..plotting.state import STORE_INDEX, PlotError, read_frame, read_frame_list
+    idx = folder / STORE_INDEX
+    if idx.is_file():
+        import json
+        try:
+            d = json.loads(idx.read_text(encoding="utf-8"))
+            lo, hi = [float(v) for v in d["min"]], [float(v) for v in d["max"]]
+            return {"nframes": int(d["nframes"]), "ncols": len(lo), "min": lo, "max": hi, "store": True,
+                    "absmax": [max(abs(a), abs(b)) for a, b in zip(lo, hi)]}
+        except (OSError, ValueError, KeyError, TypeError) as exc:
+            raise LearnError(f"{folder.name}: unreadable frame store ({exc})", 409) from None
+    try:
+        files = read_frame_list(folder)
+    except PlotError as exc:
+        raise LearnError(f"{folder.name}: {exc}", 404) from None
+    n = len(files)
+    pick = files if n <= ANIMATE_SAMPLE else [files[int(round(k * (n - 1) / (ANIMATE_SAMPLE - 1)))]
+                                              for k in range(ANIMATE_SAMPLE)]
+    lo = hi = None
+    for f in pick:
+        try:
+            v = read_frame(f).values
+        except (OSError, PlotError) as exc:
+            raise LearnError(f"{f.name}: {exc}", 409) from None
+        if not len(v):
+            continue
+        a, b = v.min(axis=0), v.max(axis=0)
+        lo = a if lo is None else np.minimum(lo, a)
+        hi = b if hi is None else np.maximum(hi, b)
+    if lo is None:
+        raise LearnError(f"{folder.name}: the frames hold no data rows", 409)
+    return {"nframes": n, "ncols": len(lo), "min": lo.tolist(), "max": hi.tolist(), "store": False,
+            "absmax": np.maximum(np.abs(lo), np.abs(hi)).tolist()}
+
+
+def _model_size(interp) -> float:
+    """Largest extent of the element-connected nodes of the active model (1 when it has none)."""
+    from ..plotting.state import model_scene
+    try:
+        sc = model_scene(interp.model, apply_hide=False)
+        bb = [float(v) for v in sc["bbox"]]
+        size = max(bb[1] - bb[0], bb[3] - bb[2], bb[5] - bb[4])
+        return size if size > 0 else 1.0
+    except Exception:            # noqa: BLE001 -- no elements, no model: a neutral size
+        return 1.0
+
+
+def animate_lines(args: str, ws: Path, interp) -> List[str]:
+    """Command text of an ``animate`` action (rule L17): ``PROCFRAME`` of a frame folder into
+    ``<folder>_ani`` (skipped when the folder is already a frame store), then ``DEFORMPLOT`` (``VECTORPLOT``,
+    ``BUBBLEPLOT``, ``CONTOURPLOT``) with every argument given -- frames 1..N, the stride, the scale (automatic:
+    the largest displacement drawn as 15 % of the model size) or the column and its colour range --, ``CNGVIEW``
+    for a view (front, side, top, iso) and ``WINDOWSETTINGS`` for the undeformed shape and the title."""
+    try:
+        spec = L.parse_animate(args)
+    except ValueError as exc:
+        raise LearnError(str(exc)) from None
+    folder = _ws_file(ws, spec.path)
+    if not folder.is_dir():
+        raise LearnError(f"{spec.path} not found in the lesson workspace {ws}: run the step first", 404)
+    info = _frames_summary(folder)
+    cmd, anitype = L.ANIMATE_KINDS[spec.kind]
+    lines: List[str] = []
+    if info["store"]:
+        store = folder
+    else:
+        store = folder.with_name(folder.name + L.ANIMATE_STORE_SUFFIX)
+        lines.append(join_command("PROCFRAME", [_in_spell(interp, folder), _out_spell(interp, store),
+                                                spec.title or spec.path, anitype]))
+    nf = int(info["nframes"])
+    head = [_out_spell(interp, store), 1, nf, min(spec.stride, nf)]
+    nd = int(info["ncols"])
+    if spec.kind in ("deformed", "vector"):
+        if spec.kind == "deformed":
+            cols = [0, 2, 4] if nd == 6 else list(range(min(3, nd)))        # the real parts are drawn
+        else:
+            cols = list(range(nd))
+        umax = max([info["absmax"][k] for k in cols] or [0.0])
+        scale = spec.scale
+        if scale is None:
+            scale = float(f"{ANIMATE_EXTENT * _model_size(interp) / umax:.2g}") if umax > 0 else 1.0
+        lines.append(join_command(cmd, head + [scale]))
+        if spec.kind == "deformed":
+            lines.append("WINDOWSETTINGS,UNDEFORMED,1")
+    else:
+        if spec.col > nd:
+            raise LearnError(f"animate: column {spec.col} outside 1..{nd} (data columns of the frames)")
+        lo, hi = float(info["min"][spec.col - 1]), float(info["max"][spec.col - 1])
+        if lo == hi:
+            hi = lo + (abs(lo) if lo else 1.0)
+        lines.append(join_command(cmd, head + [float(f"{lo:.4g}"), float(f"{hi:.4g}"), spec.col]))
+    if spec.view:
+        lines.append(join_command("CNGVIEW", list(L.ANIMATE_VIEWS[spec.view])))
+    if spec.title:
+        lines.append(join_command("WINDOWSETTINGS", ["TITLE", spec.title], text_last=True))
+    return lines

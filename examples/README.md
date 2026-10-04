@@ -123,6 +123,8 @@ keep it, so the soil and not a fixity resists the torsion of the foundation.
 **Expected results** (integration tests in parentheses):
 * The fixed-base frequency is 5.05 Hz (second mode 19 Hz). With SSI the roof ATF peaks at
   **3.49 Hz** with |ATF| = 13.1 (between 3 and 4 Hz). At 0.1 Hz every ATF is 1.000 (within 1 %).
+  The mat is stiff but not rigid: with the mat 1000 times as stiff as concrete the peak moves to
+  3.86 Hz (|ATF| = 12.6), the value of a rigid-foundation estimate (lesson 4, Try this).
 * The ISRS zero-period acceleration of the mat centre is **0.36 g** for an input PGA of 0.324 g
   (ratio 1.11; between 0.8 and 1.3). The ZPA grows up the stick: 0.48, 0.66, 0.94 and
   **1.29 g** at the roof. The roof ISRS peaks at 3.5 Hz with 15.7 g (2 %) and 8.2 g (5 %).

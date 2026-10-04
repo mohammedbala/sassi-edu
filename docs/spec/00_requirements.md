@@ -973,6 +973,7 @@ default, directly after the base command, so default models produce manual-ident
 | EDUOPT | `EDUOPT,<key>,<value>` | P0 | Algorithm switches and tolerances listed in §7 (e.g. `HSLAW`, `NFFTROUND`, `LIMITS`, `BROADENGRID`, `GEOMTOL`) |
 | FCOPY / FMOVE | `FCOPY,<src>,<dst>` | P0 | Copy / rename files in the model directory (FILE1 → FILE1X, FILE8 → FILE81 …) so workflows are scriptable |
 | REMOVEFREQ | `REMOVEFREQ,<infile>,<outfile>,<n1>,…` | P1 | Remove_Frequencies_from_FILE8 (backup kept) |
+| HARMFRAME | `HARMFRAME,<Src>,<Freq>,<OutDir>,[NFrames 24],[Ref]` | P1 | Steady-state harmonic frames `HARM_<ωt°>_<k>` (node, X, Y, Z) of every node at the computed frequency closest to `<Freq>`: u = Re(H e^{iωt}) over one period, from a FILE8-type file or the TFU restart frames; `<Ref>` blank total motion, 0 relative to the free field, n relative to node n (spec 10 §4.5) |
 | COMBXYZSTRAIN | `COMBXYZSTRAIN,<FILE74x>,<FILE74y>,<FILE74z>,<out>` | P1 | COMB_XYZ_STRAIN (SRSS of effective strains) |
 | BUILDFILE77 | `BUILDFILE77,<out>,<in1>,…,<inN>` | P1 | Build_FILE77 for per-level incoherency |
 | COMBXYZTHD | `COMBXYZTHD,<inpfile>` | P2 | COMB_XYZ_THD |

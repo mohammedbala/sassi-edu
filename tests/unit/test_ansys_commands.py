@@ -11,7 +11,7 @@ import pytest
 from sassi.io import decks
 from sassi.prep import Interpreter, Kind
 
-DATA = Path(__file__).resolve().parents[1] / "data" / "ansys"
+DATA = Path(__file__).resolve().parents[2] / "sassi" / "data" / "ansys"
 
 
 def _ui(tmp_path):

@@ -87,6 +87,14 @@ Equivalent-linear SHAKE iterations, $G = G_{\max}\,(G/G_{\max})(\gamma_\text{eff
 $\beta = D(\gamma_\text{eff})$, $\gamma_\text{eff} = 0.65\,\gamma_{\max}$
 ([Theory §12](docs/theory/THEORY_MANUAL.md#12-the-shake-equivalent-linear-method-soil), VP-04).
 
+```figure
+hysteresis mode=soil a=2
+What an equivalent-linear layer stands for: at the strain amplitude $\gamma_a$ the cyclic loop is
+replaced by a linear material with its secant modulus and the damping $E_D/(4\pi E_S)$ of the loop.
+SOIL reads both from the G/Gmax and damping curves (the library Sand points); the hyperbolic
+Masing model shows where such curves come from and where it departs from them.
+```
+
 ```action
 open-listing: SOIL
 plot-history: ex06/ACC001.TH
@@ -681,6 +689,14 @@ justify its choice
 ([OPTION_NON.md §5](docs/user/OPTION_NON.md#5-shear-capacities-and-backbone-generation-shear-bbcgen);
 SHEAR and BBCGEN verified by [VP-46](docs/verification/VERIFICATION_MANUAL.md#vp-46)).
 
+```figure
+hysteresis mode=panel a=10
+The backbone `BBCGEN` builds for these walls and a loop at the chosen amplitude. NONLINEAR replaces
+each panel by the secant stiffness at $x_\text{eq}$ and the damping $\xi_h = E_D/(4\pi E_S)$ of its
+stabilised loop; past cracking the secant stiffness falls fast, the reason for the slow convergence
+of part 4.
+```
+
 ```action
 plot-model
 explain: BBCGEN,0,1,30000,420000,0.005,0,0,0,0.3
@@ -746,6 +762,8 @@ AFWRITE
 RUNMOTION
 VAR,FL,00013TR_X01.RS,00063TR_X01.RS,00113TR_X01.RS
 FOREACH,FL,FCOPY,@FL[#],EL_@FL[#]
+* and its steady-state motion at the computed peak of the roof transfer function (X input, 8.0 Hz)
+HARMFRAME,FILE8X,8.0,HARM_EL
 * restore the panel-corner requests for the iterations
 NOUT,0
 NONLINMOTDISP
@@ -767,7 +785,9 @@ NONLINMOTDISP
   analysis (`ex07_new.hou`). `NONLINSAVE,elastic` keeps its results under `_elastic` names.
 * The last block runs MOTION once more on the elastic X case for the mat, floor and roof centres
   (nodes 13, 63, 113), keeps the spectra as `EL_*`, and restores the corner requests with `NOUT,0`
-  and `NONLINMOTDISP`.
+  and `NONLINMOTDISP`. `HARMFRAME,FILE8X,8.0,HARM_EL` keeps the steady-state motion of the uncracked
+  building at 8.008 Hz, the computed peak of its roof transfer function (6.35), for the comparison in
+  part 4: FILE8X is replaced by the iterations.
 
 ### Why it matters
 In the uncracked building the storey-1 walls reach a peak shear strain of 1.51e-4, 1.8 times their
@@ -810,6 +830,8 @@ NOUT,1,1,1,0,0,1,1,13,63,113
 AOPT,0,0,0,0,0,0,0,0,0,0,1,0,0,0
 AFWRITE
 RUNMOTION
+* the steady-state motion of the cracked building at its computed peak (7.0 Hz), as HARM_EL in part 3
+HARMFRAME,FILE8X,7.0,HARM_CR
 * done: one more New Structure run (the same FILE8) that deletes the restart files (ANALYSX <delrst>)
 ANALYSX,0,1
 AOPT,0,0,0,0,0,0,0,0,1,0,0,0,0,0
@@ -825,7 +847,13 @@ ANALYSX,0,0
 * `NONLINITER,NLHOUSE+NLDX+NLDY+NLDZ+NLNON,10`: per pass, copy `ex07_new.hou` to `ex07.hou`, HOUSE,
   ANALYS, MOTION + RELDISP × 3, COMBXYZTHD, NONLINEAR; at most 10 passes. (`FCOPY` warns in every pass
   that it replaces `ex07.hou`: that is the intended step.)
-* The next block computes the 5 % spectra of the converged building for the X input.
+* The next block computes the 5 % spectra of the converged building for the X input, and
+  `HARMFRAME,FILE8X,7.0,HARM_CR` its steady-state motion at 7.007 Hz, the computed peak of its roof
+  transfer function (5.08). Play it after the uncracked building of part 3 (same scale; each
+  animation spans one period of its own frequency). Cracked, the first storey takes the larger share of
+  the deformation: per unit control motion the storey drift in X (the difference of the complex
+  amplitudes of the slab centres above and below the storey, nodes 13, 63 and 113) is 2.26 in storey 1
+  against 1.31 in storey 2, where the uncracked building has 2.15 against 1.86.
 * The last block is housekeeping. The restart files hold the soil impedance (`COOXqqq`) and the
   factorised system (`COOTKqqq`) of every SSI frequency: 54 MB here, and, for a model with 2,000
   interaction nodes, more than 500 MB per frequency for the impedance alone (lesson 10). Once the
@@ -891,5 +919,7 @@ open-file: ex07/Panel_EQL_Matl_Prop.txt
 open-file: ex07/Panel.fmu
 plot-spectrum: ex07/EL_00063TR_X01.RS, ex07/00063TR_X01.RS, ex07/EL_00113TR_X01.RS, ex07/00113TR_X01.RS | log
 plot-history: ex07/Panel0001.thd, ex07/Panel0001_elastic.thd
+animate: ex07/HARM_EL | deformed 0.3 front | Uncracked at 8.0 Hz
+animate: ex07/HARM_CR | deformed 0.3 front | Cracked at 7.0 Hz
 open-doc: docs/user/OPTION_NON.md#11-tutorial-example-7
 ```

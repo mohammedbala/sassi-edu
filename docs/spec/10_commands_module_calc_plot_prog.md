@@ -1135,6 +1135,31 @@ PROCFRAME details:
 - Python implementation (decision): one `.npy` (or one `.npz`/HDF5 file) per frame. Keep the
   `SASSIani.xml` name for nomenclature, holding the same fields.
 
+HARMFRAME (SASSI-EDU extension, requirements §3.4.R) — steady-state harmonic frames at one frequency:
+
+`HARMFRAME,<Src>,<Freq>,<OutDir>,[NFrames],[Ref]`
+
+| Arg | Meaning |
+|---|---|
+| Src | transfer-function source: a FILE8-type file (FILE8, FILE8X, FILE81 …) or the `TFU` frame folder / list file of MOTION *Restart for TF* (Re/Im of X, Y, Z) |
+| Freq | frequency in Hz; the computed (SSI) frequency closest to it is used and printed, with a warning when it lies outside the computed range or more than 5 % away |
+| OutDir | frame folder (created; earlier `HARM_*` frames in it are deleted; other files are reported because PROCFRAME of the folder would mix them) |
+| NFrames | frames per period, 4 … 360 (default 24) |
+| Ref | blank: total motion per unit control motion; 0: relative to the free field (unit control motion, zero phase, in the control direction `cm`/`ang` of the FILE8, as RELDISP without RELFILE; FILE8 sources only; a vibration FILE8 has no free field); n: relative to node n |
+
+- Frame k (1-based) holds, for every node with a translational DOF in the source, the displacement
+  u_k = Re(H e^{iφ_k}) = Re(H) cos φ_k − Im(H) sin φ_k at φ_k = 2π(k−1)/N, with H the complex transfer
+  function of X, Y and Z at the chosen frequency (fixed DOFs 0). The time factor e^{iωt} is that of the
+  convolution a(t) = IFFT[H A]: a DOF with H = |H| e^{iθ} moves as |H| cos(ωt + θ) while the control
+  motion moves as cos ωt.
+- Frame names `HARM_<φ_k in degrees, 000.0>_<k>` (Table 3.2 pattern), header `nrows 4`, rows
+  `node ux uy uz` (D-FIL-03): PROCFRAME stores them with layout `xyz`, DEFORMPLOT draws x + Scale u, and
+  the frame label is `ωt = <φ>°`.
+- HOUSE optimizer: when `<model>.map` lies beside the source, the FILE8 (new) node numbers are written
+  in the model numbering, which DEFORMPLOT draws.
+- Output: the frequency used (and its frequency number or TFU frame), the period, the reference, the
+  number of frames and nodes, and the largest amplitude with its node, direction and phase.
+
 ### 4.6 3D view and display controls [UI]
 
 | Command | Syntax | Behaviour |

@@ -547,3 +547,52 @@ button.linkish { border: 0; background: none; color: var(--learn-accent); cursor
 .math-display .katex-display { margin: 0.4em 0; }
 .doc .katex { font-size: 1.08em; }
 .math-error { font-family: var(--mono); font-size: 12.5px; color: var(--danger); outline: 1px dashed var(--danger); outline-offset: 2px; white-space: pre-wrap; }
+
+/* ---- concept figures of the lessons (```figure blocks; static/figures.js draws them on a canvas) ---- */
+.lfig {
+  /* chart and drawing tokens, read by figures.js; series colours validated for colour-vision deficiencies */
+  --fig-ink: var(--text); --fig-muted: var(--muted); --fig-bg: var(--panel);
+  --fig-grid: #e6e9ee; --fig-axis: #a9b1bc;
+  --fig-s1: var(--accent); --fig-s2: #c25a00; --fig-s3: #7a4fb5; --fig-s4: #00897b; --fig-ref: #8a94a0;
+  --fig-hi: var(--danger); --fig-ok: var(--ok);
+  --fig-soil1: #efe3c6; --fig-soil2: #e2cf9f; --fig-rock: #d3ccbf; --fig-soil-line: #b59d6c;
+  --fig-struct: #5d6774; --fig-struct-fill: #d9dee5; --fig-font: var(--ui);
+  margin: 12px 0 14px; padding: 8px 10px 8px; border: 1px solid var(--border-2); border-radius: 6px; background: var(--panel);
+  max-width: 100%; overflow: hidden;
+}
+.lesson-figure { margin: 0; }
+.lfig-head { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+.lfig-title { font-weight: 650; font-size: 13px; color: var(--text); line-height: 1.3; }
+.lfig-grow { flex: 1; }
+.lfig-play { min-width: 76px; white-space: nowrap; }
+.lfig-stage { width: 100%; position: relative; line-height: 0; }
+.lfig-canvas { display: block; max-width: 100%; touch-action: pan-y; }
+.lfig-ctrls { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 18px; margin: 8px 0 2px; font-size: 12.5px; }
+.lfig-ctrls > .btn { min-width: 0; }
+.lfig-ctl { display: flex; align-items: center; gap: 8px; flex: 1 1 260px; min-width: 0; }
+.lfig-ctl.lfig-choice { flex: 0 1 auto; gap: 0; }
+.lfig-lab { color: var(--muted); white-space: nowrap; }
+.lfig-choice .lfig-lab { margin-right: 8px; }
+.lfig-ctl input[type="range"] { flex: 1 1 120px; min-width: 90px; accent-color: var(--accent); }
+.lfig-val { font-variant-numeric: tabular-nums; color: var(--text); min-width: 64px; }
+.lfig-seg { border: 1px solid #aeb6c1; background: #fff; padding: 3px 9px; font-size: 12px; cursor: pointer; margin-left: -1px; }
+.lfig-seg:first-of-type { border-radius: 3px 0 0 3px; margin-left: 0; }
+.lfig-seg:last-child { border-radius: 0 3px 3px 0; }
+.lfig-seg.on { background: var(--accent); border-color: var(--accent); color: #fff; position: relative; }
+.lfig-seg:focus-visible, .lfig-ctl input:focus-visible, .lfig-play:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.lfig-read { display: flex; flex-wrap: wrap; gap: 2px 14px; font-size: 12.5px; color: var(--text); margin: 6px 0 2px; font-variant-numeric: tabular-nums; }
+.lfig-read:empty { display: none; }
+.lfig-eq { margin: 8px 0 2px; font-size: 14px; display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 4px; }
+.lfig-eqt { padding: 1px 4px; border-radius: 4px; opacity: .45; transition: opacity .3s, background-color .3s; }
+.lfig-eqt.on { opacity: 1; background: var(--accent-soft); }
+.lfig-eqt.zero { text-decoration: line-through; }
+.lfig-tex { display: flex; flex-wrap: wrap; gap: 4px 22px; margin: 8px 0 2px; font-size: 13px; overflow-x: auto; }
+.lfig-tex .lfig-f { white-space: nowrap; }
+.lfig-note { font-size: 12px; color: var(--muted); line-height: 1.45; margin-top: 6px; }
+.lfig-cap { margin: 8px 0 0; padding-top: 6px; border-top: 1px solid var(--border-2); }
+.lfig-cap .doc.lesson-md { font-size: 13px; }
+.lfig-cap .doc.lesson-md > :last-child { margin-bottom: 0; }
+.lfig-missing { color: var(--danger); font-size: 12px; }
+#lessondock.full .lfig { padding: 10px 14px 10px; }
+#lessondock.full .lfig-cap .doc.lesson-md { font-size: 14px; }
+@media (prefers-reduced-motion: reduce) { .lfig-eqt { transition: none; } }

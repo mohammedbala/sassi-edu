@@ -454,7 +454,10 @@
     const kind = d.kind;
     if (kind === "DEFORMPLOT") {
       const faces = faceList(sc, {});
-      if (v.show_undeformed) traces.push(outlineTrace(sc, faces, {color: "#c8c8c8", width: 1}));
+      if (v.show_undeformed) {        // the undeformed shape in grey: face outlines and line elements (sticks)
+        traces.push(outlineTrace(sc, faces, {color: "#c8c8c8", width: 1}));
+        traces.push(...lineElementTraces(sc).filter((tr) => tr.mode === "lines").map((tr) => Object.assign(tr, {line: {color: "#c8c8c8", width: 3}})));
+      }
       traces.push(meshTrace(sc, faces, {xyz: fr.xyz, color: () => "#c00000", opacity: 0.85}));
       traces.push(outlineTrace(sc, faces, {xyz: fr.xyz, color: "#600000", width: 1}));
       traces.push(...lineElementTraces(sc, fr.xyz));

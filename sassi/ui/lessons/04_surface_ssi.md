@@ -444,6 +444,26 @@ spectrum and $d(t)$ the relative displacement history.
 
 ([Theory §11.4](docs/theory/THEORY_MANUAL.md#114-relative-displacements-reldisp); VP-34.)
 
+### Try this
+Watch the earthquake response in time. `RELDX,0,1` (*Restart For Frame Generation*) makes RELDISP
+write one frame per time step in `ex01/THD/`: the X displacements of the five requested nodes relative
+to the mat centre, 4800 frames for the 24 s of output, about 40 MB on disk once `PROCFRAME` has stored
+them as well (about a second each to write and to store). `DEFORMPLOT` then plays the first 6 s,
+every fourth frame (0.02 s apart), with the displacements drawn 100 times larger: the stick sways back
+and forth, its roof reaching 23 mm at 1.86 s. Only the five frame nodes move; the mat has no frame
+data and stays at rest.
+Delete the two folders afterwards (Learn > Free Disk Space removes the whole workspace).
+
+```sassi-show
+RELDX,0,1
+AFWRITE
+RUNRELDISP
+PROCFRAME,THD,THD_ani,RELDISP X relative to the mat centre,3
+DEFORMPLOT,THD_ani,1,1200,4,100
+WINDOWSETTINGS,UNDEFORMED,1
+RELDX,0,0
+```
+
 ## STRESS: member forces
 
 ```sassi
@@ -500,12 +520,17 @@ explains both.
 ```sassi
 * the soil moduli, for a hand estimate of the springs
 LLIST,1,3
+* the motion at 3.49 Hz over one period: total, and relative to the mat centre (node 41)
+HARMFRAME,FILE8,3.49,HARM_349
+HARMFRAME,FILE8,3.49,HARM_349R,24,41
 ```
 
 ```action
 open-file: ex01/FOUNSTIF
 open-file: ex01/FOUNDAMP
 open-listing: MOTION
+animate: ex01/HARM_349 | deformed 0.2 front | Total motion at 3.49 Hz
+animate: ex01/HARM_349R | deformed 0.2 front | Relative to the mat centre at 3.49 Hz
 ```
 
 ### What this does
@@ -515,6 +540,14 @@ $K_x = 1.72 \times 10^7\,\text{kN/m}$ and $K_{yy} = 1.77 \times 10^9\,\text{kN\,
 about Y); at 3.49 Hz $K_x = 1.48 \times 10^7\,\text{kN/m}$,
 $K_{yy} = 1.70 \times 10^9\,\text{kN\,m/rad}$, with damping ratios 7.7 % in sliding and 4.9 % in
 rocking (FOUNDAMP).
+
+The two `HARMFRAME` commands write the steady-state motion at 3.49 Hz in 24 frames over one period,
+per unit harmonic control motion: the total motion, and the motion relative to the mat centre
+(`<Ref>` = 41 subtracts the X, Y and Z motion of node 41 from every node). The animations show the
+three parts of conclusion 1 below. In the total motion the mat slides and rocks under the swinging
+stick. Relative to the mat centre the sliding is gone: the mat turns about its centre (edges ±1.59)
+and the stick tilts with it while it bends; the roof moves 11.9 relative to the mat centre instead
+of 13.1 in total.
 
 ### Why it matters
 Three conclusions an engineer can take from these numbers:
@@ -567,11 +600,26 @@ no energy radiates at all: the horizontal ones fall at $(2n-1)\,V_s/(4H)$ within
 motion radiation sets in slightly below $V_p/(4H)$ ([R2 C.7](docs/spec/R2_benchmarks.md),
 [VP-13](docs/verification/VERIFICATION_MANUAL.md#vp-13)).
 
+```figure
+fixed-base-vs-ssi f=3.49
+The estimate computed exactly for one mode: $M_1 = 3063\,\text{t}$ at $h_1 = 15.6\,\text{m}$ and the
+mat on the springs and dashpots that FOUNSTIF and FOUNDAMP give at 3.49 Hz. The peak lands near
+3.9 Hz, the value of Try this, against SASSI's 3.49 Hz (Try this explains the difference); the
+rocking dashpot adds almost nothing to the material damping, so the system damping stays near 5 %.
+```
+
 ### Try this
 Use the formula with the effective mass and height of mode 1 from a modal analysis of the stick in
 ANSYS ($k = \omega_1^2 M_1$) and $K_x$, $K_{yy}$ at 3.5 Hz from FOUNSTIF. The estimate lands above
-the SASSI value (about 3.9 Hz against 3.49 Hz): the neglected mat mass and coupling soften the
-system. Then repeat lesson 1's Try this ($V_s$ of the sand and the gravel doubled): the frequency
+the SASSI value (about 3.9 Hz against 3.49 Hz). The mat mass and the sway-rocking coupling are not
+the reason: the whole stick and mat on the same 6 x 6 springs and dashpots, frequency-dependent and
+complex, peaks at 3.86 Hz. The reason is the mat itself. $K_G$ assumes that the 81 interaction nodes
+move as one rigid body, but the spider clamps the stick to the nine central mat nodes only, and the
+1.5 m mat, ten times as stiff as concrete, still bends under the rocking moment, which softens the
+rocking spring. Make the mat 1000 times as stiff as concrete (`M,1,3.0E10,...`) and SASSI's roof
+peak moves to 3.86 Hz (|H| = 12.6). A foundation that looks rigid in a static check can be flexible
+for SSI; this is why SASSI keeps the real mat and all its interaction nodes rather than a rigid-body
+spring set. Then repeat lesson 1's Try this ($V_s$ of the sand and the gravel doubled): the frequency
 moves back towards 5 Hz (about 4.1 Hz).
 
 ### Check yourself

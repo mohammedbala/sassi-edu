@@ -67,6 +67,7 @@ prerequisites: [02-free-field, 03-impedance]
 | ```` ```sassi-show ```` | Commands or syntax shown but not run (e.g. `SITE,<opmode>,<mode1>,...` templates or a variation). |
 | ```` ```sassi-setup ```` | Only in the introduction: commands run automatically when the lesson is opened, after the workspace is prepared (e.g. to restore the state a lesson builds on). Keep them fast. |
 | ```` ```action ```` | GUI actions offered as buttons after the step has run, one per line, `verb: arguments` (below). |
+| ```` ```figure ```` | A concept figure drawn in the lesson text, where the block stands (section "Figures" below). |
 | any other fence | Displayed as code (equations in plain text, APDL, file excerpts). |
 
 Action verbs (paths are relative to the lesson workspace):
@@ -84,6 +85,54 @@ Action verbs (paths are relative to the lesson workspace):
 | `open-dialog` | `ANALYSIS[/TAB]` or `MODEL`/`WRITE`/`CHECK` | open Options ▸ Analysis at a tab, etc. |
 | `open-doc` | `docs/...md[#anchor]` | open a document in Help |
 | `explain` | `<command line>` | open the command explainer for that line |
+| `animate` | `<folder> [\| <kind> [<scale or col>] [<stride>] [<view>]] [\| <title>]` | animate a frame folder (or a frame store) on the active model: `PROCFRAME,<folder>,<folder>_ani,<title>,<anitype>` (skipped for a store), then `DEFORMPLOT` (kind `deformed`, the default; + `WINDOWSETTINGS,UNDEFORMED,1`), `VECTORPLOT` (`vector`), `BUBBLEPLOT` (`bubble`) or `CONTOURPLOT` (`contour`) with frames 1..N, the stride (default 1) and the scale (default `auto`: the largest displacement drawn as 15 % of the model size; give the same number to animations that are compared) or, for bubble / contour, the data column (default 1) and its range over the frames; `<view>` `front` (X right, Z up), `side` (Y right, Z up), `top` or `iso` adds `CNGVIEW`; `WINDOWSETTINGS,TITLE,<title>` when a title is given (the button reads "Animate: <title>") |
+
+The frames come from the step's commands: `HARMFRAME,<FILE8>,<f>,<folder>` (steady-state motion at one
+SSI frequency, a few dozen small files) or a module's restart frames (MOTION Restart for TF / ACC / RS,
+RELDISP `RELDX,,1`, STRESS). Module history frames are one file per time step (20 s at 0.005 s:
+4800 files), so keep them out of lessons or limit the output duration. Name a frame folder of its own
+(PROCFRAME stores every file of the folder). The headless run checks that the folder exists after the
+step and runs the button's commands (no image is rendered; the animation database is written to the
+workspace).
+
+## Figures
+
+A ```` ```figure ```` block puts an interactive concept figure into the lesson text (introduction,
+narrative or any section). Its first line is `<name> [key=value ...]`; the following lines are the
+caption, 1-3 sentences of Markdown (LaTeX allowed) that tie the figure to the step:
+
+````
+```figure
+soil-column f=7.3
+The column of this lesson solved exactly, per unit motion at the surface. Near 7.3 Hz ...
+```
+````
+
+The figures are drawn by `sassi/ui/static/figures.js` (canvas, vanilla JavaScript) from the formulas in
+their formula strip and note; animated ones have Play / Pause, pause while off screen and start paused
+under `prefers-reduced-motion`. Parameters set the starting values (the learner then changes them with
+the figure's sliders and buttons); numbers are clamped to the slider range.
+
+| Name | Parameters | Shows |
+|---|---|---|
+| `fixed-base-vs-ssi` | `f` (Hz), `s` (soil velocity factor) | one-mode stick on a fixed base and on sway-rocking springs and dashpots (lesson 4 impedance), harmonic steady state, \|H(f)\| of both |
+| `kinematic-inertial` | `case` = `surface` / `embedded`, `r` (D/λ) | SSI = kinematic (massless) + inertial interaction (schematic) |
+| `substructuring` | `case` = `surface` / `embedded`, `stage` (0-4) | free field + structure − excavated soil = SSI system, with the terms of Eq. 2.1 |
+| `soil-column` | `f` (Hz), `vhs` (rock Vs, m/s), `damp` (soil damping factor) | vertically propagating SH wave in the lesson 2 column (exact SHAKE recursion), outcrop / within amplification |
+| `impedance-ellipse` | `f` (Hz), `c` (kN s/m) | K(ω) = k + iωc under harmonic motion: phase lag, force-displacement ellipse, E_D, ξ |
+| `tf-to-isrs` | `f0` (Hz), `beta` | control motion → H(f) → floor motion → oscillators (Nigam-Jennings) → ISRS |
+| `interaction-sets` | `method` = `fv` / `fsin` / `evbn` / `ffv` | the interaction-node sets on the lesson 5 excavation mesh, with their counts |
+| `wave-types` | `fp` (pulse Hz) | vertically propagating SV, SH and P waves (X, Y, Z input) in a uniform column |
+| `isrs-broadening` | `b` (fraction), `cases` = `1` / `3` | envelope of soil cases and ±b peak broadening (BROADEN) |
+| `hysteresis` | `mode` = `soil` / `panel`, `a` (amplitude / reference strain) | backbone, Masing loop, secant stiffness, ξ = E_D/(4πE_S) |
+| `freq-interpolation` | `modes` = `2` / `3`, `set` = `lesson` / `coarse` | computed vs interpolated TF (MOTION option 1) and CRITFREQ |
+
+`validate_lesson` checks the name and the parameters against `FIGURES` in `sassi/ui/lessons.py`, which
+lists the same names as the registry of `figures.js`; `tests/unit/test_lesson_figures.py` checks that the
+two agree, typesets every caption and every formula of the figures with KaTeX, and compares the physics of
+the figures (run in Node.js) with the Python modules and with the numbers the lessons quote. A new figure
+needs an entry in both registries and in this table. Do not invent numbers: defaults come from the
+lesson's model, and illustrative parameters are labelled as such in the figure's note.
 
 ## Equations (LaTeX)
 
@@ -132,4 +181,6 @@ the total runtime of any lesson below about two minutes on a laptop.
 * running each lesson headlessly (setup, then every step's `sassi` blocks in order, in a fresh
   temporary workspace) produces **no error messages**, and every file named by an action exists after
   its step;
-* every link to `docs/` resolves.
+* every link to `docs/` resolves;
+* every `figure` block names a known figure with known parameters (`tests/unit/test_lesson_figures.py`
+  checks the figures themselves).

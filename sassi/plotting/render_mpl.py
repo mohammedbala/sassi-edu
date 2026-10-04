@@ -357,6 +357,9 @@ def model_figure(d: Dict[str, Any], dpi: int = DPI):
                                              linewidths=0.8 if wire else 0.4))
     # beams, springs, GENERAL elements as lines
     edges = np.asarray(sc["edges"], dtype=np.int64).reshape(-1, 2)
+    if len(edges) and kind == "DEFORMPLOT" and v.get("show_undeformed"):
+        ax.add_collection3d(Line3DCollection([P0[e] for e in edges], colors=palette_color("DEFORMED", 4),
+                                             linewidths=1.2))
     if len(edges) and kind != "NODEPLOT":
         segs = [P[e] for e in edges]
         cols = [ecolor[k] for k in np.asarray(sc["edge_elem"], dtype=np.int64)]

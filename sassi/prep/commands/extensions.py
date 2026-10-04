@@ -108,8 +108,7 @@ def cmd_stressx(c):
 @command("RELDX")
 def cmd_reldx(c):
     """RELDX,<saverot>,<rstframes>: Save Rotations for ANSYS; Restart for Frame Generation (P1)."""
-    store_xrecord(c, "RELDX")
-    _tier(c, "RELDX", "P1")
+    store_xrecord(c, "RELDX")             # both fields are read by RELDISP (THDR files, THD/THDR frames)
 
 
 @command("CMODFORM")
