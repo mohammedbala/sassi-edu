@@ -30,7 +30,11 @@ virtual environment has both):
 It prints the size of the site (about 7.7 MB: Plotly.js 4.8 MB, the Python bundle `web/sassi-edu.zip`
 1.9 MB, KaTeX 0.6 MB; about 3.9 MB over the network, as GitHub Pages compresses text files). Visitors
 also download Pyodide, NumPy and SciPy from cdn.jsdelivr.net at their first visit (23 MB compressed,
-32 MB unpacked), which their browser then caches: about 27 MB in all.
+32 MB unpacked): about 27 MB in all. The service worker `sw.js` (from `web/sw.js`, written at the site
+root so that its scope is the whole site) keeps these files in the browser's Cache Storage: the Pyodide
+files in `sassi-edu-pyodide-<version>` (kept across deployments), the site's files in
+`sassi-edu-site-<build>` (replaced by the next build). Visits after the first download nothing and work
+offline; `web/boot.js` waits for the service worker on the first visit so the one download is stored.
 
 The front end `sassi/ui/static/` is copied with its subfolders: `katex/` and `examples/`, the pictures of
 the examples gallery (eight PNGs, about 50 kB, written by `python -m sassi.ui.thumbnails`; regenerate them

@@ -295,12 +295,26 @@
       el("div", {class: "opt-note", text: "WRITE,<file>,<path>: the model as a .pre command file (Options > Write adds MDL / AFWRITE lines)"})),
       buttons: [{label: "OK", primary: true, action: (a) => cmdOk(`WRITE,${q(file.value)},${q(dir.value)}`, a)}, {label: "Cancel", action: () => true}]});
   };
-  D.exportAnsys = function () {
-    const m = S.state.model || {};
-    const file = txt(m.name ? m.name + ".inp" : ""), dir = txt(m.path || "");
-    return D.modal({title: "Export to ANSYS", body: el("div", {style: {width: "520px"}}, row("File name", file), row("Directory", dir),
-      el("div", {class: "opt-note", text: "ANSYS,[FileName],[Dir]: APDL input; run ANSYSREFORMAT first for beam end releases (manual WARNING)"})),
-      buttons: [{label: "OK", primary: true, action: (a) => cmdOk(`ANSYS,${q(file.value)},${q(dir.value)}`, a)}, {label: "Cancel", action: () => true}]});
+  /** File > Export to ANSYS (and the toolbar button): write the active model as ANSYS APDL input with the
+   *  ANSYS command -- <model>.inp in the model folder; the command is in the Command History (rule L17) --
+   *  and download the written file to this computer.  Other names, folders or the beam end-release map:
+   *  type ANSYS,[FileName],[Dir],[<dmap>] in Command Entry. */
+  D.exportAnsys = async function () {
+    let res;
+    try { res = await S.command("ANSYS"); } catch (e) { D.alert("Export to ANSYS", e.message); return; }
+    const msgs = (res && res.messages) || [];
+    const done = msgs.find((x) => /^APDL written to /.test(String(x.text || "")));
+    if (!done) {
+      const errs = msgs.filter((x) => x.kind === "ERROR").map((x) => x.text).join("\n");
+      D.alert("Export to ANSYS", errs || "the model was not exported (see the Command History)");
+      return;
+    }
+    const path = String(done.text).replace(/^APDL written to /, "").trim();
+    let d;
+    try { d = await S.get(`/api/file?name=${encodeURIComponent(path)}`); }
+    catch (e) { D.alert("Export to ANSYS", `${path} was written but cannot be downloaded: ${e.message}`); return; }
+    saveText(d.name, d.text);
+    S.status(`${d.name} downloaded (ANSYS APDL input of the active model)`);
   };
   D.exit = async function () {
     let info = {unsaved: []};

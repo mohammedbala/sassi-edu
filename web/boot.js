@@ -63,12 +63,18 @@
   bar.appendChild(fill);
   const time = node("p", "time", "");
   const error = node("div", "error");
+  const note = node("p", "note", "");
+  const FIRST_VISIT = "This first visit downloads about 27 MB (the Python runtime, NumPy, SciPy, Plotly and SASSI-EDU) " +
+    "and keeps it on this computer: the next visits start without downloading anything.";
+  const FROM_CACHE = "Loading from this computer: an earlier visit stored the Python runtime, NumPy, SciPy and " +
+    "SASSI-EDU, so nothing is downloaded. Starting Python still takes a few seconds.";
+  const NO_SW = "The first visit downloads about 27 MB (the Python runtime, NumPy, SciPy, Plotly and SASSI-EDU); the " +
+    "browser caches it for the next visits.";
   card.append(node("h1", "", "SASSI-EDU — soil-structure interaction in your browser"),
     node("p", "sub", "The guided course, the examples, the plots and Help of the SASSI-EDU GUI, with Python running in this tab."),
-    stage, bar, time,
-    node("p", "note", "The first visit downloads about 27 MB (the Python runtime, NumPy, SciPy, Plotly and SASSI-EDU); the browser " +
-      "caches it for the next visits. Everything runs on your computer: nothing is sent to a server. Files live in this " +
-      "tab only (a reload starts afresh; your course progress is kept)."),
+    stage, bar, time, note,
+    node("p", "note", "Everything runs on your computer: nothing is sent to a server. Files live in this tab only " +
+      "(a reload starts afresh; your course progress is kept)."),
     node("p", "disclaimer", "Disclaimer. " + DISCLAIMER), error);
   overlay.appendChild(card);
   document.body.appendChild(overlay);
@@ -114,17 +120,58 @@
     pending.clear();
   }
 
+  /** The service worker (sw.js, from web/sw.js) keeps the files of the app on this computer: a visit after the
+   *  first one downloads nothing.  On the first visit Python starts once the service worker controls the page,
+   *  so that the one download is stored (at most a few seconds' wait).  Resolves true when it controls the page. */
+  async function serviceWorker() {
+    if (!("serviceWorker" in navigator) || !window.isSecureContext) return false;
+    try {
+      await navigator.serviceWorker.register("sw.js", {scope: "./"});
+    } catch (e) {
+      console.warn("SASSI-EDU: no service worker (files are cached by the browser only):", e);
+      return false;
+    }
+    if (navigator.serviceWorker.controller) return true;
+    await new Promise((res) => {
+      const t = setTimeout(res, 4000);
+      navigator.serviceWorker.addEventListener("controllerchange", () => { clearTimeout(t); res(); }, {once: true});
+    });
+    // ask the browser to keep the stored files under storage pressure (Firefox would ask the visitor: not there)
+    if (navigator.storage && navigator.storage.persist && !/Firefox\//.test(navigator.userAgent)) {
+      navigator.storage.persist().catch(() => {});
+    }
+    return !!navigator.serviceWorker.controller;
+  }
+  /** Number of Pyodide files (runtime, NumPy, SciPy ...) an earlier visit stored (sw.js: its Pyodide cache). */
+  async function storedFiles() {
+    try {
+      const name = `sassi-edu-pyodide-${PYODIDE_VERSION}`;
+      if (!window.caches || !(await caches.has(name))) return 0;
+      return (await (await caches.open(name)).keys()).length;
+    } catch (e) {
+      return 0;
+    }
+  }
+
   if (typeof WebAssembly !== "object" || typeof Worker !== "function") {
     stop("This browser has no WebAssembly or no Web Workers.");
   } else {
-    setStage("Starting the Python engine (Web Worker) ...", 0.02);
-    try {
-      worker = new Worker(`web/worker.js?v=${BUILD}`, {type: "module"});
-    } catch (e) {
-      stop(`The Web Worker could not be created: ${e.message || e}`);
-    }
+    setStage("Preparing ...", 0.01);
+    (async () => {
+      const [sw, stored] = await Promise.all([serviceWorker(), storedFiles()]);
+      note.textContent = !sw ? NO_SW : stored >= 4 ? FROM_CACHE : FIRST_VISIT;
+      window.SASSI_WEB.storage = {serviceWorker: sw, storedFiles: stored};
+      setStage("Starting the Python engine (Web Worker) ...", 0.02);
+      try {
+        worker = new Worker(`web/worker.js?v=${BUILD}`, {type: "module"});
+      } catch (e) {
+        stop(`The Web Worker could not be created: ${e.message || e}`);
+        return;
+      }
+      connect(worker);
+    })();
   }
-  if (worker) {
+  function connect(worker) {
     worker.onerror = (ev) => {
       ev.preventDefault();
       stop(`The Python engine stopped (${ev.message || "the worker script failed to load"}).`);

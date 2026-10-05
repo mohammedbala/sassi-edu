@@ -176,10 +176,22 @@ def build(out: Path = DEFAULT_OUT) -> Dict[str, object]:
     for name in ("boot.js", "worker.js"):
         text = (WEB / name).read_text(encoding="utf-8").replace("__SASSI_BUILD__", build_id)
         put("web/" + name, text.encode("utf-8"))
+    # the service worker at the root of the site (its scope is the folder it is served from): it keeps the
+    # files of the app on the visitor's computer (web/sw.js)
+    sw = (WEB / "sw.js").read_text(encoding="utf-8")
+    put("sw.js", sw.replace("__SASSI_BUILD__", build_id).replace("__PYODIDE_VERSION__", pyodide_version()).encode("utf-8"))
     put("web/sassi-edu.zip", zbytes)
     total = sum(written.values())
     return {"out": str(out), "build": build_id, "files": sorted(written), "bytes": total, "zip_bytes": len(zbytes),
             "zip_files": len(rels), "sizes": written}
+
+
+def pyodide_version() -> str:
+    """The Pyodide version pinned in web/worker.js (one place for it)."""
+    m = re.search(r'const PYODIDE_VERSION = "([0-9.]+)"', (WEB / "worker.js").read_text(encoding="utf-8"))
+    if not m:
+        raise BuildError("web/worker.js: PYODIDE_VERSION not found")
+    return m.group(1)
 
 
 def _mb(n: int) -> str:
@@ -202,7 +214,8 @@ def main(argv=None) -> int:
     print(f"  static/plotly.min.js {_mb(sizes['static/plotly.min.js'])}")
     katex = sum(v for k, v in sizes.items() if k.startswith("static/katex/"))
     print(f"  static/katex/        {_mb(katex)}")
-    print("  + Pyodide 314.0.7, NumPy and SciPy from cdn.jsdelivr.net at the first visit (cached by the browser)")
+    print(f"  + Pyodide {pyodide_version()}, NumPy and SciPy from cdn.jsdelivr.net at the first visit; sw.js keeps "
+          "everything on the visitor's computer for the next visits")
     print(f"test locally: python -m http.server 8811 -d {s['out']}   then open http://127.0.0.1:8811/")
     return 0
 

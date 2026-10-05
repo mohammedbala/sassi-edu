@@ -67,7 +67,7 @@ sassi/web/bridge.py  -- Bridge(push): GuiSession(web mode) + route() + run_pendi
   `tests/`, `.venv`. The build prints the site size; keep the zip small (a few MB).
 * **Pyodide version** pinned (314.0.7, CDN `https://cdn.jsdelivr.net/pyodide/v314.0.7/full/`), the same
   version the Node test uses.
-* **Loading screen.** First visit downloads ~30 MB (Pyodide, numpy, scipy; cached by the browser
+* **Loading screen.** First visit downloads ~30 MB (Pyodide, numpy, scipy; kept by the service worker sw.js,
   afterwards): show a progress overlay with what is loading, and a clear error if WebAssembly/workers are
   unavailable. Show the disclaimer (educational, not affiliated with ACS SASSI, not for design) on the
   overlay and in Help > About.

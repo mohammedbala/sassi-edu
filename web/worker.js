@@ -67,7 +67,7 @@ function fatal(err, what) {
 
 async function start() {
   const t0 = performance.now();
-  status(`Downloading the Python runtime (Pyodide ${PYODIDE_VERSION}) ...`, 0.05);
+  status(`Loading the Python runtime (Pyodide ${PYODIDE_VERSION}) ...`, 0.05);
   let loadPyodide;
   try {
     ({loadPyodide} = await import(`${PYODIDE_URL}pyodide.mjs`));
@@ -75,9 +75,9 @@ async function start() {
     throw new Error(`Pyodide could not be loaded from ${PYODIDE_URL} (${err.message || err})`);
   }
   const py = await loadPyodide({indexURL: PYODIDE_URL});
-  status("Downloading NumPy and SciPy ...", 0.3);
+  status("Loading NumPy and SciPy ...", 0.3);
   await py.loadPackage(["numpy", "scipy"], {messageCallback: () => {}});
-  status("Downloading SASSI-EDU ...", 0.85);
+  status("Loading SASSI-EDU ...", 0.85);
   const url = new URL(`sassi-edu.zip?v=${BUILD}`, self.location.href);
   const r = await fetch(url);
   if (!r.ok) throw new Error(`${url.pathname}: HTTP ${r.status}`);

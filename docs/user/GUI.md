@@ -108,7 +108,7 @@ a `.pre` file the same commands fail, as in batch mode (D-UI-08).
 | Converters > ANSYS .cdb | **ANSYS .cdb to .pre Converter**: as above plus **Enter Value for Gravity** (required: 32.2 ft/s², 386.4 in/s² or 9.81 m/s²) and an optional damping ratio (SASSI-EDU extension; blank = the materials' damping). See [ANSYS.md](ANSYS.md). | `CONVERT,ANSYS,<model>,<file.cdb>,<gravity>,[<prefile>],[<damp>]` |
 | Converters > GT-STRUDL Database | greyed (not included) | |
 | Output | **Output (WRITE)**: file name and folder of the `.pre` file. Options > Write adds the `MDL` / `AFWRITE` lines. | `WRITE,<file>,<path>` |
-| Export to ANSYS | file name and folder of the APDL input (run `ANSYSREFORMAT` first for beam end releases, manual WARNING) | `ANSYS,<file>,<dir>` |
+| Export to ANSYS | writes the active model as ANSYS APDL input (`<model>.inp` in the model folder) and downloads it to this computer (in the web version too); other names or folders: type `ANSYS,<file>,<dir>` (run `ANSYSREFORMAT` first for beam end releases, manual WARNING) | `ANSYS` |
 | Export to STRUDL | greyed (not included) | |
 | Exit | lists the models changed since their last SAVE and asks; then saves `SASSIini.xml`, cancels a running module and stops the server | |
 
@@ -889,9 +889,12 @@ Python runs in the page itself: [Pyodide](https://pyodide.org) (CPython compiled
 NumPy and SciPy) in a Web Worker runs the same `sassi` package, the same API and the same front end as
 `sassi-gui`. No server computes anything and nothing you type leaves your computer.
 
-* **First start.** The first visit downloads about 27 MB (Python, NumPy, SciPy, Plotly.js and SASSI-EDU),
-  which the browser keeps for the next visits. A progress panel shows what is loading, with the
-  disclaimer. A current desktop browser (Chrome, Edge, Firefox, Safari) is needed.
+* **First start.** The first visit downloads about 27 MB (Python, NumPy, SciPy, Plotly.js and SASSI-EDU).
+  A service worker (`sw.js`) keeps all of it on your computer, so the next visits download nothing --
+  the site even works offline -- and only start Python (a few seconds). A new version of the site
+  replaces only the SASSI-EDU files; Python, NumPy and SciPy stay stored. A progress panel shows what is
+  loading (and whether it comes from this computer), with the disclaimer. A current desktop browser
+  (Chrome, Edge, Firefox, Safari) is needed; in a private window the files are not kept.
 * **Same course and tools.** The Learn tab, the lessons with their module runs, the examples, plots,
   Help (with the formulas and figures), the command explainer, the Options dialogs and Command Entry
   work as described above. Module runs show their listing and the status-bar progress while they run.

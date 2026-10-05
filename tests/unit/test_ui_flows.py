@@ -423,3 +423,17 @@ def test_javascript_syntax():
     for f in ("app.js", "dialogs.js", "plots.js", "main.js"):
         r = subprocess.run(["node", "--check", str(STATIC / f)], capture_output=True, text=True, timeout=60)
         assert r.returncode == 0, (f, r.stderr)
+
+
+def test_export_to_ansys_writes_the_model_inp_that_the_browser_downloads(S, tmp_path):
+    """File > Export to ANSYS (static/dialogs.js D.exportAnsys) submits ANSYS, finds the written file in the
+    confirmation 'APDL written to <path>' and downloads it with GET /api/file: the contract it relies on."""
+    box = load_model(S, tmp_path)
+    r = cmd(S, "ANSYS")
+    done = [m["text"] for m in r["messages"] if m["text"].startswith("APDL written to ")]
+    assert len(done) == 1
+    path = done[0][len("APDL written to "):].strip()
+    assert Path(path) == box / "box.inp"
+    st, f = call(S, "GET", "/api/file", query={"name": path})
+    assert st == 200 and f["name"] == "box.inp" and f["text"] == (box / "box.inp").read_text(encoding="utf-8")
+    assert "/PREP7" in f["text"].upper()

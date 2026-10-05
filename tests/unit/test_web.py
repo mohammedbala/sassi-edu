@@ -269,6 +269,22 @@ def test_site_ships_the_example_pictures(site):
     assert not [f for f in summary["files"] if f.startswith("static/examples/") and not f.endswith(".png")]
 
 
+def test_site_service_worker_keeps_the_app_on_the_computer(site):
+    """sw.js at the site root (its scope is the site folder), with this build and the Pyodide version of
+    worker.js: the Pyodide cache is named by the version only (kept across deployments), the site cache by the
+    build (replaced by the next build); boot.js registers it before starting Python."""
+    out, summary = site
+    sw = (out / "sw.js").read_text(encoding="utf-8")
+    assert "__SASSI_BUILD__" not in sw and "__PYODIDE_VERSION__" not in sw
+    assert f'const BUILD = "{summary["build"]}";' in sw
+    version = re.search(r'const PYODIDE_VERSION = "([0-9.]+)"', (WEB / "worker.js").read_text(encoding="utf-8")).group(1)
+    assert f'const PYODIDE_VERSION = "{version}";' in sw
+    assert "sassi-edu-pyodide-${PYODIDE_VERSION}" in sw and "sassi-edu-site-${BUILD}" in sw
+    boot = (out / "web" / "boot.js").read_text(encoding="utf-8")
+    assert 'navigator.serviceWorker.register("sw.js", {scope: "./"})' in boot
+    assert f'const PYODIDE_VERSION = "{version}";' in boot          # boot.js reads the same Pyodide cache name
+
+
 def test_build_refuses_to_empty_other_folders(tmp_path):
     b = _load_build()
     (tmp_path / "mine.txt").write_text("keep")
@@ -299,7 +315,7 @@ def test_web_front_end_wiring():
 
 @pytest.mark.skipif(shutil.which("node") is None, reason="node is not installed")
 def test_web_js_syntax():
-    for f in (WEB / "boot.js", WEB / "worker.js", WEB / "test_pyodide.mjs", STATIC / "app.js", STATIC / "dialogs.js"):
+    for f in (WEB / "boot.js", WEB / "worker.js", WEB / "sw.js", WEB / "test_pyodide.mjs", STATIC / "app.js", STATIC / "dialogs.js"):
         r = subprocess.run(["node", "--check", str(f)], capture_output=True, text=True, timeout=60)
         assert r.returncode == 0, (f.name, r.stderr)
 
