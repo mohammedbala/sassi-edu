@@ -30,7 +30,7 @@ edit them by hand.
 | [OPTION_A.md](user/OPTION_A.md) | Option A, the two-step approach: SSI motions as equivalent static or dynamic ANSYS loads (module LOADGEN) |
 | [OPTION_NON.md](user/OPTION_NON.md) | Option NON: nonlinear wall panels and springs by equivalent-linear SSI iterations (module NONLINEAR), hysteresis models, SHEAR and BBCGEN |
 | [WATER.md](user/WATER.md) | water in pools and tanks: FILLPOOL, REFINEMODEL, LISTPOOLINTER, MERGEPOOL; impulsive hydrodynamic mass |
-| [examples/README.md](../examples/README.md) | the eight tutorial examples and their expected results |
+| [examples/README.md](../examples/README.md) | the nine tutorial examples and their expected results |
 | [impedance_study.md](verification/impedance_study.md) | the independent boundary-element references of the foundation-impedance problems |
 | [AUDIT_REPORT.md](verification/AUDIT_REPORT.md) | the final independent cross-module audit: end-to-end checks (units, phases, coordinates, damping), defects found and fixed, the audit of the verification suite and the residual limitations |
 

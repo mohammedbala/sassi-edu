@@ -218,6 +218,16 @@ def prerequisites(module: str, model_name: str, mdir: Path, deck) -> List[str]:
     return out
 
 
+def defaults_notes(model, module: str, dirs: Sequence[Path] = ()) -> List[str]:
+    """The built-in defaults of blank inputs that ``module`` uses (requirements section 7.19, D-W5-11): the
+    lines RUN<MODULE> writes to the listing (and so to the screen), the same as CHECK's EDU-29."""
+    from ..check import Resolved
+    try:
+        return [u.text for u in Resolved(model, dirs).defaults_used(module)]
+    except Exception:                      # never stop a run for the report
+        return []
+
+
 def run_command(c, module: str) -> None:
     """RUN<MODULE>,[model]: run one module synchronously in the model directory (D-RUN-05)."""
     interp = c.interp
@@ -256,8 +266,10 @@ def run_command(c, module: str) -> None:
     from ...modules.base import run_module
     c.info(f"RUN{module}: model {m.name} in {mdir}")
     hook = c.interp.module_progress          # the GUI's progress panel (a worker process passes its own)
+    notes = defaults_notes(m, module, search_dirs(c))
     rc = run_module(module, m.name, mdir, echo=lambda line: c.info(line),
-                    progress=(lambda f, msg: hook(module, f, msg)) if hook is not None else None)
+                    progress=(lambda f, msg: hook(module, f, msg)) if hook is not None else None,
+                    **({"notes": notes} if notes else {}))
     listing = mdir / f"{m.name}_{module}.out"
     if rc != 0:
         c.fail(f"{module} finished with status FAILED ({rc}); see {listing.name}")

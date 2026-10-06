@@ -26,7 +26,7 @@ second-step ANSYS analysis (module LOADGEN), [OPTION_NON.md](OPTION_NON.md) nonl
 1. [Getting started](#1-getting-started)
 2. [How an SSI analysis works](#2-how-an-ssi-analysis-works)
 3. [Units, axes and sign conventions](#3-units-axes-and-sign-conventions)
-4. [The command language](#4-the-command-language)
+4. [The command language](#4-the-command-language): [built-in inputs and defaults](#46-built-in-inputs-and-defaults)
 5. [Building the structural model](#5-building-the-structural-model)
 6. [ANSYS models and the two-step approach](#6-ansys-models-and-the-two-step-approach)
 7. [Site and soil](#7-site-and-soil)
@@ -374,6 +374,67 @@ that produces a missing file.
 
 `FCOPY,<src>,<dst>` and `FMOVE,<src>,<dst>` copy or rename files in the model directory (FILE1 to
 FILE1X, FILE8 to FILE81 ...), so that multi-run workflows can be scripted completely.
+
+### 4.6 Built-in inputs and defaults
+
+SASSI-EDU ships a small library of standard inputs, so that a model can be checked and run before its
+project inputs (the site-specific record, the design spectrum, the soil curves) exist:
+
+| File | What it is | Units |
+|---|---|---|
+| `@rg160h_030g.acc` | acceleration record matched by EQUAKE to the RG 1.60 horizontal spectrum at 0.30 g (PGA 0.324 g, 20 s) | g; Δt 0.005 s, 4001 values, first line Δt (`<fopt>` 0) |
+| `@rg160h_030g.rsi` | RG 1.60 horizontal design spectrum anchored to 0.30 g, 5 % damping, 27 frequencies | Hz, SA in g |
+| `@rg160h_1g.rsi`, `@rg160v_1g.rsi` | RG 1.60 horizontal / vertical spectra anchored to 1.0 g (scale linearly) | Hz, SA in g |
+| `@rg160h_030g_cm2s3.tpsd`, `@rg160h_030g_in2s3.tpsd` | SRP 3.7.1 Appendix A minimum PSD for the 0.30 g spectrum (SI / British) | Hz, cm²/s³ or in²/s³ |
+| `@rg160h_appa_1g_cm2s3.tpsd`, `@rg160h_appa_1g_in2s3.tpsd` | the same at 1.0 g (scale by PGA²) | Hz, cm²/s³ or in²/s³ |
+| `@ricker_5hz.th` | 5 Hz Ricker wavelet, peak 1 at t = 0.5 s, 2 s: a load history for forced vibration | load factor; Δt 0.005 s, first line Δt |
+| `@dynp_library.pre` | SHAKE91 strain-dependent soil curves Clay, Sand and Rock (`DYNP` commands) | strain %, G/Gmax, damping % |
+
+**Using a built-in file.** Type its name with the prefix `@` wherever a file name is read:
+`THFILE,@rg160h_030g.acc`, `RSIN,1,@rg160h_030g.rsi`, `TPSD,1,@rg160h_030g_cm2s3.tpsd`,
+`INP,@dynp_library.pre`, `READSPEC,@rg160h_030g.rsi,1,2`. The name works the same in a local install, a pip
+install and the browser version; decks written by AFWRITE keep the `@` name, so a model folder stays
+portable. The files are read-only: an `@` name is never an output file. `LIBRARY` lists the files,
+`LIBRARY,<@name>` describes one (units, source, where it is installed), and the library's README
+(`sassi/data/library/README.txt`) gives the sources. In the GUI every file field of Options > Analysis has a
+**Library** button that lists the built-in files that fit the field: records for THFILE, ACCIN and the
+SOIL-only file, the load pulse for THFILE, spectra for RSIN and PSDs for TPSD. A built-in name is a
+variable-free file name: `@rg160h_030g.acc` is never read as the variable `rg160h_030g`.
+
+**Defaults of blank inputs.** ACS SASSI requires these inputs; SASSI-EDU fills the blanks below from the
+library, and **reports every default it uses**:
+
+| Blank input | Default | When |
+|---|---|---|
+| THFILE (MOTION, STRESS, RELDISP) | `@rg160h_030g.acc`, or `@ricker_5hz.th` when ANALYS `<type>` = 1 (forced vibration) | MOTION `<fopt>` = 0 and SITE Δt = 0.005 s |
+| THFILE and SOILX file (SOIL) | `@rg160h_030g.acc` (SOIL skips its first line, the time step, when Number of Header Lines is 0) | SITE Δt = 0.005 s |
+| RSIN (no RSIN file at all) | RSIN 1 = `@rg160h_030g.rsi`; a blank Number of Frequencies takes its 27 rows | EQUAKE `<accopt>` ≠ 2 |
+| RSOUT / ACCOUT of a spectrum that runs | `<model>_eq<i>.rso` / `<model>_eq<i>.acc` in the model folder | always |
+| a DYNP label used by SPRO that the model does not define | the built-in curve Clay, Sand or Rock of that label (no INP needed; labels are case-sensitive) | a model `DYNP` of the same label always wins |
+| SPRO (none at all) | sublayer k = TOPL layer k with Sand (Vs < 760 m/s, 2493 ft/s) or Rock, then the SITE half-space `<hs>` (linear) | TOPL and `<hs>` defined |
+
+Where a default is used, CHECK lists **Warning EDU-29 Built-In Default Input Used** under each module that
+uses it, naming the input and its replacement, for example
+
+```
+Warning EDU-29 : Built-In Default Input Used  [THFILE blank: the built-in RG 1.60 record @rg160h_030g.acc (0.30 g, 20 s, dt 0.005 s) is used]
+```
+
+AFWRITE repeats it in its notes and writes the default into the deck; `RUN<MODULE>` prints it and writes it
+at the top of the module listing; the modules note every built-in file they read. `LIBRARY,DEFAULTS` lists
+the defaults the active model uses, module by module, and why a blank input has none. A warning never
+blocks a module, so read the Check window: a default is a placeholder for an input you have not given yet,
+not a design input. The RG 1.60 record in particular is one educational record, not a site-specific design
+motion, and the default SOIL profile assigns generic curves.
+
+What is **not** defaulted: a file that is given but missing (Errors 73, 85, 88 ... still stop the module), the
+seed or external record ACCIN of EQUAKE `<accopt>` 1 / 2 (Error 88), SPRO entries given without curve labels
+(Error 95), numeric options such as SOIL Number of Values. A record at another time step is never stretched:
+with Δt ≠ 0.005 s or a pairs file (`<fopt>` = 1) a blank THFILE stays Error 73, and the error says why.
+
+`EDUOPT,DEFAULTS,OFF` switches every default off (the ACS SASSI behaviour: Errors 73, 84, 86, 87, 95, 97,
+99 for blank inputs); the `@` names still work. The decisions are D-W5-01 to D-W5-14 of the requirements
+(section 7.19).
 
 ---
 
@@ -1477,7 +1538,8 @@ section 5. The ones you will meet most often:
 | Error 55 Illegal Sum of Wave Ratios | WAVE ratios do not sum to 1 | `WAVE` |
 | Error 57 Illegal Radius of Central Zone | POINT `<rad>` ≤ 0 | POINT, section 8.4 |
 | Error 64 No Nodal Output Request | MOTION/RELDISP enabled without NOUT/RDND | `NOUT`, `RDND` |
-| Error 73 Acceleration Time History File Does Not Exist | THFILE path wrong (a relative path is looked for in the model directory, then the working directory) | `THFILE`, `MDL`, run with `--cwd` |
+| Error 73 Acceleration Time History File Does Not Exist | THFILE path wrong (a relative path is looked for in the model directory, then the working directory), or THFILE blank where no built-in default applies (Δt ≠ 0.005 s, `<fopt>` = 1, `EDUOPT,DEFAULTS,OFF`; section 4.6) | `THFILE`, `MDL`, run with `--cwd` |
+| EDU-29 Built-In Default Input Used (warning) | a blank input file took a built-in default (section 4.6) | nothing to fix while you learn; give the project input before relying on the results |
 | Errors 77 / 78 Multiplication Factor and Maximum Value ... | both zero or both non-zero | MOTION `<mult>`/`<max>` |
 | Error 124 Node Is a Fixed Interaction Node | interaction node with fixed translations | `D` or `INT` |
 | EDU-01 Interaction Node Is Not on a Soil Layer Interface | node elevation does not match a TOPL interface | adjust layers or mesh levels |
@@ -1566,7 +1628,7 @@ A paraphrase of the "Engineering Considerations" of manual §4.1.2, with the num
 The examples in `examples/` are ordinary `.pre` files, commented line by line. Run them from the
 `examples` directory (`../.venv/bin/sassi run exNN_....pre`) or with `--cwd examples` from the
 project root; the results go to `examples/exNN/`. [examples/README.md](../../examples/README.md)
-lists the expected results, which `tests/integration/test_examples.py` (examples 1-5 and 8),
+lists the expected results, which `tests/integration/test_examples.py` (examples 1-5, 8 and 9),
 `tests/unit/test_nlsoil_example.py` (example 6) and `tests/unit/test_nonlinear_example.py` (example 7)
 check.
 
@@ -1580,6 +1642,7 @@ check.
 | ex06 | loose backfill behind a wall: near-field soil iterations | SOIL SITE ×3 POINT HOUSE ANALYS STRESS ×3, then 6 iterations HOUSE ANALYS STRESS ×3; MOTION | ~5 s |
 | ex07 | Option NON: shear-wall building with cracking wall panels | SITE ×3 POINT HOUSE ANALYS MOTION ×3 RELDISP ×3 NONLINEAR, then 7 iterations; MOTION | 30-120 s |
 | ex08 | embedded shear-wall building with a tower: FV against FI-FSIN (SM) and FI-EVBN (MSM) | SITE POINT HOUSE ANALYS MOTION STRESS (3 models) | 60-90 s |
+| ex09 | three-storey braced steel frame (W and HSS shapes) on a 1.2 m RC mat: SSI against a fixed base, ISRS, brace forces, storey drifts | SITE POINT HOUSE ANALYS MOTION STRESS RELDISP ×3 (2 models) | ~30 s |
 
 ### 15.1 Example 1: stick on a surface mat (the basic workflow)
 

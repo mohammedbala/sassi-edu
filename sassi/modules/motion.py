@@ -46,6 +46,7 @@ from ..core import interp as I
 from ..core import signal as S
 from ..core.spectra import log_frequencies, response_spectrum
 from ..io import decks, textfiles, thfile
+from ..io import library as LIB
 from ..io.container import Container, read_container
 from ..io.files import validate
 from .base import ModuleContext, ModuleError, batch_main
@@ -563,7 +564,7 @@ def _convert_external(ctx: ModuleContext, d, damps: np.ndarray, rs_f: np.ndarray
     names = [n for n in names if n and n[0] not in "#*"]
     dt = float(d["delt"])
     for nm in names:
-        src = Path(nm) if Path(nm).is_absolute() else ctx.workdir / nm
+        src = LIB.module_path(nm, ctx.workdir)
         if src.suffix.upper() != ".ACC":
             lst.warning(f"{nm}: external histories must have the .ACC extension; skipped")
             continue
@@ -626,9 +627,7 @@ def run(ctx: ModuleContext) -> int:
         raise ModuleError("Error 64: no nodal output request")
 
     # ---------------------------------------------------------------- control motion
-    thpath = Path(d["thfile"]) if d["thfile"] else None
-    if thpath is not None and not thpath.is_absolute():
-        thpath = ctx.workdir / thpath
+    thpath = LIB.module_path(d["thfile"], ctx.workdir) if str(d["thfile"] or "").strip() else None
     need_motion = bool(reqs or allpts) and not int(d["out"])
     cmot: Optional[ControlMotion] = None
     if need_motion or (int(d["opmode"]) == 1 and thpath is not None):
@@ -637,6 +636,8 @@ def run(ctx: ModuleContext) -> int:
         cmot = read_control_motion(thpath, int(d["fopt"]), int(d["rec1"]), int(d["rec2"]), dt, nfft,
                                    float(d["mult"]), float(d["max"]))
         lst.section("Control motion" if seismic else "Reference load history")
+        if LIB.is_library_name(d["thfile"]):
+            lst.write(f"   {LIB.note(d['thfile'])}")
         lst.write(f"   file {cmot.path.name}: {cmot.nrec} records, {len(cmot.acc)} used, "
                   f"duration {len(cmot.acc) * dt:g} s, quiet zone {(nfft - len(cmot.acc)) * dt:g} s")
         unit = "g" if seismic else "load factor"

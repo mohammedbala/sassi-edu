@@ -5,6 +5,11 @@ break count (requirements section 6.2, D-CHK-01..09).
 Every case starts from a base model that enables every module and passes CHECK without errors; the
 case appends the command lines (or applies a model edit) that break one rule.  The test asserts
 that the message number appears and that no *other* error appears except the listed companions.
+
+Blank inputs that have a built-in default in SASSI-EDU (requirements section 7.19: RSIN, RSOUT, ACCOUT,
+THFILE, SPRO, the DYNP labels Clay / Sand / Rock) are errors in ACS SASSI.  Their catalogue cases run in
+the ACS mode ``EDUOPT,DEFAULTS,OFF`` (:data:`ACS_MODE`); :func:`test_blank_inputs_take_reported_defaults`
+checks the same blanks with the defaults on: no error, and the default named by Warning EDU-29.
 """
 from __future__ import annotations
 
@@ -79,6 +84,9 @@ SOIL,100,32.2,0,1,1,8,0.65,1,0
 SRS,1,1,0
 AOPT,1,1,0,1,1,1,0,1,1,1,1,1,1,0
 """
+
+#: ACS SASSI behaviour for blank inputs: no built-in defaults (D-W5-12)
+ACS_MODE = "\nEDUOPT,DEFAULTS,OFF"
 
 _SIXTEEN = "\n".join(["SPRO,0"] + [f"DYNP,1,0.0001,1,0.0001,0.5,P{k}\nDYNP,2,0.1,0.5,0.1,10,P{k}\nSPRO,{k},1,P{k}"
                                    for k in range(1, 18)])
@@ -167,10 +175,10 @@ ERROR_CASES = {
     81: ("EOUT,1,1,1,1,1,1,0,0,0,0,0,0,1,5", set(), None),
     82: ("EOUT,1,1,1,1,1,1,0,0,0,0,0,0,1,1", set(), None),
     83: ("GROUP,4\nRSET,1,1,1,9", set(), None),
-    84: ("RSIN,1,", set(), None),
+    84: ("RSIN,1," + ACS_MODE, set(), None),
     85: ("RSIN,1,missing.rsi", set(), None),
-    86: ("RSOUT,1,", set(), None),
-    87: ("ACCOUT,1,", set(), None),
+    86: ("RSOUT,1," + ACS_MODE, set(), None),
+    87: ("ACCOUT,1," + ACS_MODE, set(), None),
     88: ("EQUAKE,1,5,11975,0.05,20,0,1", set(), None),
     89: ("EQUAKE,0,4,11975,0.05,20,0,1", set(), None),
     90: ("EQUAKE,0,5,0,0.05,20,0,1", set(), None),
@@ -339,3 +347,67 @@ def test_err_format_headers_in_run_order(tmp_path):
                      "STRESS", "RELDISP"]
     assert "Error 85 : RS Input File 1 Does Not Exist  [missing.rsi]" in lines
     assert "EQUAKE: 1 errors, 0 warnings" in lines
+
+
+# ---------------------------------------------------------------------------------- built-in defaults (7.19)
+def _defaults(rep, module=None):
+    return [m.detail for m in rep.warnings(module) if m.number == "EDU-29"]
+
+
+def test_blank_inputs_take_reported_defaults(tmp_path):
+    """The blanks of cases 84, 86, 87 (and a blank THFILE, no SPRO, an undefined library label) with the
+    defaults on: no error, every default named by Warning EDU-29 (D-W5-03 ... D-W5-11)."""
+    ui, rep = _run(tmp_path, "RSIN,1,\nEQUAKE,0,,11975,0.05,20,0,1")          # blank <nrfreq>: rows of the default
+    assert rep.errors() == [], rep.format()
+    assert ("RSIN blank: the built-in RG 1.60 H spectrum @rg160h_030g.rsi (0.30 g, 5 %, 27 frequencies) is the "
+            "target of spectrum 1") in _defaults(rep, "EQUAKE")
+    assert "Warning EDU-29 : Built-In Default Input Used  [RSIN blank:" in rep.format()
+    ui, rep = _run(tmp_path, "RSIN,1,")                  # base <nrfreq> = 5 conflicts with the default's 27 rows
+    assert rep.numbers("Error") == {89}
+    assert "leave Number of Frequencies blank" in rep.errors("EQUAKE")[0].detail
+    ui, rep = _run(tmp_path, "RSOUT,1,\nACCOUT,1,")
+    assert rep.errors() == [], rep.format()
+    assert _defaults(rep, "EQUAKE") == [
+        "RSOUT 1 blank: the output spectrum is written to base_eq1.rso (model folder)",
+        "ACCOUT 1 blank: the generated record is written to base_eq1.acc (.vel, .dis, .psd, .fft next to it; "
+        "model folder)"]
+    ui, rep = _run(tmp_path, "THFILE,")
+    assert rep.errors() == [], rep.format()
+    for mod in ("MOTION", "STRESS", "RELDISP"):
+        assert _defaults(rep, mod) == ["THFILE blank: the built-in RG 1.60 record @rg160h_030g.acc (0.30 g, 20 s, "
+                                       "dt 0.005 s) is used"], mod
+    assert "THFILE blank: the built-in RG 1.60 record @rg160h_030g.acc (0.30 g, 20 s, dt 0.005 s) is the SOIL " \
+           "input motion" in _defaults(rep, "SOIL")
+    ui, rep = _run(tmp_path, "THFILE,\nEDUOPT,DEFAULTS,OFF")                    # ACS: Error 73
+    assert {m.module for m in rep.errors() if m.number == 73} == {"SOIL", "MOTION", "STRESS", "RELDISP"}
+    assert not _defaults(rep)
+    # a given file that does not exist stays an error, defaults or not (Errors 73 / 85)
+    ui, rep = _run(tmp_path, "THFILE,@missing.acc")
+    assert {m.module for m in rep.errors() if m.number == 73} == {"SOIL", "MOTION", "STRESS", "RELDISP"}
+    assert "not a built-in input" in rep.errors("MOTION")[0].detail
+
+
+def test_soil_defaults_profile_and_library_curves(tmp_path):
+    """SPRO and DYNP blanks (D-W5-09, D-W5-10): no SPRO at all -> the default profile; a label the model does not
+    define -> the library curve; a model DYNP of the same label wins; labels are case-sensitive."""
+    def no_spro(m):                                     # no command deletes SPRO entries
+        for k, _ in list(m.options.entries("SPRO")):
+            m.options.delete_entry("SPRO", k)
+
+    ui, rep = _run(tmp_path, "", no_spro)
+    assert rep.errors() == [], rep.format()
+    prof = [d for d in _defaults(rep, "SOIL") if d.startswith("SPRO blank")]
+    assert prof == ["SPRO blank: the default SOIL profile is used -- sublayers 1-2 = the TOPL layers 1, 1 with the "
+                    "built-in curves Sand (Vs < 2493.4 ft/s) and Rock (Vs >= 2493.4 ft/s): Sand 1-2; sublayer 3 = the "
+                    "half-space L 2 (linear)"]
+    ui, rep = _run(tmp_path, "EDUOPT,DEFAULTS,OFF", no_spro)
+    assert 95 in rep.numbers("Error")
+    ui, rep = _run(tmp_path, "SPRO,1,1,Clay\nSPRO,2,1,Rock")
+    assert rep.errors() == [], rep.format()
+    labs = [d for d in _defaults(rep, "SOIL") if d.startswith("DYNP")]
+    assert len(labs) == 2 and labs[0].startswith("DYNP Clay not defined in the model: the built-in curve Clay")
+    ui, rep = _run(tmp_path, "SPRO,1,1,clay")
+    assert {97, 99} <= rep.numbers("Error")
+    assert "built-in curves: Clay, Sand, Rock" in rep.errors("SOIL")[0].detail
+    ui, rep = _run(tmp_path, "SPRO,1,1,Sand")                               # the base model defines Sand
+    assert not [d for d in _defaults(rep, "SOIL") if d.startswith("DYNP")]

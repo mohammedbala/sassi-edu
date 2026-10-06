@@ -30,6 +30,7 @@ from typing import Any, Callable, Dict, List, Optional, Sequence, Union
 
 import numpy as np
 
+from ..io import library as LIB
 from ..model import SSIModel
 from ..model.values import NumberError, parse_float, parse_int
 from .lexer import MAX_LINE, LexError, Lexed, is_comment, parse_id_list, split_args, split_head
@@ -382,7 +383,9 @@ class Interpreter:
         ``@X`` counter; ``@X+k``, ``@X-k``, ``@X++``, ``@X--`` change the counter first and give
         the new value; ``@X=k`` sets it; ``@X[i]`` is the i-th item (1-based; ``i`` may be ``#``,
         ``#+k`` or ``@Y``); ``#`` is the innermost loop index and ``#+k`` adds k without mutation.
-        An unknown name is left literally with a warning; an index out of range is an error.
+        An unknown name is left literally with a warning; an index out of range is an error.  ``@`` followed
+        by the name of a built-in library file (``@rg160h_030g.acc``) is a file name, never a variable, and is
+        left as it is (D-W5-02).
         """
         if "@" not in line and not ("#" in line and self.loops):
             return line
@@ -391,6 +394,11 @@ class Interpreter:
         while i < n:
             ch = line[i]
             if ch == "@":
+                nlib = LIB.starts_with_name(line[i + 1:])
+                if nlib:                        # a built-in input file name (@rg160h_030g.acc, D-W5-02)
+                    out.append(line[i:i + 1 + nlib])
+                    i += 1 + nlib
+                    continue
                 name = self._match_variable(line, i + 1)
                 if name is None:
                     m = re.match(r"[A-Za-z_][A-Za-z0-9_]*", line[i + 1:])
@@ -632,8 +640,17 @@ class Interpreter:
     def resolve_path(self, name: str, must_exist: bool = True) -> Path:
         """Resolve an input path: absolute; active model path; working directory; calling file's folder.
 
-        Windows separators (``.\\Node-Macro.pre`` in the manual examples) are accepted.
+        Windows separators (``.\\Node-Macro.pre`` in the manual examples) are accepted.  ``@name`` is a
+        file of the built-in input library (:mod:`sassi.io.library`, D-W5-01).
         """
+        if LIB.is_library_name(name):
+            p = LIB.library_path(name)
+            if p is not None:
+                return p
+            if must_exist:
+                raise CommandError(f"built-in file {name.strip()} not found (LIBRARY lists the built-in inputs: "
+                                   f"{', '.join(LIB.names())})")
+            return LIB.LIBRARY_DIR / LIB.bare(name)
         raw = os.path.expanduser(name.strip())
         variants = [raw]
         if "\\" in raw and os.sep == "/":
@@ -652,7 +669,10 @@ class Interpreter:
         return p if p.is_absolute() else self._candidates(p)[0]
 
     def output_path(self, name: str) -> Path:
-        """Path of a file to write: absolute, else relative to the model path (if MDL set), else the CWD."""
+        """Path of a file to write: absolute, else relative to the model path (if MDL set), else the CWD.
+        A built-in ``@`` name is refused: the library is read-only (D-W5-01)."""
+        if LIB.is_library_name(name):
+            raise CommandError(f"{name.strip()}: built-in library files are read-only; give another file name")
         raw = os.path.expanduser(name.strip())
         if "\\" in raw and os.sep == "/":
             raw = raw.replace("\\", "/")

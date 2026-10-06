@@ -160,8 +160,9 @@ def test_decisions_and_lead_sections():
     assert dec["D-W2-01"].subject.startswith("VP-11") and "VP-11" in dec["D-W2-01"].evidence
     assert "Half-space sublayer law" in dec["D-SIT-02"].subject      # id cell with a bold suffix
     lead = rep.lead_decision_sections()
-    assert [h.split()[0] for h, _, _ in lead] == ["7.16", "7.17", "7.18"]
+    assert [h.split()[0] for h, _, _ in lead] == ["7.16", "7.17", "7.18", "7.19"]
     assert any(d.id == "D-W3-05" for d in lead[2][2])
+    assert any(d.id == "D-W5-12" for d in lead[3][2])          # built-in inputs and defaults (wave 5)
     assert rep.lead_sections_text(["7.16", "7.17"]) == "7.16 and 7.17"
     assert rep.lead_sections_text(["7.16", "7.17", "7.18"]) == "7.16 to 7.18"
     assert all(len(rows) >= 10 for _, _, rows in lead)

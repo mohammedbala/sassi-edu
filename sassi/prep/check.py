@@ -17,7 +17,9 @@ module enabled by AOPT and lists the numbered messages of the manual's catalogue
   options and simultaneous-case counts of incoherent runs), EDU-27 shell material with
   different P- and S-damping (warning, requirements 4.0.2) and EDU-28 recommended practice not
   followed (warning: D-SIT-03, D-SOL-02, SRP 3.7.1 duration, an L number repeated among the embedment
-  layers of TOPL).  The EXCSTRCHK condition (G-15) is
+  layers of TOPL) and EDU-29 built-in default input used (warning: a blank THFILE, RSIN, RSOUT, ACCOUT, SPRO
+  or an undefined DYNP label Clay / Sand / Rock replaced from the built-in library, requirements section 7.19,
+  :mod:`sassi.prep.defaults`; ``EDUOPT,DEFAULTS,OFF`` restores the ACS errors).  The EXCSTRCHK condition (G-15) is
   reported as ``Error EXCSTRCHK`` -- or ``Warning EXCSTRCHK`` when the shared interior node is an
   interaction node used only by SOLID/PLANE elements built on the excavation mesh (near-field soil, a
   solid basement, the zero-SSI identity): the rule of HOUSE, :func:`sassi.core.house_lib.excstrchk_kind`
@@ -57,7 +59,9 @@ from ..conventions import ELEMENT_TYPE_NAMES, is_power_of_two, nearest_power_of_
 from ..core.house_lib import excstrchk_kind
 from ..model.entities import MIN_ELEMENT_NODES
 from ..model.materials import elastic_constants
+from ..io import library as LIB
 from ..model.values import fmt_num
+from . import defaults as DEF
 from .options import (AOPT_MODULES, eduopt, eduopt_float, get_entries, get_record, history_problems,
                       problem_fmt, time_grid_problems)
 
@@ -245,6 +249,8 @@ EDU_TEXT: Dict[str, Tuple[str, str]] = {
     "EDU-26": ("Error", "Option Combination or Value Not Allowed"),
     "EDU-27": ("Warning", "Shell Material {m} Has Different P- and S-Wave Damping"),
     "EDU-28": ("Warning", "Recommended Practice Not Followed"),
+    # built-in defaults of blank inputs (requirements section 7.19, D-W5-11): the default used, never silent
+    "EDU-29": ("Warning", "Built-In Default Input Used"),
     # non-linear soil SSI (requirements 4.4 item 7, 4.10 item 5)
     "EDU-41": ("Error", "Non-Linear Soil Group {g} Is Not Valid"),
     "EDU-42": ("Warning", "Non-Linear Soil SSI Input (.pin) Not Defined"),
@@ -745,9 +751,12 @@ def analys_memory_bytes(n_int: int) -> int:
 
 
 def resolve_file(name: str, dirs: Sequence[Union[str, Path]]) -> Optional[Path]:
-    """Resolve a file name: absolute, else the first directory of ``dirs`` where it exists."""
+    """Resolve a file name: ``@name`` from the built-in library (D-W5-01), an absolute path, else the
+    first directory of ``dirs`` where it exists."""
     if not name:
         return None
+    if LIB.is_library_name(name):
+        return LIB.library_path(name)
     raw = os.path.expanduser(name.strip())
     variants = [raw] + ([raw.replace("\\", "/")] if "\\" in raw and os.sep == "/" else [])
     for v in variants:
@@ -842,8 +851,15 @@ class Resolved:
         self.cmodform = int(R["CMODFORM"].form)
         self.type = int(self.analys.type)
         self.coh, self.wpass, self.me = int(self.house.coh), int(self.house.wpass), int(self.house.me)
-        self.thfile = model.options.string("THFILE")
         self.thtit = model.options.string("THTIT")
+        # blank inputs and their built-in defaults (requirements section 7.19, sassi.prep.defaults)
+        self.defaults_on = DEF.enabled(model)
+        self.thfile_given = model.options.string("THFILE")
+        #: the control history of MOTION, STRESS and RELDISP: THFILE, or its default (D-W5-03 ... D-W5-05)
+        self.history_choice = DEF.control_history(model, self.thfile_given, seismic=self.type != 1,
+                                                  fopt=int(self.motion.fopt), delt=self.delt)
+        self.thfile = self.history_choice.name
+        self._cache: Dict[str, Any] = {}
 
     # ---------------------------------------------------------------- helpers
     def file(self, name: str) -> Optional[Path]:
@@ -851,15 +867,78 @@ class Resolved:
 
     def deck_file_name(self, name: str) -> str:
         """File name as written into a deck: relative names found outside the model directory
-        are made absolute so the module (run in the model directory) finds them."""
+        are made absolute so the module (run in the model directory) finds them; a built-in ``@`` name
+        is kept as it is (portable, every module resolves it, D-W5-13)."""
         if not name:
             return ""
+        if LIB.is_library_name(name):
+            return name.strip()
         p = self.file(name)
         if p is None:
             return name
         if Path(name).is_absolute() or (self.dirs and p.parent.resolve() == self.dirs[0].resolve()):
             return name
         return str(p.resolve())
+
+    # ---------------------------------------------------------------- defaults of blank inputs
+    def history_needed(self, module: str) -> bool:
+        """True when ``module`` reads the control history (MOTION: full output or TH-to-RS conversion)."""
+        if module == "MOTION":
+            return int(self.motion.out) == 0 or bool(int(self.motion.cnvrt))
+        return module in ("SOIL", "STRESS", "RELDISP")
+
+    def soil_history(self) -> "DEF.HistoryChoice":
+        """SOIL input motion: SOILX <file>, THFILE, else the built-in record (D-W5-06)."""
+        if "soil_history" not in self._cache:
+            self._cache["soil_history"] = DEF.soil_history(self.m, self.rec["SOILX"].file, self.thfile_given,
+                                                           self.delt)
+        return self._cache["soil_history"]
+
+    def equake_files(self) -> Tuple[Dict[str, Dict[int, str]], List["DEF.DefaultUse"]]:
+        """EQUAKE spectrum files with the defaults applied, and the defaults used (D-W5-07, D-W5-08)."""
+        if "equake" not in self._cache:
+            self._cache["equake"] = DEF.equake_files(self.m, int(self.rec["EQUAKE"].accopt))
+        return self._cache["equake"]
+
+    def soil_profile(self) -> Tuple[List[Tuple[int, Any]], Optional["DEF.DefaultUse"], str]:
+        """SOIL sublayers (SPRO, or the default profile, D-W5-10), the default used, why there is none."""
+        if "profile" not in self._cache:
+            self._cache["profile"] = DEF.soil_profile(self.m)
+        return self._cache["profile"]
+
+    def soil_labels(self) -> List[str]:
+        return list(dict.fromkeys(rec.dynprop for _, rec in self.soil_profile()[0] if rec.dynprop))
+
+    def soil_curves(self) -> Tuple[Dict[str, Any], List["DEF.DefaultUse"]]:
+        """Library curves of the used DYNP labels the model does not define (D-W5-09)."""
+        if "curves" not in self._cache:
+            self._cache["curves"] = DEF.library_curves(self.m, self.soil_labels())
+        return self._cache["curves"]
+
+    def defaults_used(self, module: str) -> List["DEF.DefaultUse"]:
+        """The built-in defaults ``module`` uses (reported by CHECK as EDU-29, by AFWRITE and RUN<MODULE>)."""
+        out: List[DEF.DefaultUse] = []
+        if module in ("MOTION", "STRESS", "RELDISP"):
+            hc = self.history_choice
+            if hc.default is not None and self.history_needed(module) and self.file(hc.name) is not None:
+                out.append(hc.default)
+        elif module == "SOIL":
+            if self.rec["SOIL"].legacy:
+                return out
+            hc = self.soil_history()
+            if self.file(hc.name) is not None:
+                if hc.default is not None:
+                    out.append(hc.default)
+                hn = DEF.soil_header_note(hc.name, int(self.rec["SOIL"].header))
+                if hn is not None:
+                    out.append(hn)
+            prof_default = self.soil_profile()[1]
+            if prof_default is not None:
+                out.append(prof_default)
+            out.extend(self.soil_curves()[1])
+        elif module == "EQUAKE":
+            out.extend(self.equake_files()[1])
+        return out
 
     @property
     def fcut(self) -> Optional[float]:
@@ -972,9 +1051,12 @@ class Checker:
         """Control-motion data shared by MOTION, STRESS and RELDISP (Errors 73-78, EDU-03)."""
         r = self.r
         mo = r.motion
+        hc = r.history_choice
         p = r.file(r.thfile)
         if p is None:
-            self.rep.error(module, 73, f"THFILE '{r.thfile}'" if r.thfile else "THFILE not given")
+            self.rep.error(module, 73, _missing_history(r.thfile, hc.why_not))
+        elif hc.default is not None:
+            self.rep.edu(module, DEF.EDU_DEFAULT, hc.default.text)
         for kind, num, det in history_problems(mo.mult, mo.get("max"), mo.rec1, mo.rec2):
             self.rep.add(module, kind, num, det)
         if p is not None:
@@ -1467,18 +1549,22 @@ class Checker:
         if r.delt <= 0:
             rep.error(mod, 49, f"<delt> = {fmt_num(r.delt)}")
         self._record_problems(mod, eq)
-        files = {name: dict(get_entries(m, name)) for name in ("RSIN", "RSOUT", "ACCIN", "ACCOUT", "TPSD")}
+        # the spectrum files with the built-in defaults of blank inputs (D-W5-07, D-W5-08)
+        files, uses = r.equake_files()
+        for u in uses:
+            rep.edu(mod, DEF.EDU_DEFAULT, u.text)
+        defaulted = {u.item for u in uses}
         accopt = int(eq.accopt)
         comps = sorted({k for d in files.values() for k in d if isinstance(k, int)})
         if accopt != 2:
-            rsin = {k: rec for k, rec in files["RSIN"].items() if rec.file}
+            rsin = {k: f for k, f in files["RSIN"].items() if f}
             if not rsin:
-                rep.error(mod, 84)
+                rep.error(mod, 84, "EDUOPT,DEFAULTS,OFF: no built-in default" if not r.defaults_on else "")
             nrfreq = int(eq.nrfreq)
-            for i, rec in sorted(rsin.items()):
-                p = r.file(rec.file)
+            for i, f in sorted(rsin.items()):
+                p = r.file(f)
                 if p is None:
-                    rep.error(mod, 85, rec.file, i=i)
+                    rep.error(mod, 85, f + _library_hint(f), i=i)
                     continue
                 nrec = count_xy_rows(p)
                 if not eq.given(2):
@@ -1487,29 +1573,30 @@ class Checker:
                         if nrfreq <= 0:
                             rep.error(mod, 91, f"RSIN {i} has no records")
                 if nrec is not None and nrfreq > 0 and nrec != nrfreq:
-                    rep.error(mod, 89, f"{nrec} records, <nrfreq> = {nrfreq}", i=i)
+                    det = f"{nrec} records, <nrfreq> = {nrfreq}"
+                    if f"RSIN {i}" in defaulted:
+                        det += f"; RSIN {i} is the built-in default {f}: leave Number of Frequencies blank"
+                    rep.error(mod, 89, det, i=i)
             for i in sorted(rsin):
-                if not _file_of(files["RSOUT"], i):
-                    rep.error(mod, 86, i=i)
-                if not _file_of(files["ACCOUT"], i):
-                    rep.error(mod, 87, i=i)
-                if accopt == 1 and not _file_of(files["ACCIN"], i):
+                self._equake_output(mod, 86, files["RSOUT"].get(i, ""), i)
+                self._equake_output(mod, 87, files["ACCOUT"].get(i, ""), i)
+                if accopt == 1 and not files["ACCIN"].get(i):
                     rep.error(mod, 88, i=i)
             if accopt == 1 and not rsin:
                 for i in comps:
-                    if not _file_of(files["ACCIN"], i):
+                    if not files["ACCIN"].get(i):
                         rep.error(mod, 88, i=i)
         else:
             active = sorted(set(files["ACCIN"]) | set(files["RSOUT"]))
             if not active:
                 rep.error(mod, 88, "External Accel selected: no ACCIN file", i=1)
             for i in active:
-                if not _file_of(files["ACCIN"], i):
+                acc_in = files["ACCIN"].get(i, "")
+                if not acc_in:
                     rep.error(mod, 88, i=i)
-                elif r.file(_file_of(files["ACCIN"], i)) is None:
-                    rep.error(mod, 88, f"{_file_of(files['ACCIN'], i)} not found", i=i)
-                if not _file_of(files["RSOUT"], i):
-                    rep.error(mod, 86, i=i)
+                elif r.file(acc_in) is None:
+                    rep.error(mod, 88, f"{acc_in} not found" + _library_hint(acc_in), i=i)
+                self._equake_output(mod, 86, files["RSOUT"].get(i, ""), i)
         if int(eq.corr):
             pairs = get_entries(m, "CORR")
             if not pairs:
@@ -1522,13 +1609,22 @@ class Checker:
             rep.edu(mod, "EDU-28", f"total duration {fmt_num(eq.dur)} s < 20 s (SRP 3.7.1)")
         if int(eq.tpsd):
             for i in comps:
-                f = _file_of(files["TPSD"], i)
+                f = files["TPSD"].get(i, "")
                 if f and r.file(f) is None:
-                    rep.edu(mod, "EDU-28", f"target PSD file {f} not found (spectrum {i})")
+                    rep.edu(mod, "EDU-28", f"target PSD file {f} not found (spectrum {i})" + _library_hint(f))
+
+    def _equake_output(self, mod: str, number: int, name: str, i: int) -> None:
+        """Errors 86 / 87: a blank output file (no default: EDUOPT,DEFAULTS,OFF), or a built-in ``@`` name
+        (the library is read-only)."""
+        if not name:
+            self.rep.error(mod, number, i=i)
+        elif LIB.is_library_name(name):
+            self.rep.error(mod, number, f"{name}: built-in library files are read-only", i=i)
 
     # ================================================================== SOIL
     def soil_profile(self) -> List[Tuple[int, Any]]:
-        return [(k, rec) for k, rec in get_entries(self.m, "SPRO") if isinstance(k, int)]
+        """SOIL sublayers: the SPRO entries, or the default profile when none is given (D-W5-10)."""
+        return list(self.r.soil_profile()[0])
 
     def check_soil(self, mod: str) -> None:
         rep, m, r = self.rep, self.m, self.r
@@ -1540,7 +1636,10 @@ class Checker:
         self._record_problems(mod, sx)
         for kind, num, det in time_grid_problems(0.0, r.delt, r.nft_raw, harmonic_ok=False):
             rep.add(mod, kind, num, det if num != 9 else f"NFFT = {r.nft_raw}; {r.nft} is written")
-        prof = self.soil_profile()
+        prof, prof_default, prof_why = r.soil_profile()
+        prof = list(prof)
+        if prof_default is not None:
+            rep.edu(mod, DEF.EDU_DEFAULT, prof_default.text)
         nlay = len(prof)
         layers_no = [k for k, _ in prof]
         expect = list(range(1, nlay + 1))
@@ -1549,13 +1648,17 @@ class Checker:
             for i in missing:
                 rep.edu(mod, "EDU-25", "SPRO sublayers must be numbered 1..N (last = half-space, D-SOL-02)", i=i)
         if nlay < 2:
-            rep.error(mod, 95, "the SOIL profile needs SPRO sublayers and the half-space (last SPRO)")
+            rep.error(mod, 95, "the SOIL profile needs SPRO sublayers and the half-space (last SPRO)"
+                               + (f"; {prof_why}" if prof_why else ""))
         for idx, (k, rec) in enumerate(prof):
             self._layer(mod, int(rec.prop), halfspace=(idx == nlay - 1))
         labels_used = [rec.dynprop for _, rec in prof if rec.dynprop]
         if prof and not labels_used:
             rep.error(mod, 95)
         dyn = {label for (label, _), _rec in get_entries(m, "DYNP")}
+        lib_curves, lib_uses = r.soil_curves()               # built-in curves of undefined labels (D-W5-09)
+        for u in lib_uses:
+            rep.edu(mod, DEF.EDU_DEFAULT, u.text)
         distinct = list(dict.fromkeys(labels_used))
         if len(distinct) > 15 and r.limits == "PREP":
             rep.error(mod, 96, f"{len(distinct)} > 15 (LIMITS,PREP, D-SOL-05)")
@@ -1563,8 +1666,12 @@ class Checker:
             rep.edu(mod, "EDU-02", f"{len(distinct)} dynamic properties > 100")
         for lab in distinct:
             if lab not in dyn:
-                rep.error(mod, 97, p=lab)
-                rep.error(mod, 99, p=lab)
+                if lab in lib_curves:
+                    continue
+                hint = (f"built-in curves: {', '.join(LIB.dynp_labels())} (labels are case-sensitive)"
+                        if r.defaults_on else "")
+                rep.error(mod, 97, hint, p=lab)
+                rep.error(mod, 99, hint, p=lab)
                 continue
             pts = [rec for (l2, _), rec in get_entries(m, "DYNP") if l2 == lab]
             gpts = [p for p in pts if p.given(2) and p.given(3)]
@@ -1593,19 +1700,28 @@ class Checker:
             any(int(rec.save) for _, rec in get_entries(m, "SSAF"))
         if rs_req and not m.damp:
             rep.error(mod, 107)
-        # input history
-        fname = sx.file or r.thfile
+        # input history (SOILX file, THFILE, or the built-in record, D-W5-06)
+        hc = r.soil_history()
+        fname = hc.name
         p = r.file(fname)
         if p is None:
-            rep.error(mod, 73, f"'{fname}'" if fname else "THFILE not given")
-        elif soil.nrval > 0:
-            from ..io import thfile
-            try:
-                nvals: Optional[int] = len(thfile.read_soil_history(p, 0, max(int(soil.header), 0)))
-            except (OSError, ValueError):
-                nvals = None
-            if nvals is not None and nvals < soil.nrval:
-                rep.error(mod, 100, f"{soil.nrval} values requested, {nvals} in {p.name}")
+            rep.error(mod, 73, _missing_history(fname, hc.why_not, quote=True))
+        else:
+            if hc.default is not None:
+                rep.edu(mod, DEF.EDU_DEFAULT, hc.default.text)
+            header = max(int(soil.header), 0)
+            hn = DEF.soil_header_note(fname, header)
+            if hn is not None:
+                rep.edu(mod, DEF.EDU_DEFAULT, hn.text)
+                header = 1
+            if soil.nrval > 0:
+                from ..io import thfile
+                try:
+                    nvals: Optional[int] = len(thfile.read_soil_history(p, 0, header))
+                except (OSError, ValueError):
+                    nvals = None
+                if nvals is not None and nvals < soil.nrval:
+                    rep.error(mod, 100, f"{soil.nrval} values requested, {nvals} in {p.name}")
         if soil.nrval > 0 and r.nft > 0 and r.nft < soil.nrval:
             self._edu03(mod, int(soil.nrval))
         # nonlinear soil (P2) and the half-space consistency (D-SOL-02)
@@ -2393,6 +2509,20 @@ def drilling_unrestrained(v: ModelView, eps: float = 1e-4) -> Dict[int, str]:
 def _file_of(entries: Dict[Any, Any], i: int) -> str:
     rec = entries.get(i)
     return rec.file if rec is not None else ""
+
+
+def _library_hint(name: str) -> str:
+    """Detail for an ``@`` name that is not in the built-in library."""
+    if LIB.is_library_name(name) and LIB.library_path(name) is None:
+        return " (not a built-in input: LIBRARY lists them)"
+    return ""
+
+
+def _missing_history(name: str, why_not: str = "", quote: bool = False) -> str:
+    """Detail of Error 73: the file given, or "THFILE not given" and why no built-in default applies."""
+    if name:
+        return (f"'{name}'" if quote else f"THFILE '{name}'") + _library_hint(name)
+    return "THFILE not given" + (f"; {why_not}" if why_not else "")
 
 
 class _Placeholders(dict):

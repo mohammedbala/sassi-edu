@@ -470,7 +470,7 @@
   }
   function examplesPanel() {
     const sec = el("section", {class: "learn-sec", id: "learn-examples"}, el("h2", {text: "Examples"}),
-      el("p", {text: "Eight complete models, each commented line by line. Click a picture to build the model in a fresh workspace and turn it around in the 3D view. Load one into a fresh workspace to read it in the File Editor (and run it with Run (INP)), or run it all at once and explore the results (File > Results Browser, Plot > Spectrum). When a lesson is built on the example, the guided lesson is the best way in."}));
+      el("p", {text: "Nine complete models, each commented line by line. Click a picture to build the model in a fresh workspace and turn it around in the 3D view. Load one into a fresh workspace to read it in the File Editor (and run it with Run (INP)), or run it all at once and explore the results (File > Results Browser, Plot > Spectrum). When a lesson is built on the example, the guided lesson is the best way in."}));
     const grid = el("div", {class: "xcards"});
     for (const x of (L.examples || [])) grid.appendChild(exampleCard(x));
     if (!(L.examples || []).length) grid.appendChild(el("p", {class: "empty", text: "No examples found."}));

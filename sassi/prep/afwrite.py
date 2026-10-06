@@ -36,6 +36,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
 
 from ..io import deckfmt, decks
+from . import defaults as DEF
 from .check import PLANE, SOLID, CheckOptions, CheckReport, Checker, ModelView, Resolved, write_err
 from .options import eduopt, eduopt_float, get_entries
 
@@ -100,10 +101,16 @@ class DeckBuilder:
         for n in sorted(set(self.r.fnums or [])):
             d.table("freqs").append([n])
 
-    def _hist(self, d: decks.Deck) -> None:
-        """Control-motion data shared by MOTION, STRESS and RELDISP (spec 07 section 3)."""
+    def _hist(self, d: decks.Deck, module: str = "") -> None:
+        """Control-motion data shared by MOTION, STRESS and RELDISP (spec 07 section 3).  A blank THFILE is
+        written as its built-in default when the module reads the history (D-W5-03 ... D-W5-05, D-W5-13)."""
         r, mo = self.r, self.r.motion
-        d["thfile"] = r.deck_file_name(r.thfile)
+        hc = r.history_choice
+        use = hc.default is not None and (not module or r.history_needed(module))
+        d["thfile"] = r.deck_file_name(r.thfile if use or hc.default is None else r.thfile_given)
+        if use:
+            self._note(f"{hc.default.text} (EDU-29); {hc.name} is written to the decks that read the "
+                       f"control motion")
         d["thtit"] = r.thtit
         d["mult"] = float(mo.mult)
         d["max"] = float(mo.get("max"))
@@ -191,12 +198,14 @@ class DeckBuilder:
         d = decks.new("EQUAKE")
         self._common(d)
         d["opmode"] = 0
-        files = {name: dict(get_entries(m, name)) for name in ("RSIN", "RSOUT", "ACCIN", "ACCOUT", "TPSD")}
+        files, uses = r.equake_files()                 # blank inputs with their defaults (D-W5-07, D-W5-08)
+        for u in uses:
+            self._note(f"EQUAKE: {u.text} (EDU-29)")
         nrfreq = int(eq.nrfreq)
         if not eq.given(2):
             from .check import count_xy_rows
-            rs = [k for k, rec in sorted(files["RSIN"].items()) if rec.file]
-            p = r.file(files["RSIN"][rs[0]].file) if rs else None
+            rs = [k for k, f in sorted(files["RSIN"].items()) if f]
+            p = r.file(files["RSIN"][rs[0]]) if rs else None
             nrfreq = (count_xy_rows(p) or 0) if p is not None else 0
             if rs:
                 self._note(f"EQUAKE <nrfreq> = {nrfreq} (records of RSIN {rs[0]}, dialog default)")
@@ -214,8 +223,7 @@ class DeckBuilder:
         comps = sorted({k for dd in files.values() for k in dd if isinstance(k, int)})
         for i in comps:
             def f(name: str, inp: bool) -> str:
-                rec = files[name].get(i)
-                v = rec.file if rec is not None else ""
+                v = files[name].get(i, "")
                 return r.deck_file_name(v) if inp else v
             d.table("spectra").append([i, f("RSIN", True), f("RSOUT", False), f("ACCIN", True), f("ACCOUT", False),
                                        f("TPSD", True)])
@@ -240,27 +248,30 @@ class DeckBuilder:
         d["delt"] = r.delt
         d["nft"] = r.nft
         d["cl"] = int(sx.cl) if int(sx.cl) > 0 else int(r.site.cl)
-        d["thfile"] = r.deck_file_name(sx.file or r.thfile)
+        hc = r.soil_history()                          # SOILX file, THFILE or the built-in record (D-W5-06)
+        d["thfile"] = r.deck_file_name(hc.name)
+        for u in r.defaults_used("SOIL"):
+            self._note(f"SOIL: {u.text} (EDU-29)")
         d["thtit"] = r.thtit
         d["mult"] = float(sx.mult)
         d["max"] = float(sx.get("max"))
         d["indir"] = int(sx.indir)
         d["cmodform"] = r.cmodform
-        prof = self.chk.soil_profile()
+        prof = self.chk.soil_profile()                 # SPRO, or the default profile (D-W5-10)
         for k, rec in prof:
             row = self._layer_row(int(rec.prop))
             d.table("profile").append([int(rec.layer)] + row[1:] + [rec.dynprop])
         used = list(dict.fromkeys(rec.dynprop for _, rec in prof if rec.dynprop))
-        dyn = get_entries(m, "DYNP")
-        labels = used + [lab for (lab, _), _ in dyn if lab not in used]
-        for lab in dict.fromkeys(labels):
-            pts = sorted(((no, rec) for (l2, no), rec in dyn if l2 == lab), key=lambda t: t[0])
-            for _, rec in pts:
-                if rec.given(2) and rec.given(3):
-                    d.table("dynp").append([lab, "G", float(rec.sg), float(rec.g)])
-            for _, rec in pts:
-                if rec.given(4) and rec.given(5):
-                    d.table("dynp").append([lab, "D", float(rec.sd), float(rec.d)])
+        # model curves, and the built-in curve of a used label the model does not define (D-W5-09)
+        rows = DEF.dynp_table(m, used)
+        for lab in dict.fromkeys(row[0] for row in rows):
+            pts = [row for row in rows if row[0] == lab]
+            for row in pts:
+                if row[6]:
+                    d.table("dynp").append([lab, "G", row[2], row[3]])
+            for row in pts:
+                if row[7]:
+                    d.table("dynp").append([lab, "D", row[4], row[5]])
         for k, rec in get_entries(m, "SACC"):
             d.table("sacc").append([int(rec.layer), int(rec.opt), int(rec.outcrop)])
         for k, rec in get_entries(m, "SRS"):
@@ -499,7 +510,7 @@ class DeckBuilder:
             d[name] = int(mx.get(name))
         d["cm"], d["ang"] = self.environment()
         self._fft(d)
-        self._hist(d)
+        self._hist(d, "MOTION")
         for v in m.damp:
             d.table("damp").append([float(v)])
         merged: Dict[Tuple[int, int], List[int]] = {}
@@ -536,7 +547,7 @@ class DeckBuilder:
         d["thshlstr"] = 1 if (tsr is not None and tsr.integer(1, 0) == 1) else 0
         d["cm"], d["ang"] = self.environment()
         self._fft(d)
-        self._hist(d)
+        self._hist(d, "STRESS")
         for req in m.eout:
             codes = [int(c) for c in (list(req.codes) + [0] * 12)[:12]]
             for e in req.elements:
@@ -558,7 +569,7 @@ class DeckBuilder:
         d["rstframes"] = int(rx.rstframes)
         d["cm"], d["ang"] = self.environment()
         self._fft(d)
-        self._hist(d)
+        self._hist(d, "RELDISP")
         for q in m.rdnd:
             d.table("rdnd").append([int(q.node)] + [1 if int(f) >= 1 else 0 for f in (list(q.flags) + [0] * 6)[:6]])
         return d

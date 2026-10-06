@@ -1504,7 +1504,7 @@ history-file data by MOTION; coherency/wave passage/ME by HOUSE). Defaults below
 | Tab | Field (dialog label) | Type | Default | Stored in |
 |---|---|---|---|---|
 | EQUAKE | Spectrum Number | 1–3 | 1 | index of RSIN/RSOUT/ACCIN/ACCOUT/TPSD |
-| | Spectrum Input File / Spectrum Output File / Acceleration Output File (+ Edit) | path | — | RSIN, RSOUT, ACCOUT |
+| | Spectrum Input File / Spectrum Output File / Acceleration Output File (+ Edit, + Library) | path | — (blank: built-in default, §7.19) | RSIN, RSOUT, ACCOUT |
 | | Accel. Record / External Accel | check (exclusive) | off | EQUAKE `<accopt>` 1 / 2 |
 | | Acceleration Input File | path | — | ACCIN |
 | | Use Target PSD / PSD File | check / path | off | EQUAKE `[tpsd]`, TPSD |
@@ -1523,7 +1523,7 @@ history-file data by MOTION; coherency/wave passage/ME by HOUSE). Defaults below
 | | Number of Header Lines | int ≥ 0 | 0 | `<header>` |
 | | Input Direction | 0/1 | 0 | SOILX `<indir>` |
 | | Control Point Layer | int | 1 | SITE `<cl>` (SOIL-only override SOILX `<cl>`) |
-| | File | path | — | THFILE (SOIL-only override SOILX `<file>`) |
+| | File (+ Library) | path | — (blank: built-in record, §7.19) | THFILE (SOIL-only override SOILX `<file>`) |
 | | Assign as Outcrop Motion | check | on | `<outcrop>` |
 | | Save Strain-Compatible Soil Properties | check | on | `<save>` |
 | | Number of Iterations | int ≥ 0 | 8 | `<iter>` |
@@ -1586,7 +1586,7 @@ history-file data by MOTION; coherency/wave passage/ME by HOUSE). Defaults below
 | | Incoherent SSI: Input (SRSSTF.txt editor) / use SRSS | button / check | off | MOTIONX `<srss>` |
 | | Interpolation Option / Phase Adjustment / Smoothing Parameter | int 0–6 / 0–1 / real ≥ 0 | 1 / 0 / 0 | `<interp>`, `<pzadj>`, `<smo>` |
 | | Node List (Add/Edit/Delete; "1, 3-6 10") × Direction (X…ZZ) × six flags | list | — | NOUT |
-| | Nr. of Fourier Components / Time Step (shared) / Multiplication Factor / Max Value / First Record / Last Record / Title / File / File Contains Pairs | | shared / 1 / 0 / 1 / last / — / — / off | MOTION args, THFILE, THTIT |
+| | Nr. of Fourier Components / Time Step (shared) / Multiplication Factor / Max Value / First Record / Last Record / Title / File / File Contains Pairs | | shared / 1 / 0 / 1 / last / — / — (blank: built-in record or load pulse, §7.19) / off | MOTION args, THFILE, THTIT |
 | | Convert TH to RS: Select External Files / Input Time History Files | check / button | off | `<cnvrt>`, CONTTRS.txt |
 | | Post Processing: Save TF / ACC / RS in All Points; Save Rotation for Ansys; Restart for TF / ACC / RS | checks | off | MOTIONX flags (P1) |
 | | Save Binary Database | check | off | BINOUT `[mot]` (P2) |
@@ -2262,6 +2262,33 @@ BEM with exact Lamb kernels (reproduces the Wong/Apsel table of R2 D.3 to 0.001)
 | D-W3-13 | D-ANL-12 (corrected) and 2D scope | The image-superposition formula is `F_red(i,j) = Σ_S s_S F(i, j_S) P_S` over the 2^k plane combinations (P_S reflection, s_S = ±1 per symmetric/antisymmetric plane; equivalently `s P F(i′, j)`); the earlier text `F(i,j) ± P F(i,j′) P` was wrong. Symmetry-constrained translations are removed before inversion and ANALYS checks that the free field has the declared symmetry. Wave passage, multiple excitation, incoherency and global impedance are refused with SYMM and in 2D (manual §2.7); 2D is plane strain in X–Z (UX, UZ); anti-plane SH analysis is not implemented. Verified by VP-T2 (half/quarter = full to 1e-11), VP-T3 (2D zero-SSI identity 1e-15), VP-42 (strip statics within 5 % after extrapolation) | 2D package |
 | D-W3-14 | EXCSTRCHK severity (refines §4.4 item 3 and G-15) | One rule shared by CHECK and HOUSE (`sassi.core.house_lib.excstrchk_kind`): an excavation-interior node shared with the structure is an **error**, unless the node is an interaction node and every structural element at it is a SOLID/PLANE on the excavation mesh (near-field soil, solid basement, the VP-16 same-mesh identity), which is a **warning**. Evidence (final audit F-01): shared vs separate nodes changes the response by 0.5–2.5 % with FV on solid blocks, 5 % to 478 % with FI-EVBN, and removes the resonance of a flexible floor slab on interior FV nodes (peak 1.0 instead of 9.7); manual §9.8.1, §1.5.1 rule 11 and guideline 13a | final audit |
 | D-W3-04 | VERIFY work files | VERIFY removes its temporary work directory after a clean run and keeps it (and reports its path) only when a problem fails; informative comparisons are printed as `info` | disk use |
+
+
+### 7.19 Lead decisions: built-in inputs and defaults of blank inputs (wave 5, binding)
+
+ACS SASSI requires the input files of an analysis: a blank THFILE is Error 73, no RSIN file Error 84, blank
+RSOUT / ACCOUT Errors 86 / 87, a SOIL profile without curves Errors 95 / 97 / 99. The user asked that the
+standard inputs have defaults instead of having to be loaded. SASSI-EDU therefore ships a built-in input
+library and fills these blanks from it, **reports every default it uses** so that a design engineer always sees
+what input was assumed, and keeps the ACS behaviour one switch away (`EDUOPT,DEFAULTS,OFF`). The policy is one
+module, `sassi/prep/defaults.py`, used by CHECK, AFWRITE, the RUN commands, `LIBRARY,DEFAULTS` and the GUI.
+
+| ID | Subject | Decision | Evidence |
+|---|---|---|---|
+| D-W5-01 | Built-in input library | `sassi/data/library/` (package data, also in the browser bundle) holds the RG 1.60 0.30 g record `rg160h_030g.acc` and spectrum `rg160h_030g.rsi`, the RG 1.60 H and V 1 g spectra, the SRP 3.7.1 App. A target PSDs (1 g, and 0.30 g = 0.09 × 1 g; cm²/s³ and in²/s³), the 5 Hz Ricker pulse `ricker_5hz.th` and the SHAKE91 curves `dynp_library.pre` (README.txt: source and units of each). A file is named `@<file>` (case-insensitive), resolved from the package's own location in a source tree, a pip install and Pyodide (`/home/pyodide/sassi-edu/sassi`). The library is read-only: an `@` output name is refused (command error; EQUAKE Errors 86 / 87). New command `LIBRARY,[kind\|@name\|DEFAULTS]` (P0) lists it | user request; `tests/unit/test_input_defaults.py` (copies identical to their originals) |
+| D-W5-02 | `@` resolution | Every reader of a file name resolves `@name`: the interpreter (`resolve_path`: INP, READSPEC, READTH ...), CHECK (`resolve_file`), AFWRITE (`deck_file_name` keeps the `@` name), the modules (`sassi.io.library.module_path`: EQUAKE, SOIL, MOTION, STRESS, RELDISP, LOADGEN) and the GUI file API (read-only). Variable substitution (L13) leaves `@<library file>` as it is: library names contain a '.', which variable names cannot, and the library name wins over a variable of the same stem | interpreter tests |
+| D-W5-03 | THFILE blank, seismic | MOTION, STRESS and RELDISP of a seismic analysis (ANALYS `<type>` ≠ 1) read `@rg160h_030g.acc` (RG 1.60 H record matched by EQUAKE, PGA 0.324 g, 20 s, Δt 0.005 s) | ACS: Error 73 |
+| D-W5-04 | THFILE blank, forced vibration | With ANALYS `<type>` = 1 (the `type` of the MOTION / STRESS / RELDISP decks) the load history is `@ricker_5hz.th` (5 Hz Ricker wavelet, peak 1, 2 s) | ACS: Error 73 |
+| D-W5-05 | When the THFILE default applies | Only with MOTION `<fopt>` = 0 (the files hold Δt on line 1) and SITE `<delt>` = 0.005 s (relative 1e-6); otherwise there is no default and Error 73 names the reason. MOTION with `<out>` = 1 and no TH-to-RS conversion reads no history: no default is written or reported | a record at another Δt would be silently stretched |
+| D-W5-06 | SOIL input motion | SOILX `<file>`, else THFILE, else `@rg160h_030g.acc` (SOIL is a seismic site response whatever ANALYS `<type>`), with the Δt condition of D-W5-05. A built-in record holds Δt on line 1: SOIL with `<header>` = 0 skips that line (read as 1) and checks that it equals `<delt>`; the rule is reported like a default | SOIL module tests |
+| D-W5-07 | EQUAKE target spectrum | With no RSIN file at all and `<accopt>` ≠ 2, RSIN 1 = `@rg160h_030g.rsi` (RG 1.60 H, 0.30 g, 5 %, 27 rows); a blank Number of Frequencies takes its 27 rows (the existing "records of RSIN 1" rule); a given `<nrfreq>` ≠ 27 stays Error 89 with a hint. RSIN 2 / 3 given with RSIN 1 blank: no default (the user chose the components) | ACS: Error 84 |
+| D-W5-08 | EQUAKE output names | For every spectrum that runs, a blank RSOUT is `<model>_eq<i>.rso` and (`<accopt>` ≠ 2) a blank ACCOUT `<model>_eq<i>.acc`, in the model folder. ACCIN of `<accopt>` 1 / 2 (Error 88) and TPSD have no default | ACS: Errors 86 / 87 |
+| D-W5-09 | DYNP labels from the library | A SPRO label that no model DYNP defines resolves to the library curve of that label (Clay, Sand, Rock; case-sensitive) without INP; a model DYNP of the same label always wins (an incomplete one keeps Errors 97–99). AFWRITE writes the curve to the SOIL deck in FILE73 order; PIN ICURVE labels, SOILPROPPLOT and the GUI follow | ACS: Errors 97 / 99 |
+| D-W5-10 | Default SOIL profile | With **no** SPRO entry at all: sublayer k = TOPL layer k, labelled Rock when its Vs ≥ 760 m/s (2493.4 ft/s; unit system of SOIL `<grav>`, or the HOUSE gravity while SOIL is not given) and Sand otherwise, then the SITE half-space `<hs>` without a label (linear) as the last sublayer. It needs TOPL layers and a defined `<hs>`; otherwise Error 95 names the reason. SPRO entries given without labels stay Error 95. 760 m/s is the ASCE 7 site class B/C boundary: a reported starting point that a site-specific profile replaces | ACS: Error 95 |
+| D-W5-11 | Reporting (never silent) | Every default used is reported: CHECK **Warning EDU-29** "Built-In Default Input Used" under each module that uses it, naming the blank input and what replaces it (a warning: it never blocks AFWRITE); AFWRITE notes; RUN`<MODULE>` writes the defaults after the listing header (and so on the screen); the modules note every built-in input they read (`built-in input @x: ...`); `LIBRARY,DEFAULTS` lists them per AOPT module | `tests/unit/test_input_defaults.py` |
+| D-W5-12 | ACS behaviour | `EDUOPT,DEFAULTS,ON\|OFF` (default ON). OFF: no defaults, blank inputs are Errors 73, 84, 86, 87, 95, 97, 99 as in ACS SASSI; `@` names still work. The CHECK catalogue cases of these errors run with OFF | `tests/unit/test_check_catalogue.py` |
+| D-W5-13 | Decks | AFWRITE writes the default into the deck (Shown = used, like `<nrfreq>` and SITE `<freq2>`); a built-in file is written as its portable `@` name, which every module resolves. A module run from a hand-written deck with a blank input keeps the ACS module errors: the defaults are a preprocessor policy | module tests unchanged |
+| D-W5-14 | GUI | A blank file field shows its default as placeholder ("built-in: RG 1.60, 0.30 g (@rg160h_030g.acc)"), computed with the rules above on the values being edited (type, `<fopt>`, Δt, `<accopt>`, spectrum number); file fields have a Library button listing the built-in files that fit (records for THFILE / ACCIN / SOILX, loads for THFILE, spectra for RSIN, PSDs for TPSD); the soil-curve field and Select Dynamic Soil Property list the library curves; a model without SPRO shows the default profile on the layer pages, stored with the first page changed (as the implicit wave field) | `tests/unit/test_input_defaults.py` |
 
 ---
 

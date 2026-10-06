@@ -47,6 +47,7 @@ from .. import conventions as C
 from ..core import interp as I
 from ..core import signal as S
 from ..io import decks, textfiles
+from ..io import library as LIB
 from ..io.container import read_container
 from .base import ModuleContext, ModuleError, batch_main
 from .motion import (MAX_NFFT, read_control_motion, write_frame, write_history_file, write_tf_file,
@@ -193,17 +194,17 @@ def run(ctx: ModuleContext) -> int:
                                  "RDND nodes and the RELFILE reference")
 
     # ---------------------------------------------------------------- control motion
-    thpath = Path(d["thfile"]) if d["thfile"] else None
+    thpath = LIB.module_path(d["thfile"], ctx.workdir) if str(d["thfile"] or "").strip() else None
     if thpath is None:
         raise ModuleError("Error 73: no time-history file (THFILE) given")
-    if not thpath.is_absolute():
-        thpath = ctx.workdir / thpath
     cmot = read_control_motion(thpath, int(d["fopt"]), int(d["rec1"]), int(d["rec2"]), dt, nfft,
                                float(d["mult"]), float(d["max"]))
     nK = nfft // 2 + 1
     f = S.fourier_grid(nfft, dt)
     lst.write(f"   control motion   : {cmot.path.name}, {len(cmot.acc)} records, peak "
               f"{np.max(np.abs(cmot.acc)):.6g} {'g' if seismic else '(load factor)'}")
+    if LIB.is_library_name(d["thfile"]):
+        lst.write(f"   {LIB.note(d['thfile'])}")
 
     # ---------------------------------------------------------------- reference
     ref_dof = None

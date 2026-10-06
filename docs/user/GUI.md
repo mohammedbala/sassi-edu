@@ -134,7 +134,7 @@ that the folder stays one argument when the history is replayed.
 | Spectrum TFU-TFI | **Line Selection** dialog (section 6.1) | `READSPEC` + `SPECPLOT` (+ `PLOTTITLE`, `XTITLE`, `YTITLE`, `AXES`, `PLOTRANGE`) |
 | Time History | **Line Selection** for histories | `READTH` + `THPLOT` (+ settings) |
 | Soil Layers | layer column and property table of the active model | `LAYERPLOT` |
-| Soil Properties | **Select Dynamic Soil Property**: the `DYNP` properties of the model; **New** asks for a name; the 11-point table (strain %, G/Gmax, strain %, damping %) can be edited. Ok submits the edited points and plots. | `DYNP,<no>,<sg>,<g>,<sd>,<d>,<label>` ... + `SOILPROPPLOT,<label>` |
+| Soil Properties | **Select Dynamic Soil Property**: the `DYNP` properties of the model and the built-in curves Clay, Sand and Rock (marked "built-in": SOIL uses them by their label without `INP` while the model does not define that label; editing one stores model `DYNP` points of that label); **New** asks for a name; the 11-point table (strain %, G/Gmax, strain %, damping %) can be edited. Ok submits the edited points and plots. | `DYNP,<no>,<sg>,<g>,<sd>,<d>,<label>` ... + `SOILPROPPLOT,<label>` |
 | Non Uniform Soil Field | greyed (not active in V3) | |
 | Process Animation Frame List | **Parse Frame Data** (section 6.3): List File Name (`<<` a list file, **Folder** a frame folder written by a module restart option), Frame Storage Dir, Data Description, Plot Type | `PROCFRAME,<list>,<dir>,<description>,<type>` |
 | Bubble / Vector / Contour / Deformed Shape | **Load Frame Data**: the processed animations of `SASSIani.xml` (Remove Animation asks, then offers to delete the frame store), Start, End, Stride, and the colour-map range and column (Bubble, Contour) or the scale factor (Vector, Deformed) | `BUBBLEPLOT` / `CONTOURPLOT,<dir>,<start>,<end>,<stride>,<min>,<max>,<col>`; `VECTORPLOT` / `DEFORMPLOT,<dir>,<start>,<end>,<stride>,<scale>` |
@@ -239,7 +239,15 @@ commands):
   `TOPL,1,2,3`. Separators are blank, tab, `,`, `;` or Enter.
 * Request tables (`NOUT`, `EOUT`, `RDND`). They have Add/Delete rows; OK submits `NOUT,0` and then
   one command per row. Node and element lists accept `1, 3-6 10`. A wide table scrolls inside its box.
-* String fields (`THFILE`, `THTIT`, `EQTIT`, `RELFILE`). **<<** browses; **Edit** opens the file.
+* String fields (`THFILE`, `THTIT`, `EQTIT`, `RELFILE`). **<<** browses; **Edit** opens the file (a built-in
+  `@` file opens read-only). File fields that can take a built-in input (THFILE, the SOIL-only file, RSIN,
+  ACCIN, TPSD) also have a **Library** button: it lists the built-in files that fit the field (records, the
+  Ricker load pulse, spectra, target PSDs; command `LIBRARY`) and puts the `@` name into the field, which
+  then sits on its own line below the buttons. A blank file with a built-in default shows that default as
+  its placeholder, for example `built-in: RG 1.60, 0.30 g (@rg160h_030g.acc)`, `built-in: 5 Hz Ricker pulse
+  (@ricker_5hz.th)` for Foundation Vibration, `default: <model>_eq1.rso` for RSOUT; the placeholder follows
+  the values being edited (type of analysis, File Contains Pairs, time step, spectrum number) and says when
+  no default applies. CHECK reports every default used as Warning EDU-29 (User Guide section 4.6).
 * Records of the later options (Option NON `EQL`, `P`, `S`, `BBCI`/`BBCX`/`BBCY`; SOIL-NON `NLSOIL`,
   `NLSLAYER`; sections 5.1 and 5.2). Their commands check the values themselves, so OK first runs the
   commands on a copy of the model; an error refuses the whole commit with the command's own message,
@@ -301,7 +309,11 @@ The AFWRITE tab sets `AOPT`; LIQUEF and PINT are greyed.
 Helpers: **From mesh (RADIUS)** on the POINT tab runs `RADIUS` and copies the average central-zone
 radius into the field. The **Edit** buttons open `<model>.pin`, `SRSSTF.txt`, `CONTTRS.txt` or
 `Frames.txt` in a File Editor tab. The **...** button next to the SOIL Dynamic Soil Property opens
-Select Dynamic Soil Property.
+Select Dynamic Soil Property. The field's list proposes the model's DYNP labels and the built-in curves.
+While the model has no `SPRO` entry, every SOIL layer page shows the default profile AFWRITE writes (the
+TOPL layers with Sand or Rock by Vs, the SITE half-space last; the "Without SPRO" line summarises it);
+changing one layer stores the whole profile with it, as the implicit wave field is stored with the first
+WAVE page.
 
 ### 5.1 SOIL tab: Nonlinear Soil Behavior (SOIL-NON)
 

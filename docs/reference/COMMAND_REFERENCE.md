@@ -1,6 +1,6 @@
 # SASSI-EDU Command Reference
 
-> Generated on 2026-10-04 by `python -m sassi.verify.report --commands-only` from the command catalogue of the interpreter (`sassi/prep/registry.py`) and the docstrings of the command handlers (`sassi/prep/commands/`). Do not edit by hand.
+> Generated on 2026-10-06 by `python -m sassi.verify.report --commands-only` from the command catalogue of the interpreter (`sassi/prep/registry.py`) and the docstrings of the command handlers (`sassi/prep/commands/`). Do not edit by hand.
 
 Every command of the ACS SASSI V3 manual and of the SASSI-EDU dialect is listed with its syntax, its documented abbreviation or alias, its priority tier and whether this build implements it. The rules of the command language (comma-separated fields, blank fields take defaults, `*` comment lines, abbreviations, variables and loops) are explained in the [User Guide](../user/USER_GUIDE.md#4-the-command-language); the normative detail of every command is in [requirements section 3](../spec/00_requirements.md) and the manual-derived specifications `docs/spec/07` to `11`.
 
@@ -31,12 +31,12 @@ Every command of the ACS SASSI V3 manual and of the SASSI-EDU dialect is listed 
 | [3.4.O Option NON and nonlinear soil](#34o-option-non-and-nonlinear-soil) | 32 | 29 | 0 | 3 |
 | [3.4.P Binary databases](#34p-binary-databases) | 15 | 0 | 1 | 14 |
 | [3.4.Q Thick shell](#34q-thick-shell) | 2 | 2 | 0 | 0 |
-| [3.4.R Extension commands of SASSI-EDU](#34r-extension-commands-of-sassi-edu) | 39 | 39 | 0 | 0 |
-| **Total** | 363 | 340 | 1 | 22 |
+| [3.4.R Extension commands of SASSI-EDU](#34r-extension-commands-of-sassi-edu) | 40 | 40 | 0 | 0 |
+| **Total** | 364 | 341 | 1 | 22 |
 
 | Tier | Commands | Implemented |
 |---|---:|---:|
-| P0 | 161 | 160 |
+| P0 | 162 | 161 |
 | P1 | 124 | 124 |
 | P2 | 78 | 56 |
 
@@ -470,6 +470,7 @@ Every command of the ACS SASSI V3 manual and of the SASSI-EDU dialect is listed 
 | **LGNODE** | `LGNODE,<kind>,<nodes>` | - | P2 | yes | Add nodes to a LOADGEN node list (kind D interface nodes that receive D, M master nodes, A acceleration check nodes); LGNODE,&lt;kind>,0 clears the list. |
 | **LGOPT** | `LGOPT,<digits>,<opmode>,<rest>` | - | P2 | yes | Significant digits of the APDL values (6..17, default 12), data-check mode (1 = check the inputs, no file written) and &lt;rest> (1, default: the relative displacements start at rest -- their initial value, the zero-mean ... |
 | **LGTIME** | `LGTIME,<crit>,...` | - | P2 | yes | Critical times of the static loads -- V\|VX\|VY\|VZ,&lt;n>,&lt;tsep>; MX\|MY\|MZ,&lt;n>,&lt;tsep>,&lt;x0>, &lt;y0>,&lt;z0>; ACC\|DISP,&lt;n>,&lt;tsep>,&lt;node>,&lt;dof>; TIME,&lt;t1>,&lt;t2>,...; STEP,&lt;k1>,&lt;k2>,... (default V,1). |
+| **LIBRARY** | `LIBRARY,[kind\|@name\|DEFAULTS]` | - | P0 | yes | List the built-in input library (files named @&lt;file>, sassi/data/library), one kind (RECORD, LOAD, SPECTRUM, PSD, DYNP) or one file, or the defaults of blank inputs the active model uses (DEFAULTS). |
 | **LOADGEN** | `LOADGEN,<data>,<multi>,<rotdisp>,<rotacc>,<masstype>,<genmass>,<source>` | - | P2 | yes | ANSYS Eq. Static Load options (Option A): data 1 DISP / 2 ACC / 3 DISPACC / 4 SOILDISP, Use Multiple File List Inputs, Rotational Disp., Rotational Accel., Mass Type 1 LUMPED / 2 MASTER, Generate Mass Data, history ... |
 | **LOADGENDYN** | `LOADGENDYN,<alpha>,<beta>,<method>,<refnode>,<source>,<rotdisp>,<rotacc>,<zeta>,<f1>,<f2>,<gfopt>,<gmult>` | - | P2 | yes | ANSYS Dynamic Load options (Option A): Rayleigh alpha/beta (or from zeta at f1, f2), method REL (ground ACEL + relative D, manual) / ACC (fixed base driven by &lt;refnode>), reference node (0 = control motion), source ... |
 | **MOTIONX** | `MOTIONX,<f1213>,<resp>,<srss>,<savetf>,<saveacc>,<savers>,<saverot>,<rsttf>,<rstacc>,<rstrs>` | - | P0 | yes | Save FILE12/13 (0/1 FILE13/2 FILE12); vibration response 0 disp / 1 vel / 2 acc; use SRSSTF.txt; post-processing Save/Restart flags |

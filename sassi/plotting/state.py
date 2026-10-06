@@ -905,7 +905,9 @@ def layer_table(model, start: int = 1, end: int = -1) -> Dict[str, Any]:
 def soil_property_curves(model, name: str) -> Dict[str, Any]:
     """DYNP curves of the dynamic soil property ``name`` (case-sensitive; spec 06 section 7).
 
-    Strains in %, G/Gmax and damping (%) as entered with DYNP (SHAKE convention).
+    Strains in %, G/Gmax and damping (%) as entered with DYNP (SHAKE convention).  A label the model does
+    not define is taken from the built-in library (Clay, Sand, Rock of ``@dynp_library.pre``, D-W5-09) and
+    the plot title says so.
     """
     pts = []
     names = set()
@@ -915,8 +917,15 @@ def soil_property_curves(model, name: str) -> Dict[str, Any]:
         if label == name:
             pts.append((int(no), rec))
     if not pts:
+        from ..io import library as LIB
+        lib = LIB.dynp_points(name)
+        if lib and name not in names:
+            return {"name": f"{name} (built-in, @{LIB.DYNP_FILE})", "builtin": True,
+                    "g_strain": [float(p.sg) for p in lib], "g": [float(p.g) for p in lib],
+                    "d_strain": [float(p.sd) for p in lib], "d": [float(p.d) for p in lib], "points": len(lib)}
         avail = ", ".join(sorted(str(n) for n in names if n)) or "none"
-        raise PlotError(f"dynamic soil property '{name}' not defined (names are case-sensitive; defined: {avail})")
+        raise PlotError(f"dynamic soil property '{name}' not defined (names are case-sensitive; defined: {avail}; "
+                        f"built-in: {', '.join(LIB.dynp_labels())})")
     pts.sort(key=lambda t: t[0])
     g = [(rec.number(2), rec.number(3)) for _, rec in pts if rec.given(2) and rec.given(3)]
     d = [(rec.number(4), rec.number(5)) for _, rec in pts if rec.given(4) and rec.given(5)]

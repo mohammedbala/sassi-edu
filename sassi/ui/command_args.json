@@ -15,7 +15,7 @@
    {
     "pos": 2,
     "name": "file",
-    "meaning": "path of the input acceleration history (g); relative paths are searched from the model directory; a blank file name clears the entry",
+    "meaning": "path of the input acceleration history (g), or a built-in record @name (LIBRARY); relative paths are searched from the model directory; a blank file name clears the entry",
     "default": ""
    }
   ]
@@ -24,7 +24,7 @@
   "summary": "Names the file that receives the spectrum-compatible acceleration history EQUAKE generates for spectrum <no>; the velocity, displacement, PSD and FFT files reuse its base name (.vel, .dis, .psd, .fft).",
   "configures": "EQUAKE module options",
   "source": "spec 07 §9.2.2",
-  "notes": "Required for every simulated spectrum (Error 87); the .acc file is in g with Δt on the first line, so it can be used directly as THFILE.",
+  "notes": "Required for every simulated spectrum (Error 87; SASSI-EDU writes <model>_eq<no>.acc when it is blank, unless EDUOPT,DEFAULTS,OFF); the .acc file is in g with Δt on the first line, so it can be used directly as THFILE.",
   "args": [
    {
     "pos": 1,
@@ -35,7 +35,7 @@
    {
     "pos": 2,
     "name": "file",
-    "meaning": "path of the generated acceleration history (.acc, in g); a blank file name clears the entry",
+    "meaning": "path of the generated acceleration history (.acc, in g); blank for a simulated spectrum: <model>_eq<no>.acc in the model folder (EDU-29); a blank file name clears the entry",
     "default": ""
    }
   ]
@@ -1459,7 +1459,7 @@
   "summary": "Defines point <no> of the strain-dependent curves of dynamic soil property <label>: G/Gmax versus shear strain and damping versus shear strain, used by SOIL's SHAKE-type equivalent-linear iterations.",
   "configures": "SOIL module options: soil curves",
   "source": "spec 07 §9.2.10",
-  "notes": "Strain and damping are in PERCENT; curves are interpolated linearly in log10(strain) with constant extrapolation; leaving one pair blank defines a point of the other curve only.",
+  "notes": "Strain and damping are in PERCENT; curves are interpolated linearly in log10(strain) with constant extrapolation; leaving one pair blank defines a point of the other curve only. Built-in curves Clay, Sand and Rock (SHAKE91, @dynp_library.pre) are used by their label without INP when the model does not define that label; a model DYNP of the same label wins.",
   "args": [
    {
     "pos": 1,
@@ -1625,7 +1625,8 @@
      "SECTBEND": "section-cut resultants include shell bending: 1 (default) or 0",
      "ANSYSMODERN": "1 = ANSYS export writes SOLID185, SHELL181, BEAM188; 0 (default) = legacy V11-15 elements",
      "NONEXT": "1 = unlock experimental Option NON features (TAK hysteresis, bending panels); default 0",
-     "SHEARFORCEARGS": "1 = SHEAR/BBCGEN arguments 6-7 are forces instead of boundary-element area and yield strength; default 0"
+     "SHEARFORCEARGS": "1 = SHEAR/BBCGEN arguments 6-7 are forces instead of boundary-element area and yield strength; default 0",
+     "DEFAULTS": "built-in defaults of blank inputs (THFILE, RSIN, RSOUT, ACCOUT, DYNP labels, SPRO): ON (default; each default used is reported as Warning EDU-29) or OFF (ACS SASSI behaviour: the inputs are required)"
     }
    },
    {
@@ -2899,7 +2900,7 @@
   "summary": "Reads and executes the commands of a .pre file (written by hand or by WRITE), then returns to the command line, like ANSYS /INPUT.",
   "configures": "Files",
   "source": "spec 07 §9.2.18",
-  "notes": "Relative names are searched in the model path, the working directory and the calling file's folder; errors inside the file do not stop it.",
+  "notes": "Relative names are searched in the model path, the working directory and the calling file's folder; errors inside the file do not stop it. @name reads a built-in file, e.g. INP,@dynp_library.pre (LIBRARY).",
   "args": [
    {
     "pos": 1,
@@ -3323,6 +3324,29 @@
     "name": "step",
     "meaning": "increment of the set numbers listed",
     "default": "1"
+   }
+  ]
+ },
+ "LIBRARY": {
+  "summary": "SASSI-EDU extension listing the built-in input library: standard records, spectra, target PSDs, a load pulse and soil curves that ship with the program and are named @<file> wherever a file is read.",
+  "configures": "Built-in inputs",
+  "source": "requirements §7.19",
+  "notes": "Blank THFILE, RSIN, RSOUT, ACCOUT, SPRO and undefined DYNP labels Clay, Sand and Rock take built-in defaults; CHECK reports each one as Warning EDU-29 and EDUOPT,DEFAULTS,OFF switches them off.",
+  "args": [
+   {
+    "pos": 1,
+    "name": "kind|@name|DEFAULTS",
+    "meaning": "what to list; blank lists every built-in file",
+    "default": "",
+    "values": {
+     "RECORD": "acceleration records (THFILE, ACCIN, SOILX)",
+     "LOAD": "load histories (THFILE of a forced-vibration analysis)",
+     "SPECTRUM": "target response spectra (RSIN)",
+     "PSD": "target power spectral densities (TPSD)",
+     "DYNP": "soil curves (INP; labels Clay, Sand, Rock)",
+     "@name": "one file: description, units, source and its path",
+     "DEFAULTS": "the defaults of blank inputs the active model uses, per AOPT module"
+    }
    }
   ]
  },
@@ -6183,7 +6207,7 @@
   "summary": "Names the target response-spectrum file of spectrum <no> that EQUAKE matches: two columns, frequency (Hz) and spectral acceleration (g), at the damping EQUAKE <damp>.",
   "configures": "EQUAKE module options",
   "source": "spec 07 §9.2.26",
-  "notes": "The number of records must equal EQUAKE <nrfreq> (Error 89).",
+  "notes": "The number of records must equal EQUAKE <nrfreq> (Error 89). SASSI-EDU: with no RSIN file at all, RSIN 1 is the built-in RG 1.60 H spectrum @rg160h_030g.rsi (0.30 g, 5 %, 27 rows; a blank <nrfreq> takes its rows), reported as EDU-29.",
   "args": [
    {
     "pos": 1,
@@ -6194,7 +6218,7 @@
    {
     "pos": 2,
     "name": "file",
-    "meaning": "target spectrum file (frequency Hz, SA g); a blank file name clears the entry",
+    "meaning": "target spectrum file (frequency Hz, SA g), or a built-in spectrum @name (LIBRARY); a blank file name clears the entry",
     "default": ""
    }
   ]
@@ -6213,7 +6237,7 @@
    {
     "pos": 2,
     "name": "file",
-    "meaning": "output spectrum file (.rso); required for a simulated spectrum (Error 86); a blank file name clears the entry",
+    "meaning": "output spectrum file (.rso); blank for a simulated spectrum: <model>_eq<no>.rso in the model folder (EDU-29; Error 86 with EDUOPT,DEFAULTS,OFF); a blank file name clears the entry",
     "default": ""
    }
   ]
@@ -7081,7 +7105,7 @@
    {
     "pos": 5,
     "name": "file",
-    "meaning": "SOIL input history file; blank = THFILE; rest of the line",
+    "meaning": "SOIL input history file, or a built-in record @name; blank = THFILE (blank too: @rg160h_030g.acc); rest of the line",
     "default": ""
    }
   ]
@@ -7104,7 +7128,7 @@
   "summary": "Assigns to SOIL sublayer <layer> an L soil-layer property (thickness, unit weight, Vp, Vs, damping) and the label of its G/Gmax and damping curves (DYNP); the last SPRO sublayer is the half-space.",
   "configures": "SOIL module options: soil profile",
   "source": "spec 07 §9.2.33",
-  "notes": "A sublayer without a label stays linear; the label of the half-space (last) sublayer is ignored.",
+  "notes": "A sublayer without a label stays linear; the label of the half-space (last) sublayer is ignored. SASSI-EDU: with no SPRO entry at all SOIL uses the default profile (the TOPL layers, Sand below Vs = 760 m/s, Rock above, the SITE half-space last), reported as EDU-29.",
   "args": [
    {
     "pos": 1,
@@ -7121,7 +7145,7 @@
    {
     "pos": 3,
     "name": "dynprop",
-    "meaning": "label of the DYNP curves (case-sensitive; rest of the line); blank = linear sublayer",
+    "meaning": "label of the DYNP curves (case-sensitive; rest of the line); blank = linear sublayer; Clay, Sand and Rock are built-in curves when the model does not define them",
     "default": ""
    }
   ]
@@ -7519,13 +7543,13 @@
   "summary": "Names the control-motion acceleration history file (in g) shared by SOIL, MOTION, STRESS and RELDISP.",
   "configures": "Control motion (SOIL, MOTION, STRESS, RELDISP)",
   "source": "spec 07 §9.2.40",
-  "notes": "Format per MOTION <fopt> (default: first line Δt, then one value per line); SOIL skips SOIL <header> lines and reads <nrval> values.",
+  "notes": "Format per MOTION <fopt> (default: first line Δt, then one value per line); SOIL skips SOIL <header> lines and reads <nrval> values. SASSI-EDU: a blank THFILE is the built-in RG 1.60 record @rg160h_030g.acc (0.30 g, 20 s) for seismic analyses and SOIL, the 5 Hz Ricker pulse @ricker_5hz.th when ANALYS <type> = 1, if MOTION <fopt> = 0 and the time step is 0.005 s; CHECK reports it (Warning EDU-29); EDUOPT,DEFAULTS,OFF restores Error 73.",
   "args": [
    {
     "pos": 1,
     "name": "file",
-    "meaning": "path of the acceleration history (g); rest of the line; must exist (Error 73)",
-    "default": ""
+    "meaning": "path of the acceleration history (g), or a built-in input @name (LIBRARY); rest of the line; a given file must exist (Error 73)",
+    "default": "blank: @rg160h_030g.acc (seismic) or @ricker_5hz.th (forced vibration)"
    }
   ]
  },
@@ -7635,7 +7659,7 @@
    {
     "pos": 2,
     "name": "file",
-    "meaning": "target PSD file; a blank file name clears the entry",
+    "meaning": "target PSD file, or a built-in PSD @name (LIBRARY); a blank file name clears the entry",
     "default": ""
    }
   ]

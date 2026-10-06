@@ -447,6 +447,7 @@ BUILDFILE77    -   P1 action
 COMBXYZTHD     -   P2 action
 VERIFY         -   P0 action
 VERIFYREPORT   -   P0 action
+LIBRARY        -   P0 action
 ACTIVATEPLOT   -   P1 ui
 PIN            -   P1 action
 PINDEL         -   P1 action

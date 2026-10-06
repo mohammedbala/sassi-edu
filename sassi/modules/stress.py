@@ -96,6 +96,7 @@ from ..elements import ELEMENTS
 from ..elements import shell as SHELL_ELEMENT
 from ..elements import tshell as TSHELL_ELEMENT
 from ..io import decks
+from ..io import library as LIB
 from ..io.container import Container, read_container
 from ..io.deckfmt import read_raw
 from ..io.files import validate
@@ -494,14 +495,14 @@ def run(ctx: ModuleContext) -> int:
         lst.write(f"   Frames.txt: {len(frames)} frames, soil-pressure groups {pgroups or 'none'}")
 
     # ---------------------------------------------------------------- control motion
-    thpath = Path(d["thfile"]) if d["thfile"] else None
-    if thpath is not None and not thpath.is_absolute():
-        thpath = ctx.workdir / thpath
+    thpath = LIB.module_path(d["thfile"], ctx.workdir) if str(d["thfile"] or "").strip() else None
     if thpath is None:
         raise ModuleError("Error 73: no time-history file (THFILE) given")
     cmot = read_control_motion(thpath, int(d["fopt"]), int(d["rec1"]), int(d["rec2"]), dt, nfft,
                                float(d["mult"]), float(d["max"]))
     lst.section("Control motion" if seismic else "Reference load history")
+    if LIB.is_library_name(d["thfile"]):
+        lst.write(f"   {LIB.note(d['thfile'])}")
     imax = int(np.argmax(np.abs(cmot.acc))) if len(cmot.acc) else 0
     lst.write(f"   file {cmot.path.name}: {cmot.nrec} records, {len(cmot.acc)} used, duration "
               f"{len(cmot.acc) * dt:g} s, quiet zone {(nfft - len(cmot.acc)) * dt:g} s")

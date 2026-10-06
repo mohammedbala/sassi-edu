@@ -884,6 +884,7 @@ EDUOPT_KEYS: Dict[str, Tuple[str, Any, str]] = {
     "ANSYSMODERN": ("0", ("0", "1"), "D-ANS-06"),
     "NONEXT": ("0", ("0", "1"), "D-NON-05"),
     "SHEARFORCEARGS": ("0", ("0", "1"), "D-NON-10"),
+    "DEFAULTS": ("ON", ("ON", "OFF"), "D-W5-12"),
 }
 
 

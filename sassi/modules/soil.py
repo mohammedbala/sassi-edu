@@ -76,6 +76,7 @@ from ..core import shake as SH
 from ..core import soilnon as SN
 from ..core import spectra as SP
 from ..io import deckfmt, decks, textfiles, thfile
+from ..io import library as LIB
 from .base import ModuleContext, ModuleError, batch_main
 
 NAME = "SOIL"
@@ -191,8 +192,28 @@ def _units(grav: float) -> Dict[str, str]:
 
 
 def _resolve(ctx: ModuleContext, name: str) -> Path:
-    p = Path(name)
-    return p if p.is_absolute() else ctx.workdir / p
+    """Input file of the deck: ``@name`` from the built-in library (D-W5-01), else absolute or in the model
+    directory."""
+    return LIB.module_path(name, ctx.workdir)
+
+
+def _history_header(d: decks.Deck, L) -> int:
+    """Header lines skipped before the values.  A built-in record (``@`` name) holds its time step on line 1:
+    SOIL skips it when ``<header>`` is 0 and checks that it equals ``<delt>`` (D-W5-06)."""
+    header = int(d["header"])
+    name = str(d["thfile"] or "")
+    dt_lib = LIB.history_dt(name)
+    if dt_lib is None:
+        return header
+    L.write(f" {LIB.note(name)}")
+    dt = float(d["delt"])
+    if dt > 0 and abs(dt_lib - dt) > 1e-6 * dt:
+        raise ModuleError(f"time step of the built-in record {name.strip()} ({dt_lib:g} s) differs from the SOIL "
+                          f"time step {dt:g} s")
+    if header == 0:
+        L.write(f" {name.strip()}: line 1 is the time step; SOIL skips it (<header> 0 read as 1, D-W5-06)")
+        return 1
+    return header
 
 
 def _validate(d: decks.Deck, nlay: int) -> None:
@@ -338,15 +359,16 @@ def run(ctx: ModuleContext) -> int:
     hpath = _resolve(ctx, d["thfile"])
     if not hpath.exists():
         raise ModuleError(f"Error 73: time-history file {d['thfile']} not found")
+    header = _history_header(d, L)
     try:
-        acc_g = thfile.read_soil_history(hpath, int(d["nrval"]), int(d["header"]))
+        acc_g = thfile.read_soil_history(hpath, int(d["nrval"]), header)
     except ValueError as exc:
         raise ModuleError(str(exc))
     if d["nrval"] <= 0:
         L.warning(f"Error 100 condition: number of values <= 0; all {len(acc_g)} values of the file are used")
     if acc_g.size == 0:
         raise ModuleError(f"{d['thfile']}: no acceleration values read")
-    if int(d["header"]) == 0 and abs(acc_g[0] - dt) <= 1e-9 * max(dt, 1e-12) and np.max(np.abs(acc_g)) > 0:
+    if header == 0 and abs(acc_g[0] - dt) <= 1e-9 * max(dt, 1e-12) and np.max(np.abs(acc_g)) > 0:
         L.warning("the first value of the history equals the time step: if the file has the THFILE/.acc "
                   "layout (dt on line 1), set Number of Header Lines = 1")
     if len(acc_g) > nfft:
@@ -357,7 +379,7 @@ def run(ctx: ModuleContext) -> int:
     pk1, _ = _peak(acc_g, dt)
     L.section("Input motion")
     L.write(f" File               : {d['thfile']}   {d['thtit']}")
-    L.write(f" Values read        : {len(acc_g)} after {int(d['header'])} header line(s); dt = {dt:g} s")
+    L.write(f" Values read        : {len(acc_g)} after {header} header line(s); dt = {dt:g} s")
     L.write(f" Maximum acceleration = {pk0:.5f} g at t = {tk0:.2f} s")
     fac = pk1 / pk0 if pk0 > 0 else 0.0
     L.write(f" Multiplied by {fac:.5f} to give a maximum of {pk1:.5f} g "
@@ -721,15 +743,16 @@ def _read_control_motion(ctx: ModuleContext, d: decks.Deck, L, dt: float, nfft: 
     hpath = _resolve(ctx, d["thfile"])
     if not hpath.exists():
         raise ModuleError(f"Error 73: time-history file {d['thfile']} not found")
+    header = _history_header(d, L)
     try:
-        acc_g = thfile.read_soil_history(hpath, int(d["nrval"]), int(d["header"]))
+        acc_g = thfile.read_soil_history(hpath, int(d["nrval"]), header)
     except ValueError as exc:
         raise ModuleError(str(exc))
     if d["nrval"] <= 0:
         L.warning(f"Error 100 condition: number of values <= 0; all {len(acc_g)} values of the file are used")
     if acc_g.size == 0:
         raise ModuleError(f"{d['thfile']}: no acceleration values read")
-    if int(d["header"]) == 0 and abs(acc_g[0] - dt) <= 1e-9 * max(dt, 1e-12) and np.max(np.abs(acc_g)) > 0:
+    if header == 0 and abs(acc_g[0] - dt) <= 1e-9 * max(dt, 1e-12) and np.max(np.abs(acc_g)) > 0:
         L.warning("the first value of the history equals the time step: if the file has the THFILE/.acc "
                   "layout (dt on line 1), set Number of Header Lines = 1")
     if len(acc_g) > nfft:
@@ -740,7 +763,7 @@ def _read_control_motion(ctx: ModuleContext, d: decks.Deck, L, dt: float, nfft: 
     pk1, _ = _peak(acc_g, dt)
     L.section("Input motion (at bedrock)")
     L.write(f" File               : {d['thfile']}   {d['thtit']}")
-    L.write(f" Values read        : {len(acc_g)} after {int(d['header'])} header line(s); dt = {dt:g} s")
+    L.write(f" Values read        : {len(acc_g)} after {header} header line(s); dt = {dt:g} s")
     L.write(f" Maximum acceleration = {pk0:.5f} g at t = {tk0:.2f} s")
     fac = pk1 / pk0 if pk0 > 0 else 0.0
     L.write(f" Multiplied by {fac:.5f} to give a maximum of {pk1:.5f} g "

@@ -184,6 +184,45 @@
     return api;
   };
 
+  /** The built-in input library (requirements 7.19; sassi/io/library.py): pick the @ name of a file of the
+   *  kinds that fit the field.  opt: {title, kinds: ['record', 'load', 'spectrum', 'psd'], entries, initial, onOk(name)} */
+  D.pickLibrary = function (opt) {
+    const kinds = opt.kinds || [];
+    const rows = (opt.entries || []).filter((e) => !kinds.length || kinds.includes(e.kind));
+    const list = el("div", {class: "list", style: {height: "auto", minHeight: "60px", maxHeight: "260px"}});
+    const info = el("div", {class: "note", style: {minHeight: "34px"}});
+    let selected = null;
+    for (const e of rows) {
+      const it = el("div", {title: e.source}, el("span", {text: e.name}),
+        el("span", {text: e.title, style: {fontFamily: "var(--sans, sans-serif)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap"}}),
+        el("span", {class: "sz", text: e.kind}));
+      const pick = () => {
+        list.querySelectorAll(".sel").forEach((x) => x.classList.remove("sel"));
+        it.classList.add("sel");
+        selected = e.name;
+        info.textContent = `${e.title}. Units: ${e.units}. Source: ${e.source}.`;
+      };
+      it.addEventListener("click", pick);
+      it.addEventListener("dblclick", () => { pick(); okBtn.click(); });
+      list.appendChild(it);
+      if (opt.initial && String(opt.initial).trim().toLowerCase() === e.name.toLowerCase()) pick();
+    }
+    if (!rows.length) list.appendChild(el("div", {class: "empty", text: "no built-in file fits this field"}));
+    const body = el("div", {class: "picker", style: {width: "560px"}}, list, info,
+      el("div", {class: "opt-note", text: "Built-in inputs ship with SASSI-EDU (command LIBRARY). The field gets the @ name, " +
+        "which every installation resolves (local, pip, browser). Leaving a file blank uses its built-in default, " +
+        "if it has one; CHECK reports every default used (Warning EDU-29)."}));
+    const api = D.modal({title: opt.title || "Built-in Inputs", body, buttons: [
+      {label: "OK", primary: true, action: async () => {
+        if (!selected) { api.setMessage("choose a file"); return false; }
+        if (opt.onOk) opt.onOk(selected);
+        return true;
+      }},
+      {label: "Cancel", action: () => true}]});
+    const okBtn = api.buttons[0];
+    return api;
+  };
+
   // ================================================================== Model menu
   D.loadModel = async function () {
     let db;
@@ -587,20 +626,27 @@
    *  opt.select(label): called instead of plotting (SOIL tab "..." button). */
   D.soilProperty = async function (opt) {
     opt = opt || {};
-    let props = {};
-    try { props = (await S.get("/api/dynp")).properties; } catch (e) { /* none */ }
-    let cur = opt.initial && props[opt.initial] ? opt.initial : Object.keys(props)[0] || null;
+    let props = {}, lib = {};
+    try { const r = await S.get("/api/dynp"); props = r.properties || {}; lib = r.library || {}; } catch (e) { /* none */ }
+    // built-in curves (Clay, Sand, Rock, requirements 7.19) the model does not define: shown and usable by
+    // their label without INP; editing one stores model DYNP points of that label, which then win
+    for (const k of Object.keys(lib)) if (props[k]) delete lib[k];
+    const known = (k) => props[k] || lib[k];
+    let cur = opt.initial && known(opt.initial) ? opt.initial : Object.keys(props)[0] || Object.keys(lib)[0] || null;
     const lst = el("div", {class: "checklist", style: {height: "120px"}});
     const tbody = el("tbody");
     const titleIn = txt(cur || "");
     const edits = {};          // label -> rows
-    const rowsOf = (label) => edits[label] || (props[label] || []).map((r) => [r.sg, r.g, r.sd, r.d]);
+    const rowsOf = (label) => edits[label] || (props[label] || lib[label] || []).map((r) => [r.sg, r.g, r.sd, r.d]);
     const drawList = () => {
       lst.innerHTML = "";
-      const names = [...new Set(Object.keys(props).concat(Object.keys(edits)))].sort();
+      const names = [...new Set(Object.keys(props).concat(Object.keys(edits)))].sort()
+        .concat(Object.keys(lib).filter((k) => !edits[k]));
       if (!names.length) lst.appendChild(el("div", {class: "empty", text: "no dynamic soil property: New"}));
       for (const n of names) {
-        const it = el("label", {class: n === cur ? "sel" : "", text: n});
+        const builtin = !!lib[n] && !edits[n];
+        const it = el("label", {class: n === cur ? "sel" : "", text: builtin ? `${n}  (built-in)` : n,
+          title: builtin ? "built-in curve (@dynp_library.pre): used by its label without INP; editing it stores model DYNP points" : null});
         it.addEventListener("click", () => { cur = n; titleIn.value = n; drawList(); drawTable(); });
         lst.appendChild(it);
       }
@@ -638,7 +684,8 @@
       row("Title", titleIn),
       el("div", {class: "tablewrap", style: {maxHeight: "300px"}}, el("table", {class: "grid"},
         el("thead", {}, el("tr", {}, el("th", {text: "#"}), el("th", {text: "Strain"}), el("th", {text: "Mod. Red."}), el("th", {text: "Strain"}), el("th", {text: "Damp"}))), tbody)),
-      el("div", {class: "opt-note", text: "Strain in %, G/Gmax in [0, 1], damping in % (SHAKE convention); at most 11 points. OK submits DYNP,<no>,<sg>,<g>,<sd>,<d>,<label> for the edited points."}));
+      el("div", {class: "opt-note", text: "Strain in %, G/Gmax in [0, 1], damping in % (SHAKE convention); at most 11 points. OK submits DYNP,<no>,<sg>,<g>,<sd>,<d>,<label> for the edited points. " +
+        "Built-in curves (Clay, Sand, Rock: SHAKE91, LIBRARY) need no DYNP: SOIL uses them by their label while the model does not define that label (CHECK Warning EDU-29)."}));
     const api = D.modal({title: "Select Dynamic Soil Property", body, buttons: [
       {label: "Ok", primary: true, action: async (a) => {
         const cmds = [];
@@ -1356,6 +1403,7 @@
     return api;
   };
 
+  D.OptionsForm = OptionsForm;          // exposed for the unit tests of the Shown = used logic (node, no DOM)
   function OptionsForm(form, values, name) {
     this.form = form;
     this.v = JSON.parse(JSON.stringify(values));
@@ -1487,11 +1535,45 @@
    *  dialogs.absent_entry) -- WAVE pages for the <wopt> currently chosen in the dialog. */
   OptionsForm.prototype.absentEntry = function (rec, key) {
     const v = this.v;
+    // SPRO without stored entries: the default profile (requirements 7.19), stored with the first page changed
+    const byKey = ((v.indexed_defaults_by_key || {})[rec] || {})[key];
+    if (byKey) return byKey;
     if (rec === "WAVE") {
       const byW = (v.wave_defaults_by_wopt || {})[String(((v.records || {}).SITE || {}).wopt)];
       return (byW || v.wave_defaults || {})[key];
     }
     return (v.indexed_defaults || {})[rec];
+  };
+  /** Placeholder of a blank input file: its built-in default (requirements 7.19), with the conditions of
+   *  sassi/prep/defaults.py applied to the values being edited (Shown = used); else the field's own text. */
+  OptionsForm.prototype.defaultPlaceholder = function (it) {
+    const own = it.placeholder || null;
+    const D0 = (this.v.context || {}).input_defaults;
+    if (!it.default_ph || !D0) return own;
+    const num = (p) => Number(this.get(p) || 0);
+    const dtOk = () => Math.abs(num("SITE.delt") - D0.dt) <= 1e-6 * D0.dt;
+    const filled = (rec) => Object.values((this.v.indexed || {})[rec] || {}).filter((e) => e && String(e.file || "").trim());
+    const entry = (rec, i) => ((this.v.indexed || {})[rec] || {})[String(i)];
+    const k = it.default_ph;
+    if (k === "thfile") {
+      if (num("MOTION.fopt") !== 0 || !dtOk()) return D0.no_default;
+      return D0.thfile[num("ANALYS.type") === 1 ? "1" : "0"];
+    }
+    if (k === "soil_thfile") {
+      if (String(this.get("SOILX.file") || "").trim()) return own;
+      return dtOk() ? D0.soil_thfile : D0.no_default_soil;
+    }
+    const acc2 = num("EQUAKE.accopt") === 2;
+    const i = Number(this.sel.spec) || 1;
+    const noRsin = !filled("RSIN").length;
+    if (k === "rsin") return !acc2 && i === 1 && noRsin ? D0.rsin : own;
+    if (k === "rsout" || k === "accout") {
+      if (k === "accout" && acc2) return own;
+      const runs = acc2 ? !!(entry("ACCIN", i) || entry("RSOUT", i))
+        : !!String((entry("RSIN", i) || {}).file || "").trim() || (i === 1 && noRsin);
+      return runs ? `default: ${D0[k].replace("{i}", String(i))}` : own;
+    }
+    return own;
   };
   OptionsForm.prototype.anyDirty = function () {
     return Object.values(this.dirty).some((d) => Object.keys(d).length > 0);
@@ -1680,13 +1762,14 @@
       inp.addEventListener("input", () => F.set(it.path, inp.value));
       inputs.push(inp);
       const b = el("button", {class: "btn small", text: "...", title: "Select Dynamic Soil Property", onclick: () => D.soilProperty({initial: inp.value, select: (lab) => { inp.value = lab; F.set(it.path, lab); }})});
-      const dl = el("datalist", {id: "dynp-" + Math.random().toString(36).slice(2)}, ...(F.v.context.dynp || []).map((n) => el("option", {value: n})));
+      const dl = el("datalist", {id: "dynp-" + Math.random().toString(36).slice(2)}, ...(F.v.context.dynp || []).map((n) => el("option", {value: n})),
+        ...(F.v.context.dynp_library || []).map((n) => el("option", {value: n, label: `${n} (built-in curve)`})));
       inp.setAttribute("list", dl.id);
       return reg(el("div", {class: "row"}, el("label", {class: "lab", text: label}), inp, b, dl));
     }
     // text-like inputs: int, real, text, path
     const cur = F.get(it.path);
-    const inp = txt(cur === undefined || cur === null ? "" : cur, {class: w === "path" || w === "text" ? "path" : "", placeholder: it.placeholder || null, title: it.tip || null});
+    const inp = txt(cur === undefined || cur === null ? "" : cur, {class: w === "path" || w === "text" ? "path" : "", placeholder: F.defaultPlaceholder(it), title: it.tip || null});
     inp.addEventListener("input", () => {
       F.set(it.path, inp.value);
       inp.classList.toggle("invalid", (w === "int" || w === "real") && inp.value.trim() !== "" && isNaN(Number(inp.value)));
@@ -1699,10 +1782,24 @@
       const browse = el("button", {class: "btn small", text: "<<", title: it.folder ? "browse (folder)" : "browse", onclick: pick});
       extras.push(browse);
       inputs.push(browse);                    // greyed with its field (enable rules)
+      if (it.library) {          // built-in inputs that fit the field (records, loads, spectra, PSD; requirements 7.19)
+        const libBtn = el("button", {class: "btn small", text: "Library", title: "built-in inputs (@ names)", onclick: () => D.pickLibrary({
+          title: `${label}: Built-in Inputs`, kinds: it.library, entries: (F.v.context || {}).library || [], initial: inp.value,
+          onOk: (name) => { inp.value = name; F.set(it.path, name); F.refresh(); }})});
+        extras.push(libBtn);
+        inputs.push(libBtn);
+      }
       if (it.edit) extras.push(el("button", {class: "btn small", text: "Edit", title: "open in the File Editor", onclick: () => inp.value.trim() && S.openEditor(inp.value.trim())}));
     }
     const hz = it.hz ? el("span", {class: "hz"}) : null;
-    return reg(el("div", {class: "row"}, el("label", {class: "lab", text: label}), inp, ...extras, hz), {hz});
+    const ph = it.default_ph ? inp : null;
+    if (w === "path" && it.library) {
+      // label and buttons on one line, the file name on its own full-width line: the placeholder of a blank
+      // file names its built-in default ("built-in: RG 1.60, 0.30 g (@rg160h_030g.acc)", requirements 7.19)
+      return reg(el("div", {class: "path-lib"}, el("div", {class: "row"}, el("label", {class: "lab", text: label}), ...extras),
+        el("div", {class: "row"}, inp)), {hz, ph});
+    }
+    return reg(el("div", {class: "row"}, el("label", {class: "lab", text: label}), inp, ...extras, hz), {hz, ph});
   };
   /** Text of an "info" item: the defined entries of a keyed family, or a context value. */
   OptionsForm.prototype.infoText = function (it) {
@@ -1825,6 +1922,7 @@
     for (const r of this.rows) {
       const it = r.it;
       if (r.info) r.info.textContent = this.infoText(it);
+      if (r.ph) { r.ph.placeholder = this.defaultPlaceholder(it) || ""; r.ph.title = r.ph.value.trim() ? (it.tip || "") : r.ph.placeholder; }
       let en = !it.disabled && this.cond(it.enable);
       const vis = this.cond(it.visible);
       r.node.style.display = vis ? "" : "none";

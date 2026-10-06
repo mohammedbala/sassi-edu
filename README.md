@@ -38,6 +38,10 @@ Around the modules:
   `HOUSE`, `ANALYS`, `MOTION`, `CHECK`, `AFWRITE`, `RUNANALYS`, variables, `FOREACH`, macros ...),
   from `.pre` files, the console or the browser GUI, with `WRITE`/`INP` round trips;
 * **CHECK** with the manual's error and warning catalogue plus SASSI-EDU checks;
+* **built-in standard inputs** (`sassi/data/library`): the RG 1.60 0.30 g record and spectrum, the RG 1.60 1 g
+  spectra, SRP 3.7.1 target PSDs, a 5 Hz Ricker load pulse and the SHAKE91 soil curves, named `@<file>`
+  (command `LIBRARY`); blank inputs take them as defaults that CHECK reports (Warning EDU-29;
+  `EDUOPT,DEFAULTS,OFF` gives the ACS behaviour);
 * model **generation and checking** tools (INTGEN, EXCAV, MERGESOIL, WELD, EXCSTRCHK, FIXEDINT,
   HINGED, FIXROT ...);
 * **post-processing**: plots, line mathematics, spectrum broadening, section cuts;
@@ -107,11 +111,12 @@ RUNANALYS
 RUNMOTION
 ```
 
-The eight tutorial examples in [`examples/`](examples/README.md) are complete, commented models: a stick
+The nine tutorial examples in [`examples/`](examples/README.md) are complete, commented models: a stick
 on a surface mat, an embedded box (FV, FI-FSIN, FI-EVBN), forced vibration and foundation impedance,
 the EQUAKE-SOIL-SITE chain, X+Y+Z input in one run, near-field soil nonlinearity (a loose backfill behind
 a wall), Option NON (a shear-wall building with cracking walls) and an embedded shear-wall building with
-a two-level basement, analysed with FV and validated against the subtraction methods.
+a two-level basement, analysed with FV and validated against the subtraction methods, and a three-storey
+braced steel frame on a concrete mat compared with the same frame on a fixed base.
 
 ## Documentation
 

@@ -19,6 +19,10 @@ physically sensible (requirements 2.4, 3.3; ARCHITECTURE sections 3 and 8):
   kept under its own file names, RELDISP with the free-field reference in Y (ex05);
 * an embedded shear-wall building: clean CHECK, INTGEN counts and masses, FI-EVBN close to FV, FI-FSIN
   with the spurious resonance of the enclosed excavated soil near 15.5 Hz, its ISRS and wall forces (ex08);
+* a braced steel frame on a surface mat: real AISC sections with the strong axis toward the K node,
+  shear-tab releases and pinned corner bases, clean CHECK and masses, the fixed-base frequency of the
+  HOUSE matrices against the rigid-site run, the SSI frequency shift, ISRS, brace forces against the
+  base shear of the floor accelerations, and the storey drifts of three RELDISP runs (ex09);
 * WRITE -> INP gives back the same model (UT-03) for every model of every example.
 
 The binary inter-module files are deleted as soon as each example has run and the results the tests
@@ -59,7 +63,7 @@ def _assert_clean_run(ui, summary, ex_dir, name, modules):
     for d, mods in modules.items():
         status = listing_status(ex_dir / d)
         model = {"ex02_fsin": "ex02fsin", "ex02_evbn": "ex02evbn", "ex08_fsin": "ex08fsin",
-                 "ex08_evbn": "ex08evbn"}.get(d, d)
+                 "ex08_evbn": "ex08evbn", "ex09_fixed": "ex09fb"}.get(d, d)
         for mod in mods:
             line = status.get(f"{model}_{mod}.out", "listing missing")
             assert "status OK" in line, f"{name} {d} {mod}: {line}"
@@ -529,6 +533,239 @@ def test_ex08_basement_wall_forces(ex08):
                 for k, d in EX08_DIRS.items()}
         for k in ("fsin", "evbn"):
             assert abs(peak[k] / peak["fv"] - 1.0) < 0.03, (e, comp, peak)
+
+
+# ======================================================================================
+# Example 9: braced steel frame on a reinforced-concrete mat, SSI against a fixed base
+# ======================================================================================
+EX09_DIRS = {"ssi": "ex09", "fb": "ex09_fixed"}
+#: floor centres (z = 5, 9.5, 14) and their RELDISP references (the floor below; 83 = mat centre)
+EX09_FLOORS = {183: 83, 218: 183, 253: 218}
+EX09_X = (83, 183, 218, 253, 185, 255)          # mat centre, floor centres, heat exchanger, air-handling unit
+EX09_Z = (76, 90, 17, 21, 185, 255)             # mat edges, bases of A1 and A2, the two equipment items
+IN2, IN4 = 0.0254 ** 2, 0.0254 ** 4
+
+
+def _ex09_model(tmp_path):
+    """The models of example 9 built from the .pre without module runs (fast)."""
+    pre = stage_example("ex09_steel_frame", tmp_path)
+    keep = [ln for ln in pre.read_text(encoding="utf-8").splitlines()
+            if not ln.strip().upper().startswith(("RUN", "FCOPY"))]
+    pre.write_text("\n".join(keep) + "\n", encoding="utf-8")
+    ui = Interpreter(cwd=pre.parent)
+    ui.run_file(str(pre), resolve=False)
+    assert not ui.sink.texts(Kind.ERROR), ui.sink.texts(Kind.ERROR)[:10]
+    return ui
+
+
+def test_ex09_sections_orientation_and_releases(tmp_path):
+    """The R table holds the AISC values in SI; the web of every W shape points to its K node (I3 = Ix, the
+    strong axis, with As2 = d tw); a 5 m W14x132 cantilever with K in +X is stiff in X (strong axis) and
+    flexible in Y; shear tabs release M3 at the supported end only; corner bases are pinned; braces are
+    axial members (I2 = I3 = 0)."""
+    from sassi.elements import beam
+    from sassi.elements.base import blas_quiet, material_from_M
+    m = _ex09_model(tmp_path).models[0]
+    aisc = {1: (38.8, 14.7 * 0.645, 12.3, 548, 1530), 2: (26.5, 14.0 * 0.440, 4.06, 362, 999),   # A, d tw, J, Iy, Ix
+            3: (22.4, 23.9 * 0.440, 2.68, 82.5, 2100), 4: (13.0, 20.7 * 0.350, 0.770, 20.7, 843)}
+    for r, (A, Aw, J, Iy, Ix) in aisc.items():
+        sec = m.sections[r]
+        got = (sec.axial / IN2, sec.shear2 / IN2, sec.tors / IN4, sec.flex2 / IN4, sec.flex3 / IN4)
+        assert np.allclose(got, (A, Aw, J, Iy, Ix), rtol=1e-5), (r, got)
+    for r, (A, J) in {5: (13.5, 204), 6: (9.74, 81.1)}.items():            # HSS braces: axial members
+        sec = m.sections[r]
+        assert np.allclose((sec.axial / IN2, sec.tors / IN4), (A, J), rtol=1e-5)
+        assert sec.flex2 == sec.flex3 == sec.shear2 == sec.shear3 == 0.0
+    ids, xyz = m.global_coordinates()
+    P = {int(n): p for n, p in zip(ids, xyz)}
+
+    def axis2(e):
+        I, J, K = (P[n] for n in e.nodes[:3])
+        e1 = (J - I) / np.linalg.norm(J - I)
+        v = (K - I) - np.dot(K - I, e1) * e1
+        return v / np.linalg.norm(v)
+
+    cols = m.groups[3].sorted_elements()
+    assert len(cols) == 36
+    for e in cols:
+        on_line_b = abs(P[e.nodes[0]][1]) < 1e-9                             # y = 0
+        assert np.allclose(np.abs(axis2(e)), (1, 0, 0) if on_line_b else (0, 1, 0)), e.id
+    for g in (1, 4):                                                        # girders and floor beams: web vertical
+        for e in m.groups[g].sorted_elements():
+            assert np.allclose(axis2(e), (0, 0, 1)), (g, e.id)
+    assert len(m.groups[1].elements) == 42 and len(m.groups[4].elements) == 96
+    assert len(m.groups[2].elements) == 48
+    for e in m.groups[4].sorted_elements():                                  # M3 at the support, one end only
+        assert (e.ki, e.kj) == (([0] * 5 + [1], [0] * 6) if e.id % 2 else ([0] * 6, [0] * 5 + [1])), e.id
+    assert all(e.ki == e.kj == [0] * 6 for e in m.groups[1].sorted_elements())  # welded moment connections
+    pinned = {e.id for e in cols if e.ki == [0, 0, 0, 0, 1, 1]}
+    assert pinned == {1, 4, 9, 12}                                           # the corner columns, storey 1
+    # the strong axis of a column with K in +X (B1, element 5): tip load X -> P L3/(3 E Ix) + P L/(G d tw)
+    mat = material_from_M(1, 2.0e8, 0.3, 77.01, 0.0, 0.0, 9.81)
+    sec = m.sections[1]
+    s = dict(A=sec.axial, As2=sec.shear2, As3=sec.shear3, J=sec.tors, I2=sec.flex2, I3=sec.flex3)
+    e = cols[4]
+    with blas_quiet():
+        K, _ = beam.matrices(np.array([P[n] for n in e.nodes[:3]]), mat, s)
+        flex = np.linalg.inv(K.real[6:, 6:])                                 # base clamped
+    E, G, L = 2.0e8, 2.0e8 / 2.6, 5.0
+    assert abs(flex[0, 0] / (L ** 3 / (3 * E * s["I3"]) + L / (G * s["As2"])) - 1) < 1e-9
+    assert abs(flex[1, 1] / (L ** 3 / (3 * E * s["I2"]) + L / (G * s["As3"])) - 1) < 1e-9
+    assert flex[1, 1] > 2.5 * flex[0, 0]
+
+
+@pytest.fixture(scope="module")
+def ex09(tmp_path_factory):
+    import scipy.linalg as sla
+    from sassi.elements.base import blas_quiet
+    ui, summary, ex = _run("ex09_steel_frame", tmp_path_factory)
+    md = ex / "ex09"
+    f8 = {k: B.read_file8(ex / d) for k, d in EX09_DIRS.items() if (ex / d / "FILE8").exists()}
+    # level masses (X rows of the HOUSE mass matrix) and the fixed-base modes (mat nodes clamped)
+    f4 = read_container(md / "ex09.N4", "FILE4")
+    Ks = read_container(md / "COOSK", "COOSK").sparse("Ks").toarray().real
+    Ms = read_container(md / "COOSM", "COOSM").sparse("Ms").toarray()
+    eqn, eqd = np.asarray(f4["eq_node"]), np.asarray(f4["eq_dof"])
+    z = {int(n): float(p[2]) for n, p in zip(f4["node_id"], f4["node_xyz"])}
+    rx = (eqd == 1).astype(float)
+    free = np.flatnonzero(eqn > 165)
+    with blas_quiet():
+        mrow = Ms @ rx
+        w2, phi = sla.eigh(Ks[np.ix_(free, free)], Ms[np.ix_(free, free)], subset_by_index=[0, 3])
+        r = rx[free]
+        gam = (phi.T @ Ms[np.ix_(free, free)] @ r) ** 2 / (r @ Ms[np.ix_(free, free)] @ r)
+    levels = {}
+    for i in np.flatnonzero(eqd == 1):
+        levels[round(z[int(eqn[i])], 2)] = levels.get(round(z[int(eqn[i])], 2), 0.0) + mrow[i]
+    modes = (np.sqrt(w2) / (2 * np.pi), gam)
+    for d in EX09_DIRS.values():
+        purge_binaries(ex / d)
+    return ui, summary, ex, f8, levels, modes
+
+
+@pytest.mark.slow                     # two models of 97 frequencies: about 30 s
+def test_ex09_runs_every_module(ex09):
+    ui, summary, ex, f8, *_ = ex09
+    mods = ("SITE", "POINT", "HOUSE", "ANALYS", "MOTION", "STRESS", "RELDISP")
+    _assert_clean_run(ui, summary, ex, "ex09", {"ex09": mods, "ex09_fixed": mods})
+    assert set(f8) == set(EX09_DIRS)
+    _assert_write_inp_roundtrip(ui, ex, {0: "ex09/ex09.pre", 2: "ex09_fixed/ex09fb.pre"})
+
+
+@pytest.mark.slow
+def test_ex09_model_checks_and_masses(ex09):
+    """CHECK: no error and no warning for both models; 165 interaction nodes on the mat, 304 nodes without
+    gaps, the slabs hidden in the 3D views; HOUSE mass 1545.7 t (mat 924.8, slabs 406.2, steel 90.7,
+    equipment 124); 611 t at the three floor levels."""
+    ui, _, ex, _, levels, _ = ex09
+    for num, d in ((0, "ex09"), (2, "ex09_fixed")):
+        m = ui.models[num]
+        rep = run_check(m, dirs=[m.path])
+        assert not rep.errors() and not rep.warnings(), [x.line() for x in rep.errors() + rep.warnings()][:5]
+        assert sum(1 for nd in m.nodes.values() if 0 in nd.flags) == 165
+        assert len(m.nodes) == max(m.nodes) == 304
+        assert m.ui_state.get("hide_groups") == [9, 11]
+        txt = (ex / d / f"{m.name}_HOUSE.out").read_text(encoding="utf-8")
+        line = next(ln for ln in txt.splitlines() if "Total structural mass" in ln)
+        assert abs(float(line.split(":")[1].split()[0]) - 1545.7) < 0.5, line
+    above = {k: v for k, v in levels.items() if k > 0}
+    assert sorted(above) == [5.0, 9.5, 14.0]
+    assert abs(sum(above.values()) - 611.3) < 1.0, above
+
+
+@pytest.mark.slow
+def test_ex09_low_frequency_transfer_functions_are_rigid_body(ex09):
+    f8 = ex09[3]
+    for k, f in f8.items():
+        assert float(f["freq"][0]) < 0.11
+        for node in EX09_X:
+            assert abs(abs(B.tf(f, node, 1)[0]) - 1.0) < 0.005, (k, node)      # observed 0.08 %
+        for node in EX09_Z:
+            assert abs(B.tf(f, node, 3)[0]) < 0.005, (k, node)
+
+
+@pytest.mark.slow
+def test_ex09_fixed_base_frequency_and_ssi_shift(ex09):
+    """Eigenvalues of the HOUSE matrices (mat clamped): X 4.38 Hz with 85 % of the mass.  The rigid-site run
+    peaks there; with SSI the roof peak moves down to about 3.98 Hz (-9 %) and the mat rocks
+    (antisymmetric vertical motion of its edges)."""
+    f8, _, (freq_eig, gam) = ex09[3], ex09[4], ex09[5]
+    k = int(np.argmax(gam))
+    assert 4.2 < freq_eig[k] < 4.6 and 0.8 < gam[k] < 0.9, (freq_eig, gam)       # 4.38 Hz, 85 % of the mass
+    fq = np.asarray(f8["fb"]["freq"])
+    f_fb, h_fb = _peak(fq, B.tf(f8["fb"], 253, 1))
+    f_ssi, h_ssi = _peak(fq, B.tf(f8["ssi"], 253, 1))
+    assert abs(f_fb / freq_eig[k] - 1.0) < 0.02, (f_fb, freq_eig[k])
+    assert 0.85 < f_ssi / f_fb < 0.95, (f_ssi, f_fb)
+    assert 15.0 < h_ssi < h_fb < 25.0, (h_ssi, h_fb)                         # 18.3 and 20.2
+    assert np.max(np.abs(B.tf(f8["fb"], 83, 1) - 1.0)) < 0.01                 # rigid site: the mat = free field
+    e76, e90 = B.tf(f8["ssi"], 76, 3), B.tf(f8["ssi"], 90, 3)
+    assert np.max(np.abs(e76)) > 0.5 and np.max(np.abs(e76 + e90)) <= 1e-8 * np.max(np.abs(e76))
+    assert np.max(np.abs(B.tf(f8["fb"], 76, 3))) < 0.01
+
+
+@pytest.mark.slow
+def test_ex09_isrs(ex09):
+    """ZPA: the rigid-site mat reproduces the PGA, the SSI mat exceeds it a little, both grow up the frame;
+    the 5 % floor-spectrum peaks with SSI are within -5 / +15 % of the fixed-base ones and lie at a lower
+    frequency (observed +3 to +5 %, 4.07 against 4.27 Hz)."""
+    ex = ex09[2]
+    pga = _pga(ex / "data" / "rg160h_030g.acc")
+    zpa = {k: [_rs(ex / d / f"{n:05d}TR_X02.RS")[1][-1] for n in (83, 183, 218, 253)] for k, d in EX09_DIRS.items()}
+    assert abs(zpa["fb"][0] / pga - 1.0) < 0.01, zpa
+    assert 1.0 < zpa["ssi"][0] / pga < 1.25, zpa
+    for k in zpa:
+        assert zpa[k] == sorted(zpa[k]), zpa
+    for n in (183, 218, 253):
+        f, a = _rs(ex / "ex09" / f"{n:05d}TR_X02.RS")
+        fb, b = _rs(ex / "ex09_fixed" / f"{n:05d}TR_X02.RS")
+        assert 0.95 < a.max() / b.max() < 1.15, n
+        assert f[np.argmax(a)] < fb[np.argmax(b)], n
+    assert 9.0 < _rs(ex / "ex09" / "00253TR_X02.RS")[1].max() < 12.0         # roof, 10.4 g
+
+
+@pytest.mark.slow
+def test_ex09_brace_forces_against_the_base_shear(ex09):
+    """Base shear above the mat = sum of level mass x floor-centre acceleration; the 8 storey-1 X-braces
+    carry most of it, so each carries close to V / (8 cos theta) (observed 97 %, SSI and fixed base); the
+    model is symmetric (braces 1 = -4, 2 = -3); SSI raises the brace forces a little (+5 %)."""
+    ex, levels = ex09[2], ex09[4]
+    cos = 6.0 / np.hypot(6.0, 5.0)
+    peak = {}
+    for k, d in EX09_DIRS.items():
+        acc = [np.asarray(textfiles.read_history(ex / d / f"{n:05d}TR_X.ACC")[0]) for n in (183, 218, 253)]
+        nt = min(len(a) for a in acc)
+        V = G * sum(levels[z] * a[:nt] for z, a in zip((5.0, 9.5, 14.0), acc))
+        N = {e: np.asarray(textfiles.read_history(ex / d / f"BEAMS_002_{e:05d}_FXI.THS")[0]) for e in (1, 2, 3, 4)}
+        # mirror images about x = 0: under X input one diagonal pulls while its mirror image pushes
+        assert np.allclose(N[1], -N[4], rtol=0, atol=1e-6 * np.max(np.abs(N[1])))
+        assert np.allclose(N[2], -N[3], rtol=0, atol=1e-6 * np.max(np.abs(N[2])))
+        nmax = max(np.max(np.abs(n)) for n in N.values())
+        est = np.max(np.abs(V)) / (8 * cos)
+        assert 0.9 < nmax / est < 1.0, (k, nmax, est)
+        # horizontal force of the 8 storey-1 braces on the base (line C mirrors line A) at the peak shear
+        t = int(np.argmax(np.abs(V)))
+        vb = 2 * cos * sum(-N[e][t] * sx for e, sx in ((1, 1), (2, -1), (3, 1), (4, -1)))
+        assert 0.9 < abs(vb / V[t]) < 1.0, (k, vb, V[t])
+        peak[k] = nmax
+        for e, lo, hi in ((17, 600, 800), (33, 330, 450)):                     # storeys 2 and 3
+            n = np.max(np.abs(textfiles.read_history(ex / d / f"BEAMS_002_{e:05d}_FXI.THS")[0]))
+            assert lo < n < hi, (k, e, n)
+    assert 1.0 < peak["ssi"] / peak["fb"] < 1.15, peak                       # 934 against 887 kN
+
+
+@pytest.mark.slow
+def test_ex09_storey_drifts(ex09):
+    """Three RELDISP runs, each floor relative to the floor below: drift ratios below 0.3 %, larger with SSI
+    (the foundation rocks: 7.9, 7.7, 7.4 mm against 6.5, 6.7, 6.4 mm on the fixed base)."""
+    ex = ex09[2]
+    for d, model in (("ex09", "ex09"), ("ex09_fixed", "ex09fb")):        # the last run: roof over floor 2
+        assert decks.read(decks.deck_path(ex / d, model, "RELDISP"), "RELDISP")["relfile"] == "00218TR_X.TFI"
+    drift = {k: [np.max(np.abs(textfiles.read_history(ex / d / f"{n:05d}TR_X.THD")[0])) for n in EX09_FLOORS]
+             for k, d in EX09_DIRS.items()}
+    for (n, ref), h, ssi, fb in zip(EX09_FLOORS.items(), (5.0, 4.5, 4.5), drift["ssi"], drift["fb"]):
+        assert 0.004 < fb < ssi < 0.003 * h, (n, ref, ssi, fb)
+        assert 1.05 < ssi / fb < 1.35, (n, ssi, fb)
 
 
 # ======================================================================================

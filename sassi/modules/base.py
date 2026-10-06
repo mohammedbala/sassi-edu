@@ -30,7 +30,7 @@ import time
 import traceback
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Callable, List, Optional, TextIO, Union
+from typing import Callable, List, Optional, Sequence, TextIO, Union
 
 from .. import PRODUCT, __version__
 
@@ -119,8 +119,11 @@ class ModuleContext:
 def run_module(module: str, model: str, workdir: Union[str, Path], deck_path: Optional[Union[str, Path]] = None,
                listing_path: Optional[Union[str, Path]] = None, echo: Optional[Callable[[str], None]] = None,
                progress: Optional[Callable[[float, str], None]] = None,
-               cancelled: Optional[Callable[[], bool]] = None) -> int:
-    """Run SSI module ``module`` for ``model`` in ``workdir``; return 0 on success."""
+               cancelled: Optional[Callable[[], bool]] = None, notes: Optional[Sequence[str]] = None) -> int:
+    """Run SSI module ``module`` for ``model`` in ``workdir``; return 0 on success.
+
+    ``notes``: the built-in defaults of blank inputs the run uses (RUN<MODULE> passes them, requirements
+    section 7.19, D-W5-11); they are written to the listing after its header."""
     module = module.upper()
     if module not in MODULE_NAMES:
         raise ValueError(f"unknown module {module}")
@@ -137,6 +140,11 @@ def run_module(module: str, model: str, workdir: Union[str, Path], deck_path: Op
     try:
         mod = importlib.import_module(f"sassi.modules.{module.lower()}")
         listing.header(module)
+        if notes:
+            listing.section("Built-in defaults of blank inputs used (CHECK Warning EDU-29; "
+                            "EDUOPT,DEFAULTS,OFF switches them off)")
+            for text in notes:
+                listing.write(f"   {text}")
         if ctx.deck_path is not None and not ctx.deck_path.exists():
             raise ModuleError(f"input deck {ctx.deck_path.name} not found -- run AFWRITE first")
         rc = int(mod.run(ctx) or 0)

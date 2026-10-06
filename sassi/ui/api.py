@@ -35,6 +35,8 @@ Routes (``route(method, path, query, body)``; all answers are JSON)::
     GET  /api/jobs, /api/jobs/<id>?since=k, POST /api/jobs/<id>/cancel
     GET  /api/files?dir=, /api/file?name=, /api/fileinfo?name=; POST /api/file {name, text}
     GET  /api/plots, /api/plot/<id>[?frame=k], /api/lines, /api/dynp, /api/animations, /api/cuts
+                                        (/api/dynp: the model's DYNP properties and the built-in library
+                                        curves; /api/file and /api/fileinfo also read built-in @ names)
     POST /api/export_table {name}       File > Export Table (CSV of the active 2D plot, D-UI-17)
     GET  /api/check                     the Check Errors window text (<model>.err, 5.5); a CHECK or
                                         AFWRITE with messages pushes a 'check' event (the window pops
@@ -81,6 +83,7 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from .. import PRODUCT, __version__
 from ..io import decks
+from ..io import library as LIB
 from ..model.values import NumberError, parse_int
 from ..plotting.state import FrameStore, PlotError, animation_frame, jsonable, plot_state
 from ..prep import Interpreter
@@ -636,7 +639,20 @@ class GuiSession:
         except files.PathError as exc:
             raise ApiError(403 if "refused" in str(exc) else 404, str(exc)) from None
 
+    def _library_file(self, name: Optional[str]) -> Optional[Path]:
+        """A built-in input (``@name``, requirements 7.19): read-only, outside the model roots."""
+        if not LIB.is_library_name(name):
+            return None
+        p = LIB.library_path(name)
+        if p is None:
+            raise ApiError(404, f"{str(name).strip()}: not a built-in input (LIBRARY lists them)")
+        return p
+
     def file(self, name: Optional[str]) -> Dict[str, Any]:
+        lib = self._library_file(name)
+        if lib is not None:
+            return {"name": LIB.PREFIX + lib.name, "path": str(lib), "text": files.read_text(lib),
+                    "info": files.classify(lib), "readonly": True}
         with self.locked():
             roots = self._roots()
         try:
@@ -647,6 +663,13 @@ class GuiSession:
         return {"name": p.name, "path": str(p), "text": text, "info": files.classify(p)}
 
     def file_write(self, body: Dict[str, Any]) -> Dict[str, Any]:
+        if LIB.is_library_name(str(body.get("name", ""))):
+            if body.get("text") is None:              # File > Open / the dialogs' Edit: show it, read-only
+                lib = self._library_file(str(body.get("name")))
+                return {"ok": True, "path": LIB.PREFIX + lib.name, "created": False, "text": files.read_text(lib),
+                        "readonly": True}
+            raise ApiError(403, f"{str(body.get('name')).strip()}: built-in library files are read-only; save a "
+                                f"copy under another name")
         with self.locked():
             roots = self._roots()
         try:
@@ -664,6 +687,9 @@ class GuiSession:
         return {"ok": True, "path": str(p), "created": not existed}
 
     def fileinfo(self, name: Optional[str]) -> Dict[str, Any]:
+        lib = self._library_file(name)
+        if lib is not None:
+            return files.file_info(lib)
         with self.locked():
             roots = self._roots()
         try:
@@ -708,7 +734,10 @@ class GuiSession:
                 label, no = key
                 vals = dialogs.record_values(dialogs.typed(rec))
                 props.setdefault(label, []).append(vals)
-            return {"properties": {k: sorted(v, key=lambda r: r.get("no", 0)) for k, v in props.items()}}
+            return {"properties": {k: sorted(v, key=lambda r: r.get("no", 0)) for k, v in props.items()},
+                    # built-in curves (Clay, Sand, Rock; requirements 7.19, D-W5-09): used by their label
+                    # while the model does not define it
+                    "library": {k: v for k, v in LIB.dynp_curves().items() if k not in props}}
 
     def animations(self) -> Dict[str, Any]:
         try:

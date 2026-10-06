@@ -225,7 +225,10 @@ def cmd_pindel(c):
 # Model -> .pin (used by AFWRITE, CHECK and PINLIST)
 # ======================================================================================
 def _dynp_points(model, label: str) -> Tuple[List[Tuple[float, float]], List[Tuple[float, float]]]:
-    """(G points, damping points) of a DYNP label, as AFWRITE writes them to the SOIL deck."""
+    """(G points, damping points) of a DYNP label, as AFWRITE writes them to the SOIL deck: the model's
+    points, else the built-in curve of that label (D-W5-09; not with EDUOPT,DEFAULTS,OFF)."""
+    from ..defaults import enabled
+    from ...io import library as LIB
     g, dmp = [], []
     for (lab, _no), rec in get_entries(model, "DYNP"):
         if lab != label:
@@ -234,19 +237,24 @@ def _dynp_points(model, label: str) -> Tuple[List[Tuple[float, float]], List[Tup
             g.append((float(rec.sg), float(rec.g)))
         if rec.given(4) and rec.given(5):
             dmp.append((float(rec.sd), float(rec.d)))
+    if not g and not dmp and enabled(model) and label not in {lab for (lab, _), _ in get_entries(model, "DYNP")}:
+        for pt in LIB.dynp_points(label):
+            g.append((float(pt.sg), float(pt.g)))
+            dmp.append((float(pt.sd), float(pt.d)))
     return g, dmp
 
 
 def file73_labels(model) -> List[str]:
     """DYNP labels in FILE73 curve order: the labels used by SPRO in profile order, then the other DYNP
     labels in key order -- the order of the SOIL deck written by AFWRITE (sassi.prep.afwrite
-    DeckBuilder.soil), which SOIL keeps in FILE73 (curve number = position, 1-based).  A label without
-    any complete point is not in the deck (nor in FILE73) and is left out."""
-    prof = [(k, rec) for k, rec in get_entries(model, "SPRO") if isinstance(k, int)]
+    DeckBuilder.soil, :func:`sassi.prep.defaults.dynp_table`: the default profile and the built-in curves
+    of labels the model does not define included), which SOIL keeps in FILE73 (curve number = position,
+    1-based).  A label without any complete point is not in the deck (nor in FILE73) and is left out."""
+    from ..defaults import dynp_table, soil_profile
+    prof = soil_profile(model)[0]
     used = list(dict.fromkeys(rec.dynprop for _, rec in prof if rec.dynprop))
-    dyn = get_entries(model, "DYNP")
-    labels = used + [lab for (lab, _), _ in dyn if lab not in used]
-    return [lab for lab in dict.fromkeys(labels) if any(_dynp_points(model, lab))]
+    rows = dynp_table(model, used)
+    return list(dict.fromkeys(row[0] for row in rows if row[6] or row[7]))
 
 
 def curve_label_problems(model, label: str) -> List[str]:

@@ -12,6 +12,7 @@
  *      RUN<MODULE> jobs by run_pending (their listing pushed while they run, then GET /api/jobs/<id>), the
  *      step actions (plots: SPECPLOT / MODELPLOT data through /api/plot/<id>; listings through /api/file);
  *   3. File > Upload to Workspace / Download (POST and GET /api/file);
+ *   3a. the built-in inputs: @ names resolve under the unpacked package (LIBRARY, INP, GET /api/file);
  *   4. unless --quick: every lesson headless (sassi.ui.lessons.run_lesson_headless), with its time.
  *
  * Prints one "RESULT {...}" line (JSON) at the end; exit status 1 when a check failed. */
@@ -162,6 +163,14 @@ check(jobs.some((j) => j.pushes > 0), "job output pushed while a job ran");
 const evPushes = pushes.filter((p) => p.events && p.events.length).length;
 check(evPushes > 0, "events pushed while Python was busy");
 timings.lesson01 = +(now() - t).toFixed(1);
+
+// ------------------------------------------------------------------ 3a. built-in inputs (@ names, requirements 7.19)
+r = post("/api/command", {lines: ["LIBRARY,@rg160h_030g.acc", "INP,@dynp_library.pre"]});
+check(r.status === 200 && r.payload.ok &&
+      r.payload.messages.some((m) => m.text.includes(`${ROOT}/sassi/data/library/rg160h_030g.acc`)),
+      "built-in @ names resolve in the bundle (LIBRARY, INP)");
+r = get("/api/file?name=" + encodeURIComponent("@rg160h_030g.rsi"));
+check(r.status === 200 && r.payload.readonly && r.payload.text.startsWith("0.100000"), "a built-in file read through the API");
 
 // ------------------------------------------------------------------ 3. upload / download
 const text = "* uploaded by the test\nN,1,0,0,0\n";

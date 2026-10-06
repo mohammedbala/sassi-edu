@@ -101,6 +101,7 @@ from .. import conventions as C
 from ..core import interp as I
 from ..core import signal as S
 from ..io import decks, thfile
+from ..io import library as LIB
 from ..io.container import read_container
 from ..io.deckfmt import Table, read_raw, write_raw
 from .base import Listing, ModuleContext, ModuleError
@@ -914,7 +915,7 @@ def control_motion_from_deck(dk, workdir: Path) -> Tuple[np.ndarray, np.ndarray,
     name = str(dk["thfile"] or "").strip()
     if not name:
         raise ModuleError(f"no control-motion file (THFILE) in the {dk.module} deck")
-    p = _resolve(name, workdir)
+    p = LIB.module_path(name, workdir) if LIB.is_library_name(name) else _resolve(name, workdir)
     cmot = read_control_motion(p, int(dk["fopt"]), int(dk["rec1"]), int(dk["rec2"]), float(dk["delt"]),
                                int(dk["nft"]), float(dk["mult"]), float(dk["max"]))
     return cmot.padded, cmot.A, p.name
@@ -1044,7 +1045,7 @@ def ground_motion(d: LoadgenDeck, workdir: Path, model: str, dt: float, n: int,
     control motion of the MOTION (source FILE8) / RELDISP / MOTION / STRESS deck."""
     gname = str(d["groundfile"] or "").strip()
     if gname:
-        p = _resolve(gname, workdir)
+        p = LIB.module_path(gname, workdir) if LIB.is_library_name(gname) else _resolve(gname, workdir)
         if not p.exists():
             raise ModuleError(f"ground acceleration file {p} not found")
         try:

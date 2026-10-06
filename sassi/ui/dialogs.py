@@ -36,7 +36,13 @@ A value displayed for something that is *not stored* is what AFWRITE writes for 
 never shows an analysis different from the one that runs: the implicit vertical SV (SH) wave field
 while no WAVE entry exists (and it is stored with the first other wave page); SOIL layer output
 requests "not requested" for a layer without entry; SITE Frequency 2 blank = NFFT/2; the
-stochastic incoherency input read and validated with the D-INC-02 rule.
+stochastic incoherency input read and validated with the D-INC-02 rule.  A blank input file with a built-in
+default (requirements section 7.19, :mod:`sassi.prep.defaults`) shows that default as its placeholder
+("built-in: RG 1.60, 0.30 g (@rg160h_030g.acc)"), computed with the policy AFWRITE applies
+(``context.input_defaults`` and the browser's ``defaultPlaceholder``), and the SOIL profile of a model without
+SPRO entries shows the default profile on every layer page; it is stored with the first SPRO page the user
+changes (like the implicit wave field).  File fields get a Library button listing the built-in files that
+fit them (``library``: record, load, spectrum, psd).
 
 Enable/disable rules (D-UI-04) are carried by the fields as ``enable`` / ``visible`` conditions
 ``[path, op, value]`` (ops ``==``, ``!=``, ``in``, ``notin``) and evaluated by the browser; the
@@ -50,6 +56,8 @@ from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 from ..conventions import ELEMENT_COMPONENTS, ELEMENT_TYPE_NAMES
 from ..model.values import NumberError, fmt_num, parse_float, parse_int
+from ..io import library as LIB
+from ..prep import defaults as DEF
 from ..prep.check import EDU_TEXT, ERRORS, WARNINGS, CheckOptions, format_title
 from ..prep.lexer import join_command
 from ..prep.options import (OPTION_SPECS, TABS, get_entries, get_record, problem_fmt, record_class,
@@ -146,7 +154,8 @@ def _acc_history(freq: bool = False) -> List[Dict[str, Any]]:
         items.append(f("SITE.freq", "Frequency Set Number"))
     items += [f("MOTION.mult", "Multiplication Factor"), f("MOTION.max", "Max Value for Time History"),
               f("MOTION.rec1", "First Record"), f("MOTION.rec2", "Last Record (0 = last)"),
-              f("$THTIT", "Title", "text"), f("$THFILE", "File", "path", edit=True),
+              f("$THTIT", "Title", "text"),
+              f("$THFILE", "File", "path", edit=True, library=["record", "load"], default_ph="thfile"),
               check("MOTION.fopt", "File Contains Pairs Time Step - Accel.")]
     return items
 
@@ -163,15 +172,16 @@ def analysis_tabs() -> List[Dict[str, Any]]:
     tabs["EQUAKE"] = [
         group("Spectrum Files", [
             sel("spec", "Spectrum Number", 1, 3),
-            f("RSIN[spec].file", "Spectrum Input File", "path", edit=True),
-            f("RSOUT[spec].file", "Spectrum Output File", "path"),
-            f("ACCOUT[spec].file", "Acceleration Output File", "path")]),
+            f("RSIN[spec].file", "Spectrum Input File", "path", edit=True, library=["spectrum"], default_ph="rsin"),
+            f("RSOUT[spec].file", "Spectrum Output File", "path", default_ph="rsout"),
+            f("ACCOUT[spec].file", "Acceleration Output File", "path", default_ph="accout")]),
         group("Optional Spectrum Files", [
             f("EQUAKE.accopt", "", "excl", choices=[[1, "Accel. Record"], [2, "External Accel"]]),
-            f("ACCIN[spec].file", "Acceleration Input File", "path", enable=["EQUAKE.accopt", "!=", 0])]),
+            f("ACCIN[spec].file", "Acceleration Input File", "path", enable=["EQUAKE.accopt", "!=", 0],
+              library=["record"])]),
         group("Target PSD", [
             check("EQUAKE.tpsd", "Use Target PSD"),
-            f("TPSD[spec].file", "PSD File", "path", enable=["EQUAKE.tpsd", "==", 1])]),
+            f("TPSD[spec].file", "PSD File", "path", enable=["EQUAKE.tpsd", "==", 1], library=["psd"])]),
         group("Simulation Parameters", [
             f("EQUAKE.nrfreq", "Number of Frequencies", placeholder="records of RSIN 1"),
             f("EQUAKE.rand", "Initial Random SEED"), f("EQUAKE.damp", "Damping Value"),
@@ -194,7 +204,8 @@ def analysis_tabs() -> List[Dict[str, Any]]:
             radio("SOILX.indir", "Input Direction", [[0, "Horizontal (Vs)"], [1, "Vertical (Vp)"]]),
             f("SITE.cl", "Control Point Layer"),
             f("SOILX.cl", "SOIL-only Control Point Layer (0 = SITE value)"),
-            f("$THFILE", "File", "path", edit=True), f("SOILX.file", "SOIL-only File (blank = File above)", "path"),
+            f("$THFILE", "File", "path", edit=True, library=["record"], default_ph="soil_thfile"),
+            f("SOILX.file", "SOIL-only File (blank = File above)", "path", library=["record"]),
             check("SOIL.outcrop", "Assign as Outcrop Motion")]),
         group("Iteration Parameters (Equivalent-Linear Soil Behavior)", [
             check("SOIL.save", "Save Strain-Compatible Soil Properties"),
@@ -202,7 +213,10 @@ def analysis_tabs() -> List[Dict[str, Any]]:
         group("Soil Profile", [
             sel("layer", "Layer Number", 1, 200),
             f("SPRO[layer].prop", "Property Number"),
-            f("SPRO[layer].dynprop", "Dynamic Soil Property", "dynp")], col=1),
+            f("SPRO[layer].dynprop", "Dynamic Soil Property", "dynp"),
+            info("Without SPRO", "spro_default",
+                 tip="no SPRO entry stored: the default profile AFWRITE writes (EDU-29); it is stored with the first "
+                     "layer you change")], col=1),
         group("Accelerations", [
             radio("SACC[layer].opt", "", [[0, "No Computation"], [1, "Compute Maximum"],
                                           [2, "Compute Maximum + Time History"]]),
@@ -784,6 +798,10 @@ def absent_entry(model, name: str, key, wopt: Optional[int] = None) -> Dict[str,
     """
     if name == "WAVE":
         return wave_effective_default(model, int(key), wopt)
+    if name == "SPRO" and key is not None:
+        dflt = spro_defaults(model).get(str(key))
+        if dflt is not None:
+            return dict(dflt)
     cls = record_class(name)
     vals = request_default(name)
     if name in LAYER_REQUESTS:
@@ -793,6 +811,49 @@ def absent_entry(model, name: str, key, wopt: Optional[int] = None) -> Dict[str,
     if cls.KEY:
         vals[cls.KEY[0]] = key
     return vals
+
+
+def spro_defaults(model) -> Dict[str, Dict[str, Any]]:
+    """The default SOIL profile of a model without SPRO entries, by layer key (what AFWRITE writes, D-W5-10);
+    empty when SPRO entries are stored, no default applies or EDUOPT,DEFAULTS,OFF."""
+    prof, use, _ = DEF.soil_profile(model)
+    if use is None:
+        return {}
+    return {str(k): {"layer": int(k), "prop": int(rec.prop), "dynprop": rec.dynprop or ""} for k, rec in prof}
+
+
+def _spro_short(dflt: Dict[str, Dict[str, Any]]) -> str:
+    """One line for the SOIL tab: "default: Sand 1-4, Rock 5; 6 = half-space L 3 (EDU-29)"."""
+    keys = sorted(int(k) for k in dflt)
+    if not keys:
+        return ""
+    last = keys[-1]
+    groups = []
+    for lab in ("Sand", "Rock"):
+        ks = [k for k in keys[:-1] if dflt[str(k)]["dynprop"] == lab]
+        if ks:
+            groups.append(f"{lab} {DEF._ranges(ks)}")
+    return f"default: {', '.join(groups)}; {last} = half-space L {dflt[str(last)]['prop']} (EDU-29)"
+
+
+def input_defaults_context(model) -> Optional[Dict[str, Any]]:
+    """Placeholder texts of the blank input files with a built-in default (requirements 7.19); the browser
+    applies the same conditions as :mod:`sassi.prep.defaults` to the values being edited
+    (``OptionsForm.defaultPlaceholder``).  None with EDUOPT,DEFAULTS,OFF (no defaults, no placeholders)."""
+    if not DEF.enabled(model):
+        return None
+    rec = LIB.entry(DEF.SEISMIC_RECORD)
+    return {
+        "dt": rec.dt if rec is not None else 0.005,
+        "thfile": {"0": f"built-in: RG 1.60, 0.30 g ({DEF.SEISMIC_RECORD})",
+                   "1": f"built-in: 5 Hz Ricker pulse ({DEF.VIBRATION_LOAD})"},
+        "soil_thfile": f"built-in: RG 1.60, 0.30 g ({DEF.SEISMIC_RECORD})",
+        "no_default": "no built-in default: it needs pairs off (fopt 0) and time step 0.005 s",
+        "no_default_soil": "no built-in default: it needs time step 0.005 s",
+        "rsin": f"built-in: RG 1.60 H, 0.30 g ({DEF.TARGET_SPECTRUM})",
+        "rsout": DEF.default_output_name(model, "RSOUT", 0).replace("_eq0.", "_eq{i}."),
+        "accout": DEF.default_output_name(model, "ACCOUT", 0).replace("_eq0.", "_eq{i}."),
+    }
 
 
 def stochastic_incoherency(hseed, vseed, randphz) -> bool:
@@ -866,12 +927,25 @@ def values(interp, name: str = "ANALYSIS") -> Dict[str, Any]:
         if cls.KEY:
             indexed_defaults[cmd].pop(cls.KEY[0], None)
     request_defaults = {cmd: request_default(cmd) for cmd in LAYER_REQUESTS if cmd in indexed}
+    # entries shown per key: the default SOIL profile while no SPRO is stored (D-W5-10)
+    spro_dflt = spro_defaults(model)
+    indexed_defaults_by_key = {"SPRO": spro_dflt} if spro_dflt else {}
+    prof_use = DEF.soil_profile(model)[1]
+    lib_dynp = [lab for lab in LIB.dynp_labels() if lab not in dynp] if DEF.enabled(model) else []
     out = {"records": records, "defaults": defaults, "indexed": indexed, "strings": strings, "lists": lists,
            "requests": requests, "wave_defaults": wave_defaults, "wave_defaults_by_wopt": wave_defaults_by_wopt,
            "indexed_defaults": indexed_defaults, "request_defaults": request_defaults,
+           "indexed_defaults_by_key": indexed_defaults_by_key,
            "context": {"dynp": dynp, "groups": groups, "model": model.name, "path": model.path,
                        "layers": sorted(model.layers), "topl": list(model.topl),
-                       "blank_default": {f"{a}.{b}": v for (a, b), v in BLANK_DEFAULT.items()}}}
+                       "blank_default": {f"{a}.{b}": v for (a, b), v in BLANK_DEFAULT.items()},
+                       # built-in inputs (requirements 7.19): the Library picker, the library soil curves the
+                       # model does not define, the placeholders of blank files and the default profile
+                       "library": LIB.catalogue_json(), "dynp_library": lib_dynp,
+                       "input_defaults": input_defaults_context(model),
+                       "spro_default": (_spro_short(spro_dflt) if prof_use is not None else
+                                        "none (SPRO entries are stored)" if get_entries(model, "SPRO") else
+                                        "none (needs TOPL, SITE <hs>, EDUOPT,DEFAULTS,ON)")}}
     # command records outside OPTION_SPECS: SOIL-NON (SOIL tab) and Option NON (NONLINEAR tab)
     out.update(CR.values(model, ANALYSIS_FAMILIES))
     out["context"].update(CR.context(model))
@@ -1159,6 +1233,17 @@ def commit_commands(interp, payload: Dict[str, Any], name: str = "ANALYSIS") -> 
                 notes.append(f"WAVE: the {WAVE_NAMES[int(main)]}-wave field shown on its page (new-model default) is "
                              f"stored with the other wave pages -- once a WAVE entry exists AFWRITE writes only "
                              f"the stored ones")
+        if cmd == "SPRO" and emitted and not stored_map:
+            # No SPRO stored yet: AFWRITE writes the default profile (D-W5-10) only while no SPRO entry exists;
+            # the first stored entry would silently drop it, so the layers the dialog shows are stored with it.
+            dflt = spro_defaults(model)
+            added = [k for k in dflt if k not in emitted]
+            for k in added:
+                emitted[k] = entry_record(k, entries.get(k) or dflt[k])
+            if added:
+                notes.append("SPRO: the default SOIL profile shown on the layer pages (built-in curves, EDU-29) is "
+                             "stored with the layer you changed -- once a SPRO entry exists AFWRITE writes only the "
+                             "stored ones")
         if errors:
             continue
         for key in sorted(emitted, key=lambda s: (len(s), s)):

@@ -43,6 +43,7 @@ from .. import conventions as C
 from ..core import equake_lib as EL
 from ..core import spectra as SP
 from ..io import decks, textfiles, thfile
+from ..io import library as LIB
 from .base import ModuleContext, ModuleError, batch_main
 
 NAME = "EQUAKE"
@@ -67,7 +68,16 @@ class Component:
 
 
 def _resolve(ctx: ModuleContext, name: str) -> Path:
-    p = Path(name)
+    """Input file of the deck: ``@name`` from the built-in library (D-W5-01), else absolute or in the model
+    directory."""
+    return LIB.module_path(name, ctx.workdir)
+
+
+def _resolve_out(ctx: ModuleContext, name: str) -> Path:
+    """Output file of the deck (the built-in library is read-only: Errors 86 / 87)."""
+    if LIB.is_library_name(name):
+        raise ModuleError(f"Error 86/87: output file {str(name).strip()} is a built-in library file (read-only)")
+    p = Path(str(name).strip())
     return p if p.is_absolute() else ctx.workdir / p
 
 
@@ -227,6 +237,8 @@ def _one_spectrum(ctx, d, r, accopt, dt, dur, n, zeta, g_len, ulen, seeds, opts,
             raise ModuleError(f"{r['rsin']}: {exc}")
         L.write(f" Target spectrum  : {r['rsin']} ({len(f)} points, {target.fmin:g} - {target.fmax:g} Hz, "
                 f"damping {zeta:g}); log-log interpolation")
+        if LIB.is_library_name(r["rsin"]):
+            L.write(f"   {LIB.note(r['rsin'])}")
         f_srp = min(50.0, 0.5 / dt)
         if target.fmax < f_srp - 1e-9:
             L.write(f"   above {target.fmax:g} Hz the target is extended at constant SA = {target.sa[-1]:g} g "
@@ -244,6 +256,8 @@ def _one_spectrum(ctx, d, r, accopt, dt, dur, n, zeta, g_len, ulen, seeds, opts,
             raise ModuleError(f"target PSD file {r['tpsd_file']} does not exist")
         tpsd_fn = _psd_function(pp)
         L.write(f" Target PSD       : {r['tpsd_file']} ({ulen}^2/s^3); check >= 80 % over 0.3 - 24 Hz (SRP App. A)")
+        if LIB.is_library_name(r["tpsd_file"]):
+            L.write(f"   {LIB.note(r['tpsd_file'])}")
     elif int(d["tpsd"]):
         L.write(" Target PSD       : none for this spectrum (PSD criterion not checked)")
 
@@ -261,6 +275,8 @@ def _one_spectrum(ctx, d, r, accopt, dt, dur, n, zeta, g_len, ulen, seeds, opts,
                       "the file's own time step is used")
         comp = Component(no, acc, dt_file, target)
         L.write(f" External history : {r['accin']} ({len(acc)} values, dt {dt_file:g} s); no simulation")
+        if LIB.is_library_name(r["accin"]):
+            L.write(f"   {LIB.note(r['accin'])}")
     else:
         if not str(r["accout"]).strip():
             raise ModuleError(f"Error 87: acceleration output file {no} is blank")
@@ -275,6 +291,8 @@ def _one_spectrum(ctx, d, r, accopt, dt, dur, n, zeta, g_len, ulen, seeds, opts,
                 raise ModuleError(f"seed record {r['accin']} does not exist")
             seed_acc = _read_input_history(pin, dt, L)
             L.write(f" Seed record      : {r['accin']} ({len(seed_acc)} values); its Fourier phases are kept")
+            if LIB.is_library_name(r["accin"]):
+                L.write(f"   {LIB.note(r['accin'])}")
         ntrial = 1 if seed_acc is not None else seeds
         if seed_acc is not None and seeds > 1:
             L.write(" (seed-record phases are deterministic: one trial)")
@@ -338,7 +356,7 @@ def _evaluate_and_write(ctx, d, r, comp: Component, zeta, g_len, ulen, tpsd_fn, 
 
     # ---- files
     if accopt != 2:
-        pacc = _with_ext(_resolve(ctx, r["accout"]), ".acc")
+        pacc = _with_ext(_resolve_out(ctx, r["accout"]), ".acc")
         textfiles.write_history(pacc, a, dt)
         vel, dis = SP.integrate(a * g_len, dt)
         textfiles.write_history(pacc.with_suffix(".vel"), vel, dt)
@@ -346,14 +364,15 @@ def _evaluate_and_write(ctx, d, r, comp: Component, zeta, g_len, ulen, tpsd_fn, 
         stem = pacc
         comp.files += [pacc.name, pacc.with_suffix(".vel").name, pacc.with_suffix(".dis").name]
     else:
-        stem = _resolve(ctx, r["accout"]) if str(r["accout"]).strip() else _resolve(ctx, r["accin"])
+        stem = _resolve_out(ctx, r["accout"]) if str(r["accout"]).strip() else \
+            _resolve_out(ctx, LIB.bare(r["accin"]) if LIB.is_library_name(r["accin"]) else r["accin"])
     if str(r["rsout"]).strip() and comp.target is not None:
         band = EL.check_bands(comp.target, dt)["manual"]
         fc = EL.check_grid(*band)
     else:
         fc = EL.check_grid(0.1, min(100.0, 0.5 / dt))
     if str(r["rsout"]).strip():
-        prs = _with_ext(_resolve(ctx, r["rsout"]), ".rso")
+        prs = _with_ext(_resolve_out(ctx, r["rsout"]), ".rso")
         sa = SP.response_spectrum(a, dt, fc, [zeta])["SA"][0]
         textfiles.write_xy(prs, fc, sa, header=f"EQUAKE response spectrum, damping {zeta:g} (f Hz, SA g)")
         comp.files.append(prs.name)

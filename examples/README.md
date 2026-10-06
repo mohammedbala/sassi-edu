@@ -1,6 +1,6 @@
 # SASSI-EDU tutorial examples
 
-Eight small models that run the complete ACS SASSI workflow the way a user runs it: a `.pre` file
+Nine small models that run the complete ACS SASSI workflow the way a user runs it: a `.pre` file
 of ACS SASSI V3 commands builds the model, `CHECK` lists the errors and warnings of the model
 and of the enabled modules, `AFWRITE` writes one input deck per module, and `RUN<MODULE>` runs the
 modules one after the other in the model directory. Each file is commented line by line; read it
@@ -16,6 +16,7 @@ next to the results.
 | `ex06_nonlinear_soil.pre` | loose backfill behind an embedded wall: near-field soil nonlinearity by equivalent-linear SSI iterations | SOIL SITE (x3) POINT HOUSE ANALYS STRESS (x3), then 6 iterations of HOUSE ANALYS (New Structure) STRESS (x3); MOTION | ~5 s |
 | `ex07_option_non.pre` | Option NON: two-storey shear-wall building with cracking wall panels | SITE (x3) POINT HOUSE ANALYS MOTION (x3) RELDISP (x3) NONLINEAR, then 7 iterations; MOTION | 30-120 s |
 | `ex08_embedded_building.pre` | embedded shear-wall building with a two-level basement and a tower: FV against the subtraction (FI-FSIN) and modified subtraction (FI-EVBN) methods | SITE POINT HOUSE ANALYS MOTION STRESS (3 models) | 60-90 s |
+| `ex09_steel_frame.pre` | three-storey braced steel frame (AISC W and HSS shapes, moment frames, composite slabs, equipment) on a 1.2 m RC mat: SSI against a fixed base, ISRS, brace and column forces, storey drifts | SITE POINT HOUSE ANALYS MOTION STRESS RELDISP (x3), 2 models | ~30 s |
 
 `data/` holds the input data:
 
@@ -23,7 +24,7 @@ next to the results.
   to 0.30 g, 5 % damping, 27 frequency / spectral acceleration (g) pairs;
 * `rg160h_030g.acc`: an acceleration history matched to it (EQUAKE, seed 11975, dt 0.005 s,
   20 s, PGA 0.324 g; first line dt, then one value in g per line: MOTION `<fopt>` = 0). It is the
-  control motion of examples 1, 2, 5 and 8, the rock-outcrop motion of example 6 (scaled to 0.30 g) and the
+  control motion of examples 1, 2, 5, 8 and 9, the rock-outcrop motion of example 6 (scaled to 0.30 g) and the
   input of example 7 (scaled to 0.6 g horizontally, 0.4 g vertically). Example 4 generates the same
   kind of record;
 * `ricker_5hz.th`: a Ricker wavelet (5 Hz, peak 1 at t = 0.5 s), the load history of example 3.
@@ -48,11 +49,11 @@ or, from the repository root, give the working directory with `--cwd`:
 Do not run `sassi run examples/ex01_surface_stick.pre` from the repository root without
 `--cwd examples`: the model directory would be created in the repository root (`./ex01`), the
 control-motion file would not be found (CHECK Error 73), and MOTION would be blocked. The results of
-example `exNN` are written to `examples/exNN/` (examples 2 and 8 also write to `examples/ex02_fsin/`,
-`examples/ex02_evbn/`, `examples/ex08_fsin/` and `examples/ex08_evbn/`). Example 6 also reads the soil curves `../sassi/data/dynp_library.pre`, so keep
+example `exNN` are written to `examples/exNN/` (examples 2, 8 and 9 also write to `examples/ex02_fsin/`,
+`examples/ex02_evbn/`, `examples/ex08_fsin/`, `examples/ex08_evbn/` and `examples/ex09_fixed/`). Example 6 also reads the soil curves `../sassi/data/dynp_library.pre`, so keep
 the repository layout. Example 7 leaves about 95 MB in `examples/ex07/` (60 MB of binary inter-module
 files such as the ANALYS restart files `COOTKnnn`, which can be deleted after the run); example 8 about 57 MB
-in its three folders. Each example ends with `WRITE`, which saves the complete model as
+in its three folders, example 9 about 58 MB in its two. Each example ends with `WRITE`, which saves the complete model as
 commands (`examples/exNN/<model>.pre`). `INP` of that file rebuilds the same model.
 
 The same commands can be typed in the console (`sassi`) or the browser GUI (`sassi-gui`); both
@@ -101,7 +102,9 @@ the examples cover the same workflows:
 * ex08: a realistic embedded building (Demo 5 is the manual's reference embedded model): the separate
   meshes of the basement interior and the excavated soil (manual 1.5.1 rule 11, `EXCSTRCHK`), `INTGEN`
   for the FV, FI-FSIN and FI-EVBN sets on one model, and the validation of the reduced sets against FV
-  that the manual's ASCE 4-16 warning asks for.
+  that the manual's ASCE 4-16 warning asks for;
+* ex09: a steel-framed structure (the BEAMS element with real sections, K nodes and end releases) on a
+  surface mat, with the fixed-base reference run of lesson 1 and storey drifts by RELDISP.
 
 ## Example 1: lumped-mass stick on a rigid surface mat
 
@@ -503,14 +506,153 @@ Lesson 11 of the guided course builds this example step by step, shows the soil 
 nodes and a cutaway of the building, animates the FV and FI-FSIN motion at 16 Hz (`HARMFRAME`) and
 discusses the validation a design engineer must document.
 
+## Example 9: a braced steel frame on a reinforced-concrete mat
+
+**Model.** A three-storey steel building of the kind that houses auxiliary systems: 18 m x 12 m in plan
+(column lines 1-4 at x = -9, -3, 3, 9 m and A-C at y = -6, 0, 6 m, 6 m bays), storeys of 5.0, 4.5 and
+4.5 m (roof at 14 m), on a 1.2 m mat of 21 m x 15 m (1.5 m beyond the outer column lines) on the ground
+surface. The lateral system:
+
+* X: concentric X-braces in the end bays of lines A and C, a welded moment frame on line B;
+* Y: X-braces in both bays of lines 1 and 4, welded moment frames on lines 2 and 3;
+* the middle bays are free of braces; every other girder and the floor beams have shear-tab connections.
+
+| Member (group, colour in the 3D view) | Shape (AISC Shapes Database v15.0) | A | Ix | Iy | J | Elements |
+|---|---|---|---|---|---|---|
+| columns, storeys 1-2 (3, blue) | W14x132 | 38.8 in2 | 1530 in4 | 548 in4 | 12.3 in4 | 24 BEAMS |
+| columns, storey 3 (3) | W14x90 | 26.5 | 999 | 362 | 4.06 | 12 |
+| moment-frame girders, lines B, 2, 3 (1, red) | W24x76 | 22.4 | 2100 | 82.5 | 2.68 | 42 |
+| girders of lines A and C (4, orange) | W24x76 | | | | | 36 |
+| edge girders of lines 1 and 4, floor beams on x = -6, 0, 6 (4) | W21x44 | 13.0 | 843 | 20.7 | 0.770 | 60 |
+| braces, storeys 1-2 (2, green) | HSS8x8x1/2 | 13.5 | 125 (0 in the model) | 125 (0) | 204 | 32 |
+| braces, storey 3 (2) | HSS6x6x1/2 | 9.74 | 48.3 (0) | 48.3 (0) | 81.1 | 16 |
+| composite slabs, floors 1-2 (9) and roof (11) | 0.15 m SHELL | | | | | 72 |
+| mat (13, cream) | 1.2 m SHELL, 1.5 m mesh | | | | | 140 |
+
+The R table gets the SI values (1 in = 0.0254 m) with the shear areas As2 = d tw (web) and As3 =
+5/6 x 2 bf tf (flanges). **Orientation.** Local axis 2 of a BEAMS element points to its K node and I3
+goes with bending in the 1-2 plane (spec 08 4.5), so the K node is put on the web side of every W
+shape and I3 = Ix: the columns of line B have their webs along X (strong axis in the X moment frame),
+the others along Y (strong axis in the moment frames of lines 2 and 3), and the girders and beams
+have K 4.5 m above (web vertical; the roof beams use a level of K-only nodes, which are not drawn and
+which AFWRITE fixes). Check: the element matrices of a 5 m W14x132 cantilever with K in +X give a tip
+deflection of 33.777 mm in X and 91.736 mm in Y under 100 kN, equal to P L3/(3 E Ix) + P L/(G d tw)
+and P L3/(3 E Iy) + P L/(G As3); a W24x76 girder along X with K above is stiff vertically (5.72 mm on
+a 3 m cantilever) and flexible sideways (132 mm). **Connections.** Shear tabs release M3 at the
+supported end of each girder or beam (two 3 m elements per member, `KI` on the odd and `KJ` on the
+even elements). The four corner columns are pinned at the base (`KI` releases M2 and M3); the other
+eight are moment-frame columns fixed into the mat (the mat's rotational stiffness at a node,
+1.2E7 kN m/rad, is about 100 times 4EI/L of a W14x132, so no rigid spider is needed). The braces are
+pin-ended axial members: `KI`/`KJ` cannot release the same moment at both ends of an element (CHECK
+Error 10), so their R rows have I2 = I3 = 0 (a truss member, as LINK180 in ANSYS); the two diagonals
+of an X-brace cross without a node. **Slabs.** The 0.15 m SHELL slabs (the average concrete
+thickness of a 75 mm deck with 115 mm of concrete above the ribs) share the beam nodes, so they are
+the diaphragms but not composite with the beams: the floor vertical frequencies are lower bounds.
+`FIXROT` fixes the drilling rotation of the shell-only mat nodes and `D` that of the twelve column
+bases (without it, local torsion modes of these nodes appear at 7-13 Hz); the floor nodes get their
+stiffness about Z from the beams (only M3 is released). `WINDOWSETTINGS,HIDEGROUP` hides the slabs
+in the 3D views (display only), so the picture shows the steel frame on the mat.
+
+Materials: mat concrete E = 30 GPa (f'c 40 MPa), slabs 25 GPa (f'c 28 MPa), steel E = 200 GPa,
+nu = 0.3, 7.85 t/m3. Damping is hysteretic and per element, from ASCE 4-16 Table 3-2 at response
+level 1 (the level of the concrete values the manual quotes in its Damping Cutoff note, as in
+ex08): concrete 4 %, welded steel 2 % (columns and moment-frame girders), bearing-bolted steel 4 %
+(braces, shear-tab girders and beams). The slab weights carry the superimposed loads: floors 6.45 kPa
+(slab and deck 3.7, services 1.5, 25 % of a 5 kPa live load), roof 5.55 kPa (slab and deck 3.7,
+roofing and services 1.1, 75 % of a 1 kPa snow load). Equipment (`MT`, placed symmetrically): two
+30 t heat exchangers on the line B girders of floor 1, four 10 t cabinets on the girders of lines 2 and
+3 of floor 2, two 12 t air-handling units on the roof. CALCM and HOUSE: **1545.7 t** (mat 924.8 t,
+slabs 406.2 t, steel 90.7 t, equipment 124 t); 611 t act at the three floor levels (235, 211, 166 t).
+
+The site: 6 m of medium-dense sand (Vs 250 m/s), 12 m of dense sand and gravel (Vs 400 m/s), 12 m of
+very dense gravel (Vs 600 m/s) on rock (Vs 1500 m/s), 24 TOPL layers. The 165 mat nodes are the
+interaction nodes (495 DOFs); the 1.5 m mesh passes Vs/(5h) = 250/(5 x 1.5) = 33 Hz, above the 30 Hz
+cut-off. 97 SSI frequencies: 0.1 Hz, every 0.5 Hz to 2.5 Hz, every 0.098 Hz from 3.0 to 5.0 Hz (the
+sharp peaks of a frame with 2-4 % damping), every 0.25 Hz to 14 Hz and every 0.5 Hz to 30 Hz. Input:
+the RG 1.60 record as a vertically incident SV wave, control motion in X at the free surface. Model 2
+(`ex09fb`, results in `ex09_fixed/`) is the same frame on a practically rigid site (all layers Vs =
+10,000 m/s), the fixed-base reference of lesson 1.
+
+**Look at.**
+* `ex09/00253TR_X.TFI` against `ex09_fixed/00253TR_X.TFI`: the roof transfer function with and without
+  SSI; `00183TR_X` and `00218TR_X` the floors, `00083TR_X` the mat centre.
+* `00nnnTR_X01.RS` (2 %) and `...02.RS` (5 %): the ISRS at the mat centre (83), the floor centres (183,
+  218), the roof (253), the heat exchanger (185) and the air-handling unit (255).
+* `00076TR_Z` and `00090TR_Z` (mat edges, rocking), `00017TR_Z` and `00021TR_Z` (the bases of columns A1
+  and A2, a braced bay), `00185TR_Z` and `00255TR_Z` (vertical response at the equipment).
+* `BEAMS_002_0000k_FXI.THS`: the axial force of the storey-1 braces of line A (1-4) and of one brace in
+  storeys 2 (17) and 3 (33); `BEAMS_003_00001_FXI.THS` / `00002` (axial force of the braced-frame
+  columns A1 and A2), `BEAMS_003_00005_FYI` / `_MZI.THS` (shear and strong-axis moment at the base of
+  the moment-frame column B1); `ex09_STRESS.out` lists the maxima.
+* `00183TR_X.THD`, `00218TR_X.THD`, `00253TR_X.THD`: the inter-storey drifts (each floor relative to the
+  floor below: three RELDISP runs with `RELFILE` = the `.TFI` of the floor below).
+
+**Model checks.**
+* CHECK: no error and no warning for either model. `INTCOUNT`: 165 interaction nodes. `FIXEDINT` and
+  `KINT` find nothing. `HINGED` lists four nodes where a single column meets coplanar shells (the bases
+  and roof tops of B2 and B3): the column's torsion cannot pass into a shell. The bases have ROTZ fixed,
+  at the roof the moment-frame girders carry it; nothing is hinged. CPMODEL warns that the copy has
+  the name of the original until `MDL` renames it (as in lesson 1).
+* At 0.1 Hz every transfer function is 1.000 (largest deviation 0.08 %), the vertical ones 0.
+* Fixed-base frequencies (an eigenvalue analysis of the HOUSE matrices `COOSK`/`COOSM` with the mat
+  nodes clamped, done outside the program): X 4.38 Hz (85 % of the mass above the mat), Y 4.84 Hz (88 %),
+  torsion 8.35 Hz, floor vertical modes 7.2-9.8 Hz, second X mode 11.8 Hz (12 %); 99.9 % of the X mass
+  is in modes below 20 Hz. The rigid-site run peaks at 4.37 Hz, the computed frequency next to 4.38 Hz.
+* The model is doubly symmetric: braces 1 and 4 (and 2 and 3) have the same forces, the four corner
+  columns the same axial force, and the mat edges move vertically in antiphase (sum 2E-14 of either).
+* **Brace forces against a hand estimate.** The floor-centre accelerations times the level masses give
+  a base shear of 5928 kN with SSI (0.99 times the weight above the mat) and 5623 kN on the fixed base.
+  If the 8 storey-1 X-braces carried all of it, each would carry V/(8 cos theta) with cos theta =
+  6/7.81 = 0.768: 965 and 915 kN. The computed maxima are 934 and 887 kN (97 %): at the instant of the
+  peak shear the braces carry 95 % of it, the moment frames the rest. 934 kN is about 0.4 of the design
+  compression strength of an HSS8x8x1/2 with a 3.9 m buckling length (AISC 360, Fy 345 MPa: 2240 kN),
+  consistent with response level 1.
+
+**Expected results** (`tests/integration/test_examples.py`, marked `slow`):
+* Run time about 30 s for the two models (ANALYS 6 s and MOTION 7 s each); about 58 MB in `ex09/` and
+  `ex09_fixed/` (FILE2 alone is 16 MB per model).
+* **Frequency shift.** Roof X transfer function: **20.2 at 4.37 Hz** on the fixed base, **18.3 at
+  3.98 Hz** with SSI (-9 % in frequency and in amplitude). The mat moves 1.45 times the free field at
+  3.9 Hz, and it rocks: its edges move 0.67 vertically per unit control motion at 3.98 Hz. The
+  steel's 2-4 % damping gains little radiation damping, because rocking radiates little at 4 Hz.
+* **ISRS** (X; SSI against fixed base). Zero-period accelerations: mat 0.362 g against 0.325 g (the
+  free field, PGA 0.324 g), floor 1 0.661 / 0.671 g, floor 2 1.018 / 1.017 g, roof **1.626 / 1.581 g**.
+  5 % peaks: floor 1 3.92 / 3.73 g, floor 2 7.22 / 6.94 g, roof **10.38 g at 4.07 Hz / 10.04 g at
+  4.27 Hz** (+3 to +5 %). 2 % peaks: 7.56 / 6.11 g, 14.25 / 11.01 g, roof **20.57 / 15.59 g** (+24 to
+  +32 %): the 2 % spectrum of this record has a peak at 4.07 Hz (1.54 g against 1.35 g at 4.38 Hz)
+  onto which the SSI frequency moves. The equipment nodes follow their floors (heat exchanger 3.93 g,
+  air-handling unit 10.41 g at 5 %).
+* **Vertical response under X input.** Fixed base: 0.25 at the heat exchanger (12.5 Hz) and 0.64 at
+  the air-handling unit (8.7 Hz), from the overturning of the frame. With SSI the mat rocking excites
+  the floor-1 vertical mode: 0.38 at 7.25 Hz at the heat exchanger (5 % ISRS 0.17 g against 0.12 g),
+  while the roof unit drops to 0.41 (0.24 g against 0.27 g).
+* **Member forces** (maxima, SSI / fixed base): storey-1 braces **934 / 887 kN** (+5 %), storey 2 702 /
+  684 kN, storey 3 390 / 381 kN; braced-frame columns A2 1801 / 1774 kN and A1 1453 / 1443 kN axial;
+  moment-frame column B1 669 / 576 kN axial, 46.7 / 41.5 kN shear and 146 / 131 kN m at the base; B2
+  176 / 148 kN m; the line B girder at B1 44 / 37 kN and 141 / 127 kN m. The braces carry axial force
+  only; the pinned bases carry no moment.
+* **Drifts** (RELDISP, each floor relative to the floor below): **7.94, 7.71 and 7.43 mm** with SSI
+  (drift ratios 0.16-0.17 %) against 6.54, 6.65 and 6.40 mm on the fixed base (+21, +16, +16 %), while
+  the braces carry only 2-5 % more. The difference is foundation rocking: the bases of the braced bay
+  A1-A2 move 0.87 and 0.41 mm vertically, more than the rigid rocking of the mat (the 1.2 m mat bends
+  under the braced-frame columns); the rotation of the bay times 5 m is 1.07 mm, and the storey-1 drift
+  without it is 6.87 mm, 5 % above the fixed base like the brace forces. Pipes and ducts between floors
+  see the total drift, the braces only the racking.
+
+**What it shows.** For a light steel frame on a heavy mat, SSI lowers the frequency by about 10 % and
+hardly reduces the peaks, because the structure has little damping and rocking radiates little energy.
+Whether the ISRS and member forces go up or down then depends on the input spectrum at the two
+frequencies, which is why design ISRS are enveloped over soil cases and broadened. The drifts include
+rocking of the foundation that the fixed-base model does not have.
+
 ## Tests
 
-* `tests/integration/test_examples.py` runs examples 1-5 and 8 in a temporary copy, through the
+* `tests/integration/test_examples.py` runs examples 1-5, 8 and 9 in a temporary copy, through the
   interpreter as `sassi --cwd examples run` does. It asserts that every module finishes with
   status OK, checks the key results above (with physically motivated bounds), checks that
   `WRITE` -> `INP` gives back the same model for every model of every example, and checks the
-  documented `--cwd` command line. The example 4 and 8 tests are marked `slow` (EQUAKE; three ANALYS
-  runs).
+  documented `--cwd` command line. The example 4, 8 and 9 tests are marked `slow` (EQUAKE; three ANALYS
+  runs; two models of 97 frequencies).
 * `tests/unit/test_nlsoil_example.py` runs example 6: a clean run, the convergence history, the
   wall-top spectrum and the `WRITE` -> `INP` round trip.
 * `tests/unit/test_nonlinear_example.py` runs example 7 (marked `slow`): a clean run, the panels and

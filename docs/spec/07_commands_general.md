@@ -203,6 +203,8 @@ The Analysis dialog tabs share variables: changing one in any tab changes it eve
 | 2 | `<file>` | path of the simulated acceleration history (`.acc`). `.vel` and `.dis` take the same base name. |
 
 - **Checks:** Error 87 if blank for a defined spectrum.
+- **SASSI-EDU:** a blank ACCOUT of a spectrum that runs is `<model>_eq<no>.acc` in the model folder, reported as
+  Warning EDU-29 (requirements §7.19, D-W5-08; `EDUOPT,DEFAULTS,OFF` restores Error 87).
 - **Example:** `ACCOUT,1,C:\SSI\Demo1\H1.acc`
 
 ### 9.2.3 AFWRITE — write analysis (module input) files  [IO][CORE]
@@ -660,10 +662,13 @@ The syntax line spells the 3rd argument `<gammmaZ>`; the argument list spells it
 ### 9.2.26 RSIN — target response-spectrum input file (EQUAKE)  [IO]
 **Syntax:** `RSIN,<no>,<file>`. `<no>` = spectrum number (1–3). `<file>` = target RS file: 2 columns (frequency, spectral acceleration) at the damping given by `EQUAKE <damp>`; record count = `<nrfreq>`.
 - **Checks:** Error 84 (all three blank), Error 85 (file missing), Error 89 (record count ≠ nrfreq).
+- **SASSI-EDU:** with all three blank, RSIN 1 is the built-in RG 1.60 H spectrum `@rg160h_030g.rsi` (0.30 g, 5 %,
+  27 rows), reported as Warning EDU-29 (requirements §7.19, D-W5-07); `@<file>` names a built-in file (LIBRARY).
 - **Example:** `RSIN,1,C:\SSI\Demo1\H1.rsi`
 
 ### 9.2.27 RSOUT — response-spectrum output file (EQUAKE)  [IO]
-**Syntax:** `RSOUT,<no>,<file>` (also `RSOU`). Output RS of the generated motion (`.rso`). Error 86 if blank.
+**Syntax:** `RSOUT,<no>,<file>` (also `RSOU`). Output RS of the generated motion (`.rso`). Error 86 if blank
+(SASSI-EDU: `<model>_eq<no>.rso`, Warning EDU-29, requirements §7.19, D-W5-08).
 **Example:** `RSOUT,1,C:\SSI\Demo1\H1.rso`
 
 ### 9.2.28 SACC — acceleration output for a SOIL sublayer  [IO]
@@ -777,6 +782,9 @@ The syntax line spells the 3rd argument `<gammmaZ>`; the argument list spells it
 
 - Error 95 if no dynamic properties are assigned. Error 19 if the L layer is undefined.
 - For nonlinear SSI, the SOIL and SITE soil properties must be consistent.
+- **SASSI-EDU** (requirements §7.19, D-W5-09/10, Warning EDU-29): the labels Clay, Sand and Rock resolve to built-in
+  SHAKE91 curves when no DYNP of the model defines them; with no SPRO entry at all SOIL uses a default profile
+  (the TOPL layers with Sand / Rock by Vs, the SITE half-space last).
 - **Example:** `SPRO,1,2,Sand` / `SPRO,2,2,Sand` / `SPRO,3,3,Clay`
 
 ### 9.2.34 SRS — SOIL response-spectrum output  [IO]
@@ -857,6 +865,9 @@ The syntax line spells the 3rd argument `<gammmaZ>`; the argument list spells it
 **Syntax:** `THFILE,<file>` (also `THFI`). Sets the control-motion acceleration file used by SOIL, MOTION, STRESS and RELDISP ("File" in those tabs).
 - Error 73 if it does not exist.
 - Format per MOTION `<fopt>` and SOIL `<header>`/`<nrval>`. Values in g.
+- **SASSI-EDU** (requirements §7.19, D-W5-03 to D-W5-06): `@<file>` names a built-in file; a blank THFILE is
+  `@rg160h_030g.acc` (seismic, SOIL) or `@ricker_5hz.th` (ANALYS `<type>` 1) when `<fopt>` = 0 and Δt = 0.005 s,
+  reported as Warning EDU-29; `EDUOPT,DEFAULTS,OFF` restores Error 73.
 - **Example:** `THFILE,C:\SSI\Demo1\H1.acc`
 
 ### 9.2.41 THTIT — time-history title  [UI]
