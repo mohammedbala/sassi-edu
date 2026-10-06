@@ -273,8 +273,12 @@ class Interpreter:
         self.session: Dict[str, Any] = {}
         #: commands accepted from the keyboard (GUI replay, L17)
         self.history: List[str] = []
-        #: GUI progress hook: progress(current_line, total_lines, source)
-        self.progress: Optional[Callable[[int, int, str], None]] = None
+        #: GUI progress hook: progress(current_line, total_lines, source, command_line) -- called before the
+        #: line of an INP / macro file is executed
+        self.progress: Optional[Callable[[int, int, str, str], None]] = None
+        #: GUI hook for module runs in this interpreter (RUN<MODULE> inside an INP file):
+        #: module_progress(module, fraction, text), the progress the module reports (ANALYS: frequency k/n ...)
+        self.module_progress: Optional[Callable[[str, float, str], None]] = None
         self.write_options: Dict[str, Any] = {"mdl": False, "afwr": False}
         self._summaries: List[RunSummary] = []
         self._direct = False
@@ -538,7 +542,7 @@ class Interpreter:
             for i, line in enumerate(lines, start=1):
                 frame.line = i
                 if self.progress is not None:
-                    self.progress(i, total, summary.source)
+                    self.progress(i, total, summary.source, line)
                 self._direct = True
                 self.execute(line)
                 self._direct = False

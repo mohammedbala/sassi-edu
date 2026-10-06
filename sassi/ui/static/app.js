@@ -124,6 +124,7 @@ const SASSI = (() => {
   function setBusy(d) {
     S.busy += d;
     $("#cmd").classList.toggle("busy", S.busy > 0);
+    if (S.busy === 0 && S.activity) S.activity.onIdle();
     if (S.busy > 0) S.status("Running ...");
     else if (!S.state || !S.state.job) {
       S.progress(null);
@@ -135,19 +136,34 @@ const SASSI = (() => {
   const HIST_MAX = 30000;
   const PREFIX = {ECHO: "> ", WARNING: "*** WARNING: ", ERROR: "*** ERROR: "};
   S.historyEl = null;
+  /* Lines are appended in batches: a module run streams thousands of listing lines, and measuring the scroll
+   * position for every line forces a layout each time (seconds per batch on a long history, during which the
+   * page cannot repaint -- the activity panel froze).  A batch is flushed once the current events have been
+   * handled (a microtask): one measure, one append, one scroll. */
+  let pendingLines = null;
   S.appendMessage = function (kind, text) {
-    const h = S.historyEl;
-    if (!h) return;
-    const sc = h.parentElement;
-    const atEnd = sc.clientHeight ? sc.scrollTop + sc.clientHeight >= sc.scrollHeight - 30 : (!S.historyAtEnd || S.historyAtEnd());
+    if (!S.historyEl) return;
     const div = document.createElement("div");
     div.className = "m-" + kind;
     div.textContent = (PREFIX[kind] || "") + text;
     if (kind === "ECHO") { div.dataset.line = text; div.title = "click: explain this command"; }
-    h.appendChild(div);
-    while (h.childNodes.length > HIST_MAX) h.removeChild(h.firstChild);
-    if (atEnd) h.parentElement.scrollTop = h.parentElement.scrollHeight;
+    if (!pendingLines) {
+      pendingLines = document.createDocumentFragment();
+      queueMicrotask(flushMessages);
+    }
+    pendingLines.appendChild(div);
   };
+  function flushMessages() {
+    const h = S.historyEl, frag = pendingLines;
+    pendingLines = null;
+    if (!h || !frag) return;
+    const sc = h.parentElement;
+    const atEnd = sc.clientHeight ? sc.scrollTop + sc.clientHeight >= sc.scrollHeight - 30 : (!S.historyAtEnd || S.historyAtEnd());
+    h.appendChild(frag);
+    const extra = h.childNodes.length - HIST_MAX;
+    for (let i = 0; i < extra; i++) h.removeChild(h.firstChild);
+    if (atEnd) sc.scrollTop = sc.scrollHeight;
+  }
   /** A GUI-side message (not from the interpreter). */
   S.local = function (kind, text) { S.appendMessage(kind === "ERROR" || kind === "WARNING" ? kind : "LOCAL", text); };
   S.applyDisplayFilters = function () {
@@ -560,6 +576,7 @@ const SASSI = (() => {
     }
   }
   function onJobEvent(job) {
+    if (S.activity) { try { S.activity.onJob(job); } catch (e) { console.error(e); } }
     S.state.job = ["starting", "running"].includes(job.state) ? job : null;
     // a job started by typed command text (RUNSITE in Command Entry, commands after it) gets its tab
     if (S.state.job && !S.jobs[job.id] && job.kind === "module") S.openJobTab(job);
@@ -643,6 +660,7 @@ const SASSI = (() => {
   }
   S.refreshState = refreshState;
   function handleEvent(ev) {
+    if (S.activity) { try { S.activity.onEvent(ev); } catch (e) { console.error(e); } }   // the activity panel
     switch (ev.type) {
       case "message": S.appendMessage(ev.kind, ev.text); break;
       case "plot": P().onEvent(ev); break;

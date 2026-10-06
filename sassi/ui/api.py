@@ -178,6 +178,7 @@ class GuiSession:
         self.start_dir = Path(self.interp.cwd)      # sassi-gui --model-dir: stays an allowed file root
         self.interp.sink.subscribe(self._on_message)
         self.interp.progress = self._on_progress
+        self.interp.module_progress = self._on_module_progress
         self.plots = plot_state(self.interp)
         self.plots.auto_render = False            # the browser draws the plots (Plotly)
         self.plots.dialog_handler = self._dialog_handler
@@ -193,6 +194,7 @@ class GuiSession:
         self.started = time.time()
         self._collect: Dict[int, List[Dict[str, Any]]] = {}
         self._last_progress = 0.0
+        self._last_module_progress = 0.0
         self.shutdown: Optional[Callable[[], None]] = None
         self.helpdocs = HelpDocs()                # Help > Help: the project documentation (5.3)
         # Learn: the guided course (lesson files, examples) and the lesson of this session
@@ -209,12 +211,41 @@ class GuiSession:
         if lst is not None:
             lst.append(ev)
 
-    def _on_progress(self, line: int, total: int, source: str) -> None:
+    def _on_progress(self, line: int, total: int, source: str, cmd: str = "") -> None:
+        """An INP / macro file is about to execute ``line`` of ``total`` (``cmd``): a progress event (at most
+        every 0.15 s, always for the first and last line and for the commands that start a module or write and
+        check the decks) with the command, its canonical name and its one-line meaning (the command
+        explainer), for the status bar and the activity panel (static/activity.js)."""
         now = time.time()
-        if line in (1, total) or now - self._last_progress > 0.15:
+        text = (cmd or "").strip()
+        name = ""
+        if text and not is_comment(text):
+            try:
+                spec = lookup(split_head(text)[0])
+            except Exception:                    # noqa: BLE001 - a line the interpreter will report itself
+                spec = None
+            name = spec.name if spec is not None else ""
+        notable = name.startswith("RUN") or name in ("AFWRITE", "CHECK", "INP", "VERIFY")
+        if line in (1, total) or notable or now - self._last_progress > 0.15:
             self._last_progress = now
+            what = ""
+            if name:
+                try:
+                    what = str(explainer.explain(name).get("meaning") or "")
+                except Exception:                # noqa: BLE001 - the panel then shows the command only
+                    what = ""
             self.events.push("progress", line=line, total=total, source=source,
-                             fraction=(line / total) if total else 1.0, text=f"{source}: line {line} / {total}")
+                             fraction=(line / total) if total else 1.0, text=f"{source}: line {line} / {total}",
+                             cmd=text[:160], name=name, what=what[:200])
+
+    def _on_module_progress(self, module: str, fraction: float, text: str) -> None:
+        """A module run in this interpreter (RUN<MODULE> inside an INP file) reports its progress (ANALYS:
+        frequency k/n ...): a progress event of kind "module", at most every 0.15 s and at its end."""
+        now = time.time()
+        if fraction >= 1.0 or now - self._last_module_progress > 0.15:
+            self._last_module_progress = now
+            self.events.push("progress", kind="module", module=str(module).upper(),
+                             fraction=max(0.0, min(1.0, float(fraction))), text=str(text))
 
     def _on_plot(self, ev) -> None:
         self.events.push("plot", **ev.to_dict())

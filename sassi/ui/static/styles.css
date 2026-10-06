@@ -604,3 +604,77 @@ button.linkish { border: 0; background: none; color: var(--learn-accent); cursor
 #lessondock.full .lfig { padding: 10px 14px 10px; }
 #lessondock.full .lfig-cap .doc.lesson-md { font-size: 14px; }
 @media (prefers-reduced-motion: reduce) { .lfig-eqt { transition: none; } }
+
+/* ---- activity panel: what an input file or a module run is doing (static/activity.js) ---- */
+.activity { position: fixed; right: 16px; bottom: 78px; z-index: 900; width: min(380px, calc(100vw - 32px));
+  background: var(--panel, #fff); border: 1px solid var(--border, #c5cbd3); border-left: 4px solid var(--learn-accent, #1f5fbf);
+  border-radius: 8px; box-shadow: 0 8px 28px rgba(15, 30, 60, .22); padding: 10px 12px 8px; font-size: 13px;
+  opacity: 0; transform: translateY(12px); transition: opacity .25s ease, transform .25s ease; }
+.activity.in { opacity: 1; transform: none; }
+.activity.leaving { opacity: 0; transform: translateY(8px); }
+.activity[hidden] { display: none; }
+.activity.done { border-left-color: var(--learn-ok, #2e7d32); }
+.activity.failed { border-left-color: var(--danger, #c62828); }
+.act-head { display: flex; align-items: center; gap: 8px; }
+.act-title { flex: 1; font-weight: 650; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.act-time { color: var(--muted, #5d6774); font-variant-numeric: tabular-nums; font-size: 12px; }
+.act-x { border: 0; background: none; font-size: 16px; line-height: 1; color: var(--muted, #5d6774); cursor: pointer; padding: 0 2px; }
+.act-x:hover { color: var(--danger, #c62828); }
+.act-spin { width: 14px; height: 14px; flex: none; border-radius: 50%; border: 2px solid var(--border-2, #dde1e6);
+  border-top-color: var(--learn-accent, #1f5fbf); animation: act-spin .8s linear infinite; }
+.activity.done .act-spin, .activity.failed .act-spin { animation: none; border: 0; display: grid; place-items: center;
+  background: var(--learn-ok, #2e7d32); }
+.activity.failed .act-spin { background: var(--danger, #c62828); }
+.activity.done .act-spin::after { content: "✓"; color: #fff; font-size: 10px; font-weight: 700; }
+.activity.failed .act-spin::after { content: "!"; color: #fff; font-size: 10px; font-weight: 700; }
+@keyframes act-spin { to { transform: rotate(360deg); } }
+.act-bar { position: relative; height: 6px; margin: 8px 0 3px; background: var(--border-2, #dde1e6); border-radius: 3px; overflow: hidden; }
+.act-bar > div { position: relative; height: 100%; width: 0; background: var(--learn-accent, #1f5fbf); border-radius: 3px;
+  transition: width .3s ease; overflow: hidden; }
+.act-bar > div::after { content: ""; position: absolute; inset: 0; background: linear-gradient(90deg, transparent, rgba(255,255,255,.55), transparent);
+  transform: translateX(-100%); animation: act-shine 1.4s ease-in-out infinite; }
+.activity.done .act-bar > div { background: var(--learn-ok, #2e7d32); }
+.activity.failed .act-bar > div { background: var(--danger, #c62828); }
+.activity.done .act-bar > div::after, .activity.failed .act-bar > div::after { animation: none; }
+@keyframes act-shine { to { transform: translateX(100%); } }
+.act-line { color: var(--muted, #5d6774); font-size: 11.5px; font-variant-numeric: tabular-nums; min-height: 14px; }
+.act-nowrow { display: flex; gap: 6px; align-items: baseline; margin-top: 6px; }
+.act-k { flex: none; font-size: 10.5px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted, #5d6774); }
+.act-now { line-height: 1.35; }
+.act-now.flash { animation: act-fade .35s ease; }
+@keyframes act-fade { from { opacity: 0; transform: translateX(-4px); } to { opacity: 1; transform: none; } }
+.act-cmd { display: block; margin: 3px 0 0 34px; font: 11.5px var(--mono, monospace); color: #3d4a5a; white-space: nowrap;
+  overflow: hidden; text-overflow: ellipsis; }
+.act-cmd[hidden] { display: none; }
+.act-mod { display: flex; align-items: center; gap: 8px; margin: 6px 0 0 34px; }
+.act-mod[hidden] { display: none; }
+.act-mod-bar { flex: 0 0 90px; height: 4px; background: var(--border-2, #dde1e6); border-radius: 2px; overflow: hidden; }
+.act-mod-bar > div { height: 100%; width: 0; background: #e08a00; transition: width .25s ease; }
+.act-mod-t { font-size: 11.5px; color: #3d4a5a; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.act-chain { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 8px; }
+.act-chain:empty { display: none; }
+.act-chip { display: inline-flex; align-items: center; gap: 4px; padding: 2px 7px 2px 6px; border-radius: 11px; font-size: 11px;
+  border: 1px solid var(--border-2, #dde1e6); background: var(--panel-2, #f6f7f9); animation: act-pop .25s ease; }
+.act-chip-n { font-weight: 650; letter-spacing: .02em; }
+.act-chip-s { color: var(--muted, #5d6774); font-variant-numeric: tabular-nums; }
+.act-chip-dot { width: 7px; height: 7px; border-radius: 50%; background: #9aa5b1; }
+.act-chip.run { border-color: #f0b44c; background: #fff7e8; }
+.act-chip.run .act-chip-dot { background: #e08a00; animation: act-pulse 1s ease-in-out infinite; }
+.act-chip.ok { border-color: #a9d5ad; background: #eef8ef; }
+.act-chip.ok .act-chip-dot { background: var(--learn-ok, #2e7d32); }
+.act-chip.fail { border-color: #e7a3a3; background: #fdeeee; }
+.act-chip.fail .act-chip-dot { background: var(--danger, #c62828); }
+@keyframes act-pulse { 50% { transform: scale(1.6); opacity: .45; } }
+@keyframes act-pop { from { transform: scale(.6); opacity: 0; } to { transform: none; opacity: 1; } }
+.act-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 8px; }
+.act-counts { font-size: 11.5px; color: var(--muted, #5d6774); }
+.act-counts.warn { color: #9a6200; }
+.act-counts.bad { color: var(--danger, #c62828); font-weight: 600; }
+.activity.is-job .act-line { display: none; }
+@media (prefers-reduced-motion: reduce) {
+  .activity, .act-now.flash, .act-chip { transition: none; animation: none; }
+  .act-spin, .act-chip.run .act-chip-dot, .act-bar > div::after { animation: none; }
+}
+.act-mod.indet .act-mod-bar > div { width: 35% !important; animation: act-indet 1.1s ease-in-out infinite; }
+@keyframes act-indet { from { transform: translateX(-100%); } to { transform: translateX(290%); } }
+@media (prefers-reduced-motion: reduce) { .act-mod.indet .act-mod-bar > div { animation: none; } }

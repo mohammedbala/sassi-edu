@@ -476,6 +476,17 @@ shell, in the model folder, with the three-line batch protocol on its standard i
 The same preconditions apply as for the built-in module: MDL set, the input deck written by AFWRITE,
 and no CHECK error for that module in the last AFWRITE.
 
+**The activity panel.** While an input file runs (`INP`: Model > Input, Run (INP) in the File Editor, an
+example's *Run all*, a lesson step) or a module runs, a panel at the bottom right shows what is happening:
+the file and its progress (line *k* of *n*), the command being executed in plain words (from the command
+explainer, e.g. *Generating nodes*, *Writing the module input files*), the module running with its own
+progress (*ANALYS: frequency 14/22 (7.0 Hz)*; an animated bar for a module that reports none), one chip
+per module run (green with its time, *x n* when it runs several times, as in nonlinear iterations; red
+when it failed), the elapsed time and the warning and error counts. A clean run fades out after a few
+seconds; with errors the panel stays, and **Command History** jumps to the first error. **x** hides it (the
+run goes on). The panel only reads the session's events (it sends no command). Long module listings are
+added to the Command History in batches, so the page stays responsive during long runs.
+
 ### 7.1 ANSYS Eq. Static Load and ANSYS Dynamic Load (Option A, LOADGEN)
 
 The two Modules-menu dialogs of spec 04 section 15.6 (manual 6.4.15), with the SASSI-EDU settings of

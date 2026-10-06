@@ -255,7 +255,9 @@ def run_command(c, module: str) -> None:
         raise CommandReported(f"{module}: prerequisites missing")
     from ...modules.base import run_module
     c.info(f"RUN{module}: model {m.name} in {mdir}")
-    rc = run_module(module, m.name, mdir, echo=lambda line: c.info(line))
+    hook = c.interp.module_progress          # the GUI's progress panel (a worker process passes its own)
+    rc = run_module(module, m.name, mdir, echo=lambda line: c.info(line),
+                    progress=(lambda f, msg: hook(module, f, msg)) if hook is not None else None)
     listing = mdir / f"{m.name}_{module}.out"
     if rc != 0:
         c.fail(f"{module} finished with status FAILED ({rc}); see {listing.name}")
