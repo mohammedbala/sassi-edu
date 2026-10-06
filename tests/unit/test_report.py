@@ -163,7 +163,7 @@ def test_decisions_and_lead_sections():
     assert [h.split()[0] for h, _, _ in lead] == ["7.16", "7.17", "7.18", "7.19", "7.20"]
     assert any(d.id == "D-W3-05" for d in lead[2][2])
     assert any(d.id == "D-W5-12" for d in lead[3][2])          # built-in inputs and defaults (wave 5)
-    assert [d.id for d in lead[4][2]] == ["D-W6-01", "D-W6-02", "D-W6-03", "D-W6-04", "D-W6-05", "D-W6-06"]   # display aids
+    assert [d.id for d in lead[4][2]] == [f"D-W6-{k:02d}" for k in range(1, 11)]   # display aids
     assert rep.lead_sections_text(["7.16", "7.17"]) == "7.16 and 7.17"
     assert rep.lead_sections_text(["7.16", "7.17", "7.18"]) == "7.16 to 7.18"
     assert all(len(rows) >= 10 for _, _, rows in lead[:4])

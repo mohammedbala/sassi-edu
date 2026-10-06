@@ -102,10 +102,13 @@ so a browser never mixes files of two builds.
 
 ## What the web version cannot do
 
-* **Files live in the browser tab.** The workspace (`/home/pyodide/work`) is in memory: a reload or
-  closing the tab starts afresh. Your course progress is kept (browser storage). Use **File > Upload to
-  Workspace...** and **File > Download...** to copy text files in and out; binary files (FILE1 ... FILE8,
-  `.sdb`) cannot be transferred.
+* **Files are kept in the browser, not on disk.** The workspace (`/home/pyodide/work`) and the settings
+  folder are IndexedDB file systems (`web/worker.js`): restored at the start, saved after every change and
+  when the page is hidden; **File > Clear Saved Files...** deletes them. The models in memory are lost on a
+  reload (Model > Save keeps one). Text files go in through **From your computer…** in every file dialog or
+  **File > Upload to Workspace...**, and out through **File > Download...** (Model > Output, Export Table,
+  Export to ANSYS and Export Image download what they write); binary files (FILE1 ... FILE8, `.sdb`) cannot
+  be transferred.
 * **No Cancel of a running module.** Module runs execute in the Python engine of the page, one at a time;
   their listing and progress are shown live, and other requests wait until the run ends.
 * **Not available:** Model > Exit, Modules > Location (external module executables), anything that needs a

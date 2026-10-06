@@ -57,10 +57,10 @@ The same GUI also runs with no installation at all, entirely in a web browser: s
 | Model  File  Plot  Modules  Options  View  Learn  Help                               |
 | [main toolbar: new open save output converters capture plots animations options .. ]|
 | [3D Plot toolbar: view centre wireframe shrink G M P labels DOF mass pause debug]   |
-| Command History | Learn | Model 0 - Model Plot | Spectrum Plot | SITE out | Lesson    |
-|                                                                         | panel     |
-|                    tabbed document area                                 | (Learn,   |
-|                                                                         |  docked)  |
+| Command History | Learn | Lesson | SITE out  || Model 0 - Model Plot | Results | Lesson    |
+|                                           ||                          | panel     |
+|   work: history, lessons, editors,        ||  plots and the Results   | (Learn,   |
+|   module output                           ||  browser (split view)    |  docked)  |
 | live argument hint: NGEN,itim,[step],n1,... (Learn)                                  |
 | Command Entry [ N,1,0,0,0                                                     ] [?] |
 | status text                     Model 0 | 30 nodes, 14 elements | cwd ...  [====]   |
@@ -77,11 +77,18 @@ The same GUI also runs with no installation at all, entirely in a web browser: s
 * **Status bar.** It shows the progress of `INP` (current line / total lines), of module runs
   (for example `ANALYS: frequency 14/22 (7.007 Hz)`) and of `PROCFRAME`. A **Cancel** button appears
   while a module is running.
-* **Tabs.** Plots open as tabs named like `Model 0 - Model Plot` or `Spectrum Plot - <title>`.
-  Bringing a plot tab to the front sends `ACTIVATEPLOT,<id>`, and closing it sends `CLOSEPLOT`,
+* **Tabs and the split view.** Plots open as tabs named like `Model 0 - Model Plot` or `Spectrum Plot -
+  <title>`. Bringing a plot tab to the front sends `ACTIVATEPLOT,<id>`, and closing it sends `CLOSEPLOT`,
   because the plot setting commands act on the active plot. File editors (`File Editor - <path>`),
-  module outputs (`SITE output`), Results, Help and Verification also open as tabs. The selected
-  tab is scrolled into view when the tab bar is full, and a plot follows the size of its tab.
+  module outputs (`SITE output`), Results, Help and Verification also open as tabs. With **View > Split
+  View** (on by default) the plots and the Results browser open in a pane of their own to the right of
+  the work -- Command History, Learn, the lesson, File Editors, module output -- so a lesson step or a
+  listing stays on the screen beside its plots. Each pane has its own tabs; the right pane closes with its
+  last tab; drag the divider to share the width (double-click: equal halves; kept by the browser). The
+  keyboard rotation of a 3D plot (section 4) acts after a click in the plot pane, so that the same keys
+  still scroll the Command History or a lesson. A window narrower than about 760 px puts the plots below
+  the work. With Split View off every tab shares one tab bar, as in ACS SASSI. The selected tab is
+  scrolled into view when the tab bar is full, and a plot follows the size of its pane.
 * **Dialogs** open over the window. They fit windows down to about 760 px wide: two-column parts
   fall back to one column, long rows wrap, wide tables scroll inside their box and a tall dialog
   scrolls. Escape or the close box cancels; drag a dialog by its title bar. Questions (remove a
@@ -123,6 +130,7 @@ that the folder stays one argument when the history is replayed.
 | Export Image | the active plot as an image file, rendered by the headless renderer (D-UI-10): PNG when the name contains `.png`, otherwise BMP | `CAPTUREPLOT,<file>` |
 | Export Table | the active spectrum, time-history or soil-property plot as CSV: the x column and one column per line on the union grid (D-UI-17) | (no command; file written by the server) |
 | Results Browser | the model folder with result types (TF, RS, histories, decks, listings); **Plot** opens Line Selection for the file, **Open** opens it in an editor (extension) | |
+| Upload to Workspace..., Download..., Clear Saved Files... | web version only (section 16): copy text files in and out of the browser's workspace; delete the workspace the browser keeps between visits | |
 
 ### 3.3 Plot
 
@@ -174,6 +182,7 @@ that the folder stays one argument when the history is replayed.
 | Command Window | brings the Command History tab back and clears it |
 | Command Display > Command Echo / Output Confirmation / Comments / Warnings & Errors | show or hide these message classes in the Command History (information is always shown); saved in `SASSIini.xml` |
 | Toolbars > Main Toolbar / Plot Toolbar | show or hide the toolbars (not saved, UI-07) |
+| Split View | plots and the Results browser in a pane of their own beside the work (on by default; section 2); kept by the browser |
 | Results Browser | as File > Results Browser |
 
 ### 3.7 Learn
@@ -950,11 +959,18 @@ NumPy and SciPy) in a Web Worker runs the same `sassi` package, the same API and
 * **Same course and tools.** The Learn tab, the lessons with their module runs, the examples, plots,
   Help (with the formulas and figures), the command explainer, the Options dialogs and Command Entry
   work as described above. Module runs show their listing and the status-bar progress while they run.
-* **Files live in the tab.** The workspace is `/home/pyodide/work`, in the memory of the tab; the course
-  workspaces are under it. A reload starts afresh (your course progress is kept by the browser).
-  **File > Upload to Workspace...** copies text files from your computer into a folder of the workspace,
-  and **File > Download...** saves a text file of the workspace (a listing, a deck, a `.pre`, a spectrum)
-  on your computer. Binary files (FILE1 ... FILE8, `.sdb`) cannot be transferred.
+* **Files are kept in the browser.** The workspace is `/home/pyodide/work`; the course workspaces are under
+  it. It and the settings folder are saved in the browser's storage (IndexedDB) after every change and
+  when you leave the page, and restored at the next visit, so decks, results and saved models survive a
+  reload; the models in memory do not (Model > Save or Output keeps one). **File > Clear Saved Files...**
+  deletes what is saved and starts afresh (your course progress is kept). In a private window the files
+  live in the tab only.
+* **Your computer's files.** Every file dialog has **From your computer…**: it copies text files from your
+  computer into the folder the dialog shows and selects the first, so Model > Input, File > Open and the
+  file fields of the Options dialogs read your own decks directly. **File > Upload to Workspace...** does
+  the same for several files, **File > Download...** saves a text file of the workspace (a listing, a deck,
+  a `.pre`, a spectrum) on your computer, and Model > Output, Export Table, Export to ANSYS and Export Image
+  download what they write. Binary files (FILE1 ... FILE8, `.sdb`) cannot be transferred.
 * **Differences.** A running module cannot be cancelled (it runs in the page's Python engine; other
   requests wait for it, Stop in the lesson panel acts after the current command). Model > Exit and
   Modules > Location (external executables) are not shown. File > Export Image saves the active plot as

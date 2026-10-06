@@ -6,7 +6,9 @@
  *    ready, and a clear error when WebAssembly, module workers or the Pyodide CDN are not available;
  *  * sets window.SASSI_TRANSPORT(method, path, body) -> Promise<{status, payload}>, which static/app.js uses
  *    instead of fetch(): the request goes to the worker by postMessage and the answer comes back the same way;
- *  * hands the pushes of the worker (events and job output sent while Python is busy) to SASSI.push.
+ *  * hands the pushes of the worker (events and job output sent while Python is busy) to SASSI.push;
+ *  * asks the worker to save the workspace in this browser when the page is hidden or closed, and offers
+ *    SASSI_WEB.clearSaved() (File > Clear Saved Files: delete the saved workspace and start afresh).
  *
  * Protocol (web/worker.js): page -> worker {id, method, path, query, body (JSON text)}; worker -> page
  * {id, answer (JSON text {status, payload})}, {push (JSON text)}, {type: "status" | "ready" | "fatal", ...}.
@@ -73,8 +75,8 @@
   card.append(node("h1", "", "SASSI-EDU — soil-structure interaction in your browser"),
     node("p", "sub", "The guided course, the examples, the plots and Help of the SASSI-EDU GUI, with Python running in this tab."),
     stage, bar, time, note,
-    node("p", "note", "Everything runs on your computer: nothing is sent to a server. Files live in this tab only " +
-      "(a reload starts afresh; your course progress is kept)."),
+    node("p", "note", "Everything runs on your computer: nothing is sent to a server. Your files are kept in this " +
+      "browser between visits (File > Clear Saved Files removes them); File > Download saves one on your computer."),
     node("p", "disclaimer", "Disclaimer. " + DISCLAIMER), error);
   overlay.appendChild(card);
   document.body.appendChild(overlay);
@@ -110,6 +112,30 @@
   let seq = 0;
   let worker = null;
   window.SASSI_WEB = {version: PYODIDE_VERSION, build: BUILD, ready, readyTime: null, info: null};
+  /** The IndexedDB databases of the kept folders (web/worker.js KEPT: Emscripten names them by mount point). */
+  const KEPT_DBS = ["/home/pyodide/work", "/home/pyodide/.sassi-edu"];
+  /** How much this site stores in the browser (the app files and the saved workspace), when the browser says. */
+  window.SASSI_WEB.storageUse = async function () {
+    try { return navigator.storage && navigator.storage.estimate ? await navigator.storage.estimate() : null; }
+    catch (e) { return null; }
+  };
+  /** File > Clear Saved Files: stop Python, delete the saved workspace and settings, start afresh (a reload).
+   *  The course progress (localStorage) and the stored app files (sw.js) are kept. */
+  window.SASSI_WEB.clearSaved = async function () {
+    if (worker) worker.terminate();
+    dead = "the saved files are being cleared";
+    await Promise.all(KEPT_DBS.map((name) => new Promise((res) => {
+      try {
+        const r = indexedDB.deleteDatabase(name);
+        r.onsuccess = r.onerror = r.onblocked = () => res();
+      } catch (e) { res(); }
+    })));
+    location.reload();
+  };
+  // save the workspace when the visitor leaves or hides the tab (the worker also saves after every change)
+  const flush = () => { if (worker && !dead) worker.postMessage({type: "flush"}); };
+  window.addEventListener("pagehide", flush);
+  document.addEventListener("visibilitychange", () => { if (document.visibilityState === "hidden") flush(); });
 
   let dead = null;                             // the message once the worker has stopped
   function stop(message) {

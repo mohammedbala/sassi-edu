@@ -73,7 +73,7 @@
     if (window.ResizeObserver) {
       let pending = false;
       t.observer = new ResizeObserver(() => {
-        if (pending || S.activeTab !== t) return;
+        if (pending || !S.isShown(t)) return;
         pending = true;
         requestAnimationFrame(() => { pending = false; resize(t); });
       });
@@ -99,10 +99,11 @@
       }
     } catch (e) { /* hidden tab */ }
   }
-  window.addEventListener("resize", () => { const t = S.activeTab; if (t && t.plotId) resize(t); });
+  // every plot on the screen follows a window or split-view resize (the ResizeObserver misses a hidden-then-shown pane)
+  window.addEventListener("resize", () => { for (const t of Object.values(P.tabs)) if (S.isShown(t)) resize(t); });
   function scheduleRender(t) {
     t.dirty = true;
-    if (S.activeTab !== t) return;            // rendered when the tab is brought to the front
+    if (!S.isShown(t)) return;                // rendered when the tab is brought to the front of its group
     clearTimeout(t._timer);
     t._timer = setTimeout(() => render(t), 60);
   }
@@ -491,9 +492,22 @@
     return out;
   }
   /** The plot note of the soil island: what is drawn, and that it is a picture only. */
+  /** Plotly annotations do not wrap: break a text into lines of at most n characters. */
+  function wrapLines(text, n) {
+    const out = [];
+    let cur = "";
+    for (const w of String(text).split(/\s+/)) {
+      if (cur && (cur + " " + w).length > n) { out.push(cur); cur = w; } else cur = cur ? cur + " " + w : w;
+    }
+    if (cur) out.push(cur);
+    return out;
+  }
   function soilNote(d) {
     let text = "";
-    if (d.soil) text = `<b>Soil</b>: ${S.esc(d.soil.summary).replace(/; /g, "<br>")}<br><i>${S.esc(d.soil.note)}</i>`;
+    if (d.soil) {
+      const lines = d.soil.summary.split("; ").flatMap((x) => wrapLines(x, 64));
+      text = `<b>Soil</b>: ${lines.map(S.esc).join("<br>")}<br><i>${wrapLines(d.soil.note, 64).map(S.esc).join("<br>")}</i>`;
+    }
     else if (d.soil_note) text = `SHOWSOIL: ${S.esc(d.soil_note)}`;
     if (!text) return null;
     return {annotations: [{text, showarrow: false, xref: "paper", yref: "paper", x: 0.005, y: 0.005, xanchor: "left", yanchor: "bottom",
@@ -672,7 +686,7 @@
     slider.addEventListener("change", () => { if (d.view.paused && frames.length) S.command(`WINDOWSETTINGS,FRAME,${frames[Number(slider.value)]}`); });
     const pause = Math.max(Number(d.params.frame_pause || 33), 60);
     const loop = async () => {
-      if (!t.anim || d.view.paused || S.activeTab !== t || !frames.length) { t.anim.timer = null; return; }
+      if (!t.anim || d.view.paused || !S.isShown(t) || !frames.length) { t.anim.timer = null; return; }
       await show((t.anim.k + 1) % frames.length);
       t.anim.timer = setTimeout(loop, pause);
     };
@@ -688,7 +702,7 @@
       upsertPlotRec(data.plot);
       S.state.plots.active = pid;
       const t = makePlotTab(data.plot);
-      if (!S.keepFocus) S.selectTab(t.id);
+      if (!S.keepFocus || t.group === "view") S.selectTab(t.id);
       scheduleRender(t);
     } else if (kind === "update") {
       upsertPlotRec(data.plot);
@@ -700,12 +714,13 @@
       const t = P.tabs[pid];
       delete P.tabs[pid];
       if (t) S.removeTab(t.id);
-      if (data.active && P.tabs[data.active] && !S.keepFocus) S.selectTab(P.tabs[data.active].id);
+      const nt = data.active && P.tabs[data.active];
+      if (nt && (!S.keepFocus || nt.group === "view") && !S.isShown(nt)) S.selectTab(nt.id);
     } else if (kind === "activate") {
       upsertPlotRec(data.plot);
       S.state.plots.active = pid;
       const t = P.tabs[pid] || makePlotTab(data.plot);
-      if (S.activeTab !== t && !S.keepFocus) S.selectTab(t.id);
+      if (!S.isShown(t) && (!S.keepFocus || t.group === "view")) S.selectTab(t.id);
     } else if (kind === "lines") {
       if (S.D && S.D.onLinesChanged) S.D.onLinesChanged(data.numbers || []);
     } else if (kind === "capture") {
@@ -726,14 +741,15 @@
   P.onModelChanged = function () {
     for (const t of Object.values(P.tabs)) {
       if (["3d", "anim"].includes(t.rec.family) || THREE_D.includes(t.rec.kind) || t.rec.kind === "LAYERPLOT" || t.rec.kind === "SOILPROPPLOT") {
-        if (S.activeTab === t) scheduleRender(t); else t.dirty = true;
+        if (S.isShown(t)) scheduleRender(t); else t.dirty = true;
       }
     }
     P.refreshResults();
   };
   /** Keyboard controls of the 3D plots (spec 06 section 1.3): rotate 5 degrees per press. */
+  const activePlotTab = () => (S.state && S.state.plots && P.tabs[S.state.plots.active]) || (S.activeTab && S.activeTab.plotId ? S.activeTab : null);
   P.onKey = function (ev) {
-    const t = S.activeTab;
+    const t = S.split ? (S.pointerGroup === "view" ? S.groups.view.active : null) : S.activeTab;
     if (!t || !t.plotId || !t.data || !THREE_D.includes(t.data.kind)) return;
     const v = t.data.view;
     const rot = {Insert: [5, 0, 0], Delete: [-5, 0, 0], Home: [0, 5, 0], End: [0, -5, 0], PageUp: [0, 0, 5], PageDown: [0, 0, -5]}[ev.key];
@@ -747,7 +763,7 @@
   };
   /** Toolbar Pause/Start, the Pause key and the tab's Pause button: see renderAnim. */
   P.togglePause = function () {
-    const t = S.activeTab;
+    const t = activePlotTab();
     if (t && t.anim && t.anim.togglePause) t.anim.togglePause();
     else S.command("PAUSE");
   };

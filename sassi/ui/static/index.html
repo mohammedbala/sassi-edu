@@ -18,8 +18,15 @@
   </header>
   <main>
     <div id="workarea">
-      <div id="tabbar" role="tablist"></div>
-      <div id="tabcontent"></div>
+      <div id="group-main" class="tabgroup">
+        <div id="tabbar" class="tabbar" role="tablist" aria-label="Work"></div>
+        <div id="tabcontent" class="tabcontent"></div>
+      </div>
+      <div id="split-resizer" hidden title="drag to resize the plots and results pane (double-click: equal halves)"></div>
+      <div id="group-view" class="tabgroup" hidden>
+        <div id="tabbar2" class="tabbar" role="tablist" aria-label="Plots and results"></div>
+        <div id="tabcontent2" class="tabcontent"></div>
+      </div>
     </div>
     <div id="dock-resizer" hidden title="drag to resize the lesson panel (double-click: default width)"></div>
     <aside id="lessondock" hidden aria-label="Lesson"></aside>

@@ -115,3 +115,18 @@ sassi/web/bridge.py  -- Bridge(push): GuiSession(web mode) + route() + run_pendi
   (native 1.2-1.6 x faster); browser: ready in 3-8 s with a warm cache. Lesson 11 (2026-10-05): 236 s
   headless (93 s native: 2.5 x; three ANALYS runs of 41 frequencies with 627 to 1215 interaction DOFs);
   the eleven lessons together take about 6 min.
+
+## Files kept between visits, files of the visitor's computer (2026-10-06)
+
+* `web/worker.js` mounts `/home/pyodide/work` and `/home/pyodide/.sassi-edu` on Emscripten IDBFS (one
+  IndexedDB database per mount point) before the session starts and restores them (`syncfs(true)`); it
+  saves (`syncfs(false)`) at most 1 s after a request that is not a GET (the 250 ms event poll does not
+  save) and after every job, and at once on `{type: "flush"}`, which `web/boot.js` sends on `pagehide` and
+  when the page is hidden. Without IndexedDB (a private window may refuse it) the files stay in memory.
+  `info.kept` reports the files restored. File > Clear Saved Files: `SASSI_WEB.clearSaved()` terminates the
+  worker, deletes the two databases and reloads; the course progress (localStorage) and the stored app files
+  (`sw.js`) stay.
+* Every file dialog (`D.pickFile`, web version, not folder pickers or Download) has **From your
+  computer…**: text files (<= 8 MB, no NUL in the first 4 kB) copied into the folder shown (`POST
+  /api/file`), the first selected. Model > Output and Export Table download the file they wrote
+  (`GET /api/file`), as Export to ANSYS already did.

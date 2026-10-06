@@ -65,16 +65,28 @@ button, input, select, textarea { font: inherit; color: inherit; }
 
 /* ---------------------------------------------------------------- tabs */
 main { flex: 1; display: flex; flex-direction: row; min-height: 0; background: var(--panel); }
-/* the tab area; the lesson panel (Learn) docks to its right */
-#workarea { flex: 1; display: flex; flex-direction: column; min-width: 0; min-height: 0; }
-#tabbar { display: flex; gap: 0; background: var(--panel-2); border-bottom: 1px solid var(--border); overflow-x: auto; flex: none; }
+/* the tab area; the lesson panel (Learn) docks to its right.  Split view: two tab groups side by side, the
+   work (Command History, Learn, lessons, File Editor, module output) left, plots and results right */
+#workarea { flex: 1; display: flex; flex-direction: row; min-width: 0; min-height: 0; }
+.tabgroup { display: flex; flex-direction: column; min-width: 0; min-height: 0; position: relative; }
+#group-main { flex: 1 1 0; }
+#group-view { flex: none; width: 50%; min-width: 260px; border-left: 1px solid var(--border); }
+#group-view[hidden], #split-resizer[hidden] { display: none; }
+#split-resizer { flex: none; width: 5px; cursor: col-resize; background: var(--panel-2); border-left: 1px solid var(--border-2); }
+#split-resizer:hover, body.resizing #split-resizer { background: #c9d8ef; }
+.tabbar { display: flex; gap: 0; background: var(--panel-2); border-bottom: 1px solid var(--border); overflow-x: auto; flex: none; }
+@media (max-width: 760px) {     /* a narrow window: the plots and results below the work */
+  #workarea { flex-direction: column; }
+  #group-view { width: auto !important; min-width: 0; height: 50%; border-left: 0; border-top: 1px solid var(--border); }
+  #split-resizer { display: none !important; }
+}
 .tab { display: flex; align-items: center; gap: 6px; padding: 5px 10px; border-right: 1px solid var(--border-2); cursor: pointer; white-space: nowrap; color: var(--muted); max-width: 320px; }
 .tab .t { overflow: hidden; text-overflow: ellipsis; }
 .tab.active { background: var(--panel); color: var(--text); box-shadow: inset 0 -2px 0 var(--accent); }
 .tab .x { border: 0; background: transparent; color: #8a94a1; cursor: pointer; padding: 0 2px; line-height: 1; font-size: 14px; }
 .tab .x:hover { color: var(--danger); }
 .tab.running .t::after { content: " \25CF"; color: var(--accent); }
-#tabcontent { flex: 1; position: relative; min-height: 0; }
+.tabcontent { flex: 1; position: relative; min-height: 0; }
 .pane { position: absolute; inset: 0; display: none; flex-direction: column; min-height: 0; }
 .pane.active { display: flex; }
 .pane-bar { display: flex; align-items: center; gap: 8px; padding: 4px 8px; border-bottom: 1px solid var(--border-2); background: var(--panel-2); flex: none; flex-wrap: wrap; }
@@ -529,6 +541,7 @@ button.linkish { border: 0; background: none; color: var(--learn-accent); cursor
 
 /* ---- lesson player, full-width layout (a tab of its own; Learn > Lesson Layout) ---- */
 #workarea { position: relative; }
+.tabgroup .lesson-back { right: 18px; }
 .pane.lesson-pane { background: var(--panel); }
 #lessondock.full { flex: 1; width: auto !important; max-width: none; min-width: 0; border-left: 0; }
 #lessondock.full .dock-head { padding: 10px max(24px, calc((100% - 1500px) / 2)) 8px; }

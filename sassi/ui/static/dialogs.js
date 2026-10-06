@@ -155,10 +155,33 @@
       api.setMessage(d.roots ? `allowed: ${d.roots.join("  |  ")}` : "", true);
     };
     showAll.addEventListener("change", () => load(cur && cur.dir));
+    // browser version: the dialog shows the workspace of this browser; "From your computer..." copies files
+    // of the visitor's computer into the folder shown and selects the first (File > Upload to Workspace in one step)
+    let fromPC = null;
+    if (S.web && !opt.folder && !opt.noUpload) {
+      const input = el("input", {type: "file", multiple: true, style: {display: "none"}, "aria-label": "files from your computer"});
+      input.addEventListener("change", async () => {
+        const chosen = Array.from(input.files || []);
+        input.value = "";
+        if (!chosen.length) return;
+        const dir = cur ? cur.dir : ((S.state && S.state.cwd) || "");
+        api.setMessage(`Copying ${chosen.length} file(s) into ${dir} ...`, true);
+        const {done, bad} = await uploadTexts(chosen, dir);
+        await load(dir);
+        if (done.length) {
+          selected = done[0];
+          name.value = done[0].split("/").pop();
+          for (const it of list.children) it.classList.toggle("sel", it.firstChild && it.firstChild.textContent === name.value);
+        }
+        api.setMessage(bad.length ? bad.join("\n") : `${done.length} file(s) copied from your computer into ${dir}: OK uses ${name.value}`, !bad.length);
+      });
+      fromPC = el("span", {}, input, el("button", {class: "btn small", text: "From your computer…",
+        title: "copy files from your computer into this folder of the workspace (text files: .pre, decks, motions, spectra ...)", onclick: () => input.click()}));
+    }
     const body = el("div", {class: "picker"},
       el("div", {class: "row"}, el("label", {text: "Folder"}), dirLab),
       list,
-      el("div", {class: "row"}, el("label", {class: "lab", text: opt.folder ? "Folder" : "File name"}), name),
+      el("div", {class: "row"}, el("label", {class: "lab", text: opt.folder ? "Folder" : "File name"}), name, fromPC),
       opt.filter ? el("div", {class: "row"}, el("label", {class: "chk"}, showAll, " show all files")) : null,
       el("div", {class: "row"}, el("label", {class: "lab", text: "Working directory"}), cwd,
         el("button", {class: "btn small", text: "CD", title: "CD,<dir>: change the working directory (command)", onclick: async () => {
@@ -332,7 +355,17 @@
     return D.modal({title: "Output (WRITE)", body: el("div", {style: {width: "520px"}}, row("File name", file),
       row("Path", dir, el("button", {class: "btn small", text: "<<", onclick: () => D.pickFile({title: "Folder", folder: true, onOk: (p) => { dir.value = p; }})})),
       el("div", {class: "opt-note", text: "WRITE,<file>,<path>: the model as a .pre command file (Options > Write adds MDL / AFWRITE lines)"})),
-      buttons: [{label: "OK", primary: true, action: (a) => cmdOk(`WRITE,${q(file.value)},${q(dir.value)}`, a)}, {label: "Cancel", action: () => true}]});
+      buttons: [{label: "OK", primary: true, action: async (a) => {
+        const r = await S.command(`WRITE,${q(file.value)},${q(dir.value)}`);
+        if (r.results.some((x) => !x.ok)) {
+          a.setMessage(r.messages.filter((m) => m.kind === "ERROR").map((m) => m.text).join("\n") || "WRITE failed");
+          return false;
+        }
+        // browser version: the file is written in the workspace of this browser -- and saved on this computer
+        const w = r.messages.map((m) => /lines written to (.+)$/.exec(String(m.text || ""))).find(Boolean);
+        if (S.web && w) await downloadWorkspaceFile(w[1].trim(), "Output");
+        return true;
+      }}, {label: "Cancel", action: () => true}]});
   };
   /** File > Export to ANSYS (and the toolbar button): write the active model as ANSYS APDL input with the
    *  ANSYS command -- <model>.inp in the model folder; the command is in the Command History (rule L17) --
@@ -349,11 +382,7 @@
       return;
     }
     const path = String(done.text).replace(/^APDL written to /, "").trim();
-    let d;
-    try { d = await S.get(`/api/file?name=${encodeURIComponent(path)}`); }
-    catch (e) { D.alert("Export to ANSYS", `${path} was written but cannot be downloaded: ${e.message}`); return; }
-    saveText(d.name, d.text);
-    S.status(`${d.name} downloaded (ANSYS APDL input of the active model)`);
+    if (await downloadWorkspaceFile(path, "Export to ANSYS")) S.status(`${path.split("/").pop()} downloaded (ANSYS APDL input of the active model)`);
   };
   D.exit = async function () {
     let info = {unsaved: []};
@@ -393,6 +422,37 @@
       }}, {label: "Cancel", action: () => true}]});
   }
   // ================================================================== File > Upload / Download (browser version)
+  /** Download a text file of the workspace (GET /api/file) to this computer; false (and a message) when it
+   *  cannot be read -- a binary file, a missing one. */
+  async function downloadWorkspaceFile(path, what) {
+    let d;
+    try { d = await S.get(`/api/file?name=${encodeURIComponent(path)}`); }
+    catch (e) { D.alert(what || "Download", `${path} cannot be downloaded: ${e.message}`); return false; }
+    saveText(d.name, d.text);
+    S.status(`${d.name} saved by the browser`);
+    return true;
+  }
+  S.downloadWorkspaceFile = downloadWorkspaceFile;
+  /** Copy files the visitor chose (an <input type=file>) into a folder of the workspace (POST /api/file).
+   *  Text files only, up to 8 MB each; returns {done: [workspace paths], bad: [reasons]}. */
+  async function uploadTexts(files, folder) {
+    const done = [], bad = [];
+    const dir = String(folder || "").trim().replace(/\/+$/, "");
+    for (const f of files) {
+      const bytes = new Uint8Array(await f.arrayBuffer());
+      if (bytes.length > 8 * 1024 * 1024) { bad.push(`${f.name}: larger than 8 MB`); continue; }
+      if (bytes.subarray(0, 4096).includes(0)) { bad.push(`${f.name}: a binary file (text files only)`); continue; }
+      const text = new TextDecoder("utf-8").decode(bytes);
+      try {
+        const r = await S.post("/api/file", {name: `${dir}/${f.name}`, text});
+        done.push(r.path);
+      } catch (e) { bad.push(`${f.name}: ${e.message}`); }
+    }
+    for (const d of done) S.local("CONFIRM", `Upload to Workspace: ${d}`);
+    for (const b of bad) S.local("WARNING", `Upload to Workspace: ${b}`);
+    if (done.length && S.P && S.P.refreshResults) S.P.refreshResults();
+    return {done, bad};
+  }
   /** Save text as a file on the visitor's computer (browser download). */
   function saveText(name, text) {
     const url = URL.createObjectURL(new Blob([text], {type: "text/plain;charset=utf-8"}));
@@ -402,8 +462,8 @@
     a.remove();
     setTimeout(() => URL.revokeObjectURL(url), 10000);
   }
-  const WEB_NOTE = "The workspace lives in the memory of this browser tab: a reload or closing the tab starts afresh " +
-    "(your course progress is kept). Download the files you want to keep.";
+  const WEB_NOTE = "The workspace is kept in this browser between visits (File > Clear Saved Files removes it); the models " +
+    "in memory are not: Model > Save or Output keeps one. Download the files you want on your computer.";
   /** File > Upload to Workspace... (browser version): text files from the visitor's computer into a folder of the
    *  workspace (POST /api/file); a binary file is refused (the File Editor and the API carry text). */
   D.uploadFiles = function () {
@@ -416,21 +476,7 @@
       buttons: [{label: "Upload", primary: true, action: async (a) => {
         const files = Array.from(input.files || []);
         if (!files.length) { a.setMessage("choose one or more files"); return false; }
-        const folder = dir.value.trim().replace(/\/+$/, "");
-        const done = [], bad = [];
-        for (const f of files) {
-          const bytes = new Uint8Array(await f.arrayBuffer());
-          if (bytes.length > 8 * 1024 * 1024) { bad.push(`${f.name}: larger than 8 MB`); continue; }
-          if (bytes.subarray(0, 4096).includes(0)) { bad.push(`${f.name}: a binary file (text files only)`); continue; }
-          const text = new TextDecoder("utf-8").decode(bytes);
-          try {
-            const r = await S.post("/api/file", {name: `${folder}/${f.name}`, text});
-            done.push(r.path);
-          } catch (e) { bad.push(`${f.name}: ${e.message}`); }
-        }
-        for (const d of done) S.local("CONFIRM", `Upload to Workspace: ${d}`);
-        for (const b of bad) S.local("WARNING", `Upload to Workspace: ${b}`);
-        if (done.length && S.P && S.P.refreshResults) S.P.refreshResults();
+        const {bad} = await uploadTexts(files, dir.value);
         if (bad.length) { a.setMessage(bad.join("\n")); return false; }
         return true;
       }}, {label: "Cancel", action: () => true}]});
@@ -439,13 +485,22 @@
   /** File > Download... (browser version): a text file of the workspace (GET /api/file) saved on the visitor's
    *  computer. */
   D.downloadFile = function () {
-    return D.pickFile({title: "Download (a text file of the workspace)", dir: S.state && S.state.model.path || undefined, onOk: async (p) => {
-      let d;
-      try { d = await S.get(`/api/file?name=${encodeURIComponent(p)}`); } catch (e) { S.local("ERROR", `Download ${p}: ${e.message}`); return false; }
-      saveText(d.name, d.text);
-      S.status(`${d.name} saved by the browser`);
-      return true;
-    }});
+    return D.pickFile({title: "Download (a text file of the workspace)", dir: S.state && S.state.model.path || undefined, noUpload: true,
+      onOk: (p) => downloadWorkspaceFile(p, "Download")});
+  };
+  /** File > Clear Saved Files (browser version): delete the workspace and settings saved in this browser and
+   *  start afresh (web/boot.js SASSI_WEB.clearSaved); the course progress is kept. */
+  D.clearSavedFiles = async function () {
+    const web = window.SASSI_WEB || {};
+    const use = web.storageUse ? await web.storageUse() : null;
+    const kept = web.info && web.info.kept;
+    const size = (b) => b >= 1e6 ? `${(b / 1e6).toFixed(1)} MB` : `${Math.max(1, Math.round(b / 1e3))} kB`;
+    let text = "Delete the files saved in this browser (the workspace: models saved, decks, results, the course " +
+      "workspaces; and the settings), stop Python and start afresh? Your course progress is kept. Download what you want to keep first.";
+    if (kept && kept.on) text += `\n\nAt the start of this visit: ${kept.files} file(s), ${size(kept.bytes)}.`;
+    if (use && use.usage) text += `\nThis site uses ${size(use.usage)} of the browser's storage (with the app files).`;
+    if (!(await D.confirm("Clear Saved Files", text, "Delete and restart", "Cancel"))) return;
+    if (web.clearSaved) await web.clearSaved();
   };
 
   D.exportTable = function () {
@@ -455,7 +510,12 @@
     return D.modal({title: "Export Table", body: el("div", {style: {width: "460px"}}, row("CSV file", name),
       el("div", {class: "opt-note", text: "x column, one column per line on the union grid (D-UI-17)"})),
       buttons: [{label: "OK", primary: true, action: async (a) => {
-        try { const r = await S.post("/api/export_table", {name: name.value}); S.status(`table written to ${r.path}`); return true; } catch (e) { a.setMessage(e.message); return false; }
+        try {
+          const r = await S.post("/api/export_table", {name: name.value});
+          S.status(`table written to ${r.path}`);
+          if (S.web) await downloadWorkspaceFile(r.path, "Export Table");      // and saved on this computer
+          return true;
+        } catch (e) { a.setMessage(e.message); return false; }
       }}, {label: "Cancel", action: () => true}]});
   };
 

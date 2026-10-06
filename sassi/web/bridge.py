@@ -21,9 +21,9 @@ of the page (``window.SASSI_TRANSPORT`` of ``web/boot.js``, carried by ``postMes
 
   The page skips what it already has (events by sequence number, listing lines by index), so a push and a
   later answer of ``/api/events`` or ``/api/jobs/<id>`` never show a line twice.
-* **Files** live in the worker's in-memory file system: the workspace :data:`WORK_DIR` (the start
-  directory; the course workspaces are under it) and the settings in :data:`SETTINGS_DIR`.  A reload of
-  the page starts afresh.
+* **Files** live in the worker's file system: the workspace :data:`WORK_DIR` (the start directory; the
+  course workspaces are under it) and the settings in :data:`SETTINGS_DIR`.  web/worker.js mounts both on
+  IndexedDB (kept between visits; File > Clear Saved Files deletes them); here they are plain folders.
 
 Nothing here needs the browser: the tests drive a :class:`Bridge` in CPython with a fake ``push``
 (``tests/unit/test_web.py``) and in Pyodide under Node (``web/test_pyodide.mjs``).
@@ -40,7 +40,7 @@ from ..ui.api import GuiSession
 
 #: the workspace of the browser version (Pyodide's home directory is /home/pyodide)
 WORK_DIR = "/home/pyodide/work"
-#: SASSIini.xml, SASSIdb.xml and SASSIani.xml of the browser version (in memory, like the workspace)
+#: SASSIini.xml, SASSIdb.xml and SASSIani.xml of the browser version (kept in IndexedDB, like the workspace)
 SETTINGS_DIR = "/home/pyodide/.sassi-edu"
 #: seconds between two pushes while Python is busy
 PUSH_INTERVAL = 0.1

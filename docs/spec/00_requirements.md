@@ -2292,7 +2292,7 @@ module, `sassi/prep/defaults.py`, used by CHECK, AFWRITE, the RUN commands, `LIB
 | D-W5-14 | GUI | A blank file field shows its default as placeholder ("built-in: RG 1.60, 0.30 g (@rg160h_030g.acc)"), computed with the rules above on the values being edited (type, `<fopt>`, Δt, `<accopt>`, spectrum number); file fields have a Library button listing the built-in files that fit (records for THFILE / ACCIN / SOILX, loads for THFILE, spectra for RSIN, PSDs for TPSD); the soil-curve field and Select Dynamic Soil Property list the library curves; a model without SPRO shows the default profile on the layer pages, stored with the first page changed (as the implicit wave field) | `tests/unit/test_input_defaults.py` |
 
 
-### 7.20 Lead decisions: display aids, the soil island and deformed shapes from the results (wave 6, binding)
+### 7.20 Lead decisions: GUI wave 6 -- the soil island, deformed shapes from the results, the split view, files in the browser (binding)
 
 The user expected to see a soil island. SASSI has none: the layered site (TOPL / L layers on the SITE
 half-space) is horizontally infinite and enters the analysis through the impedance at the interaction nodes;
@@ -2301,7 +2301,10 @@ still wants to see the model in its site, so SASSI-EDU draws the free-field prof
 picture, and says on the plot that it is one. The user also found that deformed shapes did not load: an
 animation plays frames, the modules write frames only on a restart option and no example asks for them, so
 after an analysis Load Frame Data was empty; a deformed shape needed `HARMFRAME` and `PROCFRAME` typed by
-hand (only the lessons' Animate buttons did it).
+hand (only the lessons' Animate buttons did it). Finally the user asked for plots and results beside the work
+instead of a tab in front of it, and found that files did not work like a desktop program in the browser version:
+the workspace was lost on a reload, a file of the visitor's computer had to be uploaded in a separate step, and
+Output and Export Table wrote into the browser's workspace only.
 
 | ID | Subject | Decision | Evidence |
 |---|---|---|---|
@@ -2311,6 +2314,10 @@ hand (only the lessons' Animate buttons did it).
 | D-W6-04 | Fit and rendering | The plot box, the rotation centre and the camera fit include the soil (toggling re-fits). GUI: one plotly mesh per layer; the node plot draws the soil see-through. Headless renderer (CAPTUREPLOT, batch): the soil faces that face the viewer join the model faces and the beams (as screen-plane ribbons) in one depth-sorted collection; interaction markers inside the soil are not drawn | `tests/unit/test_soil_island.py` (PNG rendering) |
 | D-W6-05 | Deformed shape from the results | Load Frame Data of Plot > Deformed Shape also offers the steady-state motion at one computed frequency of the active model's FILE8-type files (`FILE8[A-Z0-9_]*` in the model folder that read as FILE8 containers), total or relative to the free field (seismic only). **Animate** submits command text (L17): `HARMFRAME,<file>,<f>,HARM_<f>[,,0]` (folder `HARM_<f with p>[R]`), then the lines of a lesson's `animate` action for that folder (`PROCFRAME` into `<folder>_ani`, `DEFORMPLOT` with the automatic scale 0.15 × model size / largest displacement, the undeformed shape, the title). API: `GET /api/harmonic`, `POST /api/harmonic/plan`, `POST /api/harmonic/show` (`sassi/ui/harmonic.py`) | user report; `tests/unit/test_harmonic_dialog.py` |
 | D-W6-06 | Preselected frequency | The computed frequency of the largest node-to-node spread of the motion, max over nodes of the absolute value of H_n - mean_n H, in the control direction (seismic) or per translation (vibration). The largest absolute H would pick the rigid translation at the lowest frequency for an embedded box that never exceeds the free field; the spread picks 3.49 Hz for example 1 (the lessons' SSI frequency), 3.98 / 4.37 Hz for example 9 SSI / fixed base (its first frequencies) and 12 Hz for example 2 (FV) | `sassi/ui/harmonic.py` `_summary` |
+| D-W6-07 | Split view | Two tab groups: the work (Command History, Learn, the lesson, File Editors, module output, Help) left, plots and the Results browser right (`S.groupFor`: kinds `plot` and `results`), each with its own front tab (`S.groups`, `S.isShown`); the right group shows while it holds a tab and closes with its last; a divider sets its width (fraction kept in localStorage; double-click 50 %); a window below 760 px stacks the groups. View > Split View (on by default, kept in localStorage) off: one group, as in ACS SASSI. A new plot comes to the front of its group even while a lesson step keeps the focus (`S.keepFocus` applies to the work group only), so the lesson stays beside its plots. The 3D keys (Insert, Home, PageUp ...) act on the plot group's front plot only after a click in that group, so they still scroll the work. A plot renders, animates and resizes while it is shown in its group | user request; `tests/unit/test_split_view_web_files.py` |
+| D-W6-08 | Browser workspace kept | `web/worker.js` mounts `/home/pyodide/work` and `/home/pyodide/.sassi-edu` on IDBFS, restores them before the session starts and saves at most 1 s after a non-GET request or a job, and at once when the page is hidden or closed; without IndexedDB the files stay in memory. File > Clear Saved Files (web) terminates the worker, deletes the two databases and reloads; the course progress and the stored app files stay. The models in memory are not kept (Model > Save, Output) | `tests/unit/test_split_view_web_files.py`; browser check: 176 files (11.8 MB) of example 1 restored, ready in 6.4 s |
+| D-W6-09 | Files of the visitor's computer | Every file dialog of the browser version (`D.pickFile`, not folder pickers or Download) has **From your computer…**: text files (at most 8 MB, no NUL in the first 4 kB) copied into the folder shown and the first selected, so Model > Input, File > Open and the file fields read the visitor's decks in one step | `tests/unit/test_split_view_web_files.py` |
+| D-W6-10 | Downloads | In the browser version Model > Output (WRITE) and Export Table also download the file they wrote (`GET /api/file`), as Export to ANSYS and Export Image already did | `tests/unit/test_split_view_web_files.py` |
 ---
 
 ## 8. Implementation order and acceptance gates (informative)

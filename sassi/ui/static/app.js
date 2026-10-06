@@ -16,8 +16,8 @@ const SASSI = (() => {
   S.web = !!S.transport;
   S.state = null;            // GET /api/state
   S.lastEvent = 0;
-  S.tabs = [];               // {id, title, kind, pane, closable, plotId, ...}
-  S.activeTab = null;
+  S.tabs = [];               // {id, title, kind, pane, closable, plotId, group, ...}
+  S.activeTab = null;        // the tab brought to the front last (either group)
   S.recall = [];             // Command Entry Up/Down recall
   S.recallPos = 0;
   S.queue = Promise.resolve();
@@ -214,7 +214,78 @@ const SASSI = (() => {
     S.selectTab("history");
   };
 
-  // ------------------------------------------------------------------ tabs
+  // ------------------------------------------------------------------ tabs (two groups: split view)
+  /** Split view (View > Split View, on by default): plots and the Results browser open in a group of their
+   *  own beside the work -- Command History, Learn, the lesson, File Editors, module output -- instead of a tab
+   *  in front of it; a narrow window stacks the two groups.  Off: one group, as in ACS SASSI. */
+  const SPLIT_KEY = "sassi-edu.split", SPLIT_W_KEY = "sassi-edu.splitWidth";
+  const lsGet = (k) => { try { return window.localStorage.getItem(k); } catch (e) { return null; } };
+  const lsSet = (k, v) => { try { window.localStorage.setItem(k, v); } catch (e) { /* private mode */ } };
+  S.split = lsGet(SPLIT_KEY) !== "0";
+  S.groups = {main: {id: "main", active: null}, view: {id: "view", active: null}};
+  const groupEls = (g) => g === "view" ? {bar: $("#tabbar2"), content: $("#tabcontent2")} : {bar: $("#tabbar"), content: $("#tabcontent")};
+  /** The group of a tab: plots and results right while the view is split, everything else left. */
+  S.groupFor = (t) => (S.split && (t.kind === "plot" || t.kind === "results") ? "view" : "main");
+  /** Is tab t on the screen (the front tab of its group)? */
+  S.isShown = (t) => !!t && S.groups[t.group] && S.groups[t.group].active === t;
+  function placeTab(t) {
+    t.group = S.groupFor(t);
+    const g = groupEls(t.group);
+    g.bar.appendChild(t.head);
+    g.content.appendChild(t.pane);
+  }
+  /** Show the right group while it holds a tab; its width (a fraction of the work area) is kept per browser. */
+  S.layoutSplit = function () {
+    const view = $("#group-view"), rz = $("#split-resizer");
+    if (!view) return;
+    const any = S.tabs.some((t) => t.group === "view");
+    const was = !view.hidden;
+    view.hidden = !any;
+    if (rz) rz.hidden = !any;
+    const f = Number(lsGet(SPLIT_W_KEY)) || 0.5;
+    view.style.width = `${Math.round(Math.max(0.2, Math.min(0.8, f)) * 100)}%`;
+    if (was !== any) window.dispatchEvent(new Event("resize"));      // the plots follow their new width
+  };
+  S.setSplit = function (on) {
+    S.split = !!on;
+    lsSet(SPLIT_KEY, on ? "1" : "0");
+    const front = S.activeTab;
+    for (const t of S.tabs) placeTab(t);
+    // one front tab per group (selectTab marks it and unmarks the rest of its group)
+    for (const g of [S.groups.view, S.groups.main]) {
+      const cands = S.tabs.filter((t) => t.group === g.id);
+      const keep = g.active && g.active.group === g.id ? g.active : (cands.includes(front) ? front : cands[cands.length - 1]);
+      g.active = null;
+      if (keep) S.selectTab(keep.id);
+    }
+    if (front && S.tab(front.id) && !S.isShown(front)) S.selectTab(front.id);
+    S.layoutSplit();
+    window.dispatchEvent(new Event("resize"));
+    if (S.rebuildMenus) S.rebuildMenus();
+  };
+  function setupSplitResizer() {
+    const rz = $("#split-resizer"), wa = $("#workarea"), view = $("#group-view");
+    if (!rz || !wa || !view) return;
+    rz.addEventListener("mousedown", (ev) => {
+      ev.preventDefault();
+      const box = wa.getBoundingClientRect();
+      const move = (e) => {
+        const w = Math.max(260, Math.min(box.right - e.clientX, box.width - 260));
+        view.style.width = `${Math.round(100 * w / box.width)}%`;
+      };
+      const up = () => {
+        document.removeEventListener("mousemove", move);
+        document.removeEventListener("mouseup", up);
+        document.body.classList.remove("resizing");
+        lsSet(SPLIT_W_KEY, String(view.getBoundingClientRect().width / Math.max(1, box.width)));
+        window.dispatchEvent(new Event("resize"));
+      };
+      document.body.classList.add("resizing");
+      document.addEventListener("mousemove", move);
+      document.addEventListener("mouseup", up);
+    });
+    rz.addEventListener("dblclick", () => { lsSet(SPLIT_W_KEY, "0.5"); S.layoutSplit(); window.dispatchEvent(new Event("resize")); });
+  }
   S.addTab = function (t) {
     t.closable = t.closable !== false;
     const head = el("div", {class: "tab", role: "tab", title: t.title},
@@ -223,9 +294,9 @@ const SASSI = (() => {
     head.addEventListener("click", () => S.selectTab(t.id, {user: true}));
     head.addEventListener("auxclick", (ev) => { if (ev.button === 1 && t.closable) S.requestCloseTab(t.id); });
     t.head = head;
-    $("#tabbar").appendChild(head);
-    $("#tabcontent").appendChild(t.pane);
+    placeTab(t);
     S.tabs.push(t);
+    S.layoutSplit();
     return t;
   };
   S.tab = (id) => S.tabs.find((t) => t.id === id);
@@ -236,15 +307,18 @@ const SASSI = (() => {
     t.head.querySelector(".t").textContent = title;
     t.head.title = title;
   };
-  /** Bring a tab to the front.  A plot tab chosen by the user submits ACTIVATEPLOT,<id> (L17). */
+  /** Bring a tab to the front of its group (the other group keeps its front tab on the screen).  A plot tab
+   *  chosen by the user submits ACTIVATEPLOT,<id> (L17). */
   S.selectTab = function (id, opts) {
     opts = opts || {};
     const t = S.tab(id);
     if (!t) return;
     for (const o of S.tabs) {
+      if (o.group !== t.group) continue;
       o.head.classList.toggle("active", o === t);
       o.pane.classList.toggle("active", o === t);
     }
+    S.groups[t.group].active = t;
     S.activeTab = t;
     if (t.head.scrollIntoView) t.head.scrollIntoView({block: "nearest", inline: "nearest"});   // a crowded tab bar
     if (opts.user && t.plotId && S.state && S.state.plots && S.state.plots.active !== t.plotId) {
@@ -279,10 +353,16 @@ const SASSI = (() => {
     t.pane.remove();
     S.tabs.splice(i, 1);
     if (S.connectedEditor && S.connectedEditor.tabId === id) S.connectedEditor = null;
-    if (S.activeTab === t) {
-      const next = S.tabs[Math.min(i, S.tabs.length - 1)];
+    const g = S.groups[t.group];
+    if (g && g.active === t) {
+      // the next tab of the same group comes to the front; an emptied right group closes
+      g.active = null;
+      const same = S.tabs.filter((o) => o.group === t.group);
+      const next = same.length ? same[Math.min(S.tabs.slice(0, i).filter((o) => o.group === t.group).length, same.length - 1)] : null;
       if (next) S.selectTab(next.id);
     }
+    if (S.activeTab === t) S.activeTab = S.groups.main.active || S.groups.view.active || null;
+    S.layoutSplit();
   };
 
   // ------------------------------------------------------------------ status bar
@@ -341,6 +421,7 @@ const SASSI = (() => {
         // browser version: the workspace is in the memory of this tab -- copy files in and out
         {label: "Upload to Workspace...", action: () => D().uploadFiles(), webOnly: true, tip: "copy text files from your computer into the workspace of this browser tab"},
         {label: "Download...", action: () => D().downloadFile(), webOnly: true, tip: "save a text file of the workspace (listing, deck, .pre, spectrum ...) on your computer"},
+        {label: "Clear Saved Files...", action: () => D().clearSavedFiles(), webOnly: true, tip: "delete the workspace and settings this browser keeps between visits, and start afresh"},
         {label: "Export Image", action: () => D().exportImage(), enabled: () => !!(S.state && S.state.plots.active)},
         {label: "Export Table", action: () => D().exportTable(), enabled: () => P().activeKind() && ["SPECPLOT", "THPLOT", "SOILPROPPLOT"].includes(P().activeKind())},
         "-",
@@ -400,6 +481,7 @@ const SASSI = (() => {
         {label: "Toolbars", sub: [
           {label: "Main Toolbar", check: () => S.toolbarsVisible.main, action: () => S.toggleToolbar("main")},
           {label: "Plot Toolbar", check: () => S.toolbarsVisible.plot, action: () => S.toggleToolbar("plot")}]},
+        {label: "Split View", check: () => S.split, action: () => S.setSplit(!S.split), tip: "plots and results beside the work instead of a tab in front of it"},
         "-",
         {label: "Results Browser", action: () => S.openResults()}]},
       // Learn: the guided course (static/learn.js); its lessons are read from the server
@@ -752,6 +834,12 @@ const SASSI = (() => {
     });
   }
   function setupKeys() {
+    // the group last clicked in: with the split view the plot keys (Insert, Home, PageUp ...) rotate the plot
+    // only after a click in the plots group, so that they still scroll the Command History or a lesson
+    document.addEventListener("pointerdown", (ev) => {
+      const g = ev.target && ev.target.closest ? ev.target.closest(".tabgroup") : null;
+      if (g) S.pointerGroup = g.id === "group-view" ? "view" : "main";
+    }, true);
     document.addEventListener("keydown", (ev) => {
       if ((ev.ctrlKey || ev.metaKey) && ev.key.toLowerCase() === "o") { ev.preventDefault(); D().loadModel(); return; }
       if (ev.key === "F1") { ev.preventDefault(); S.openHelp(); return; }
@@ -793,6 +881,7 @@ const SASSI = (() => {
   S.start = async function () {
     watchMath();
     buildMenubar();
+    setupSplitResizer();
     makeHistoryTab();
     S.selectTab("history");
     setupCommandEntry();

@@ -664,11 +664,14 @@
   let backChip = null;
   function updateBackChip() {
     const d = dock();
-    const show = !!(isFull() && P.lesson && d && !d.hidden && S.activeTab && S.activeTab.id !== LESSON_TAB);
+    // the lesson tab is in the work group: the chip shows while another tab of that group hides it (with the
+    // split view a plot opens beside the lesson and does not)
+    const front = S.groups ? S.groups.main.active : S.activeTab;
+    const show = !!(isFull() && P.lesson && d && !d.hidden && front && front.id !== LESSON_TAB);
     if (!backChip) {
       backChip = el("button", {class: "lesson-back", type: "button", hidden: true, title: "back to the lesson tab",
         onclick: () => S.selectTab(LESSON_TAB)});
-      const wa = S.$("#workarea");
+      const wa = S.$("#group-main") || S.$("#workarea");
       if (wa) wa.appendChild(backChip);
     }
     backChip.hidden = !show;
@@ -802,7 +805,7 @@
     updateBackChip();
     const body = dock().querySelector(".dock-body");
     if (body) body.scrollTop = 0;
-    if (startBody && S.activeTab && S.activeTab.id === "learn") renderStart();
+    if (startBody && S.isShown(S.tab("learn"))) renderStart();
   }
   function renderPlayer() {
     const d = dock();
