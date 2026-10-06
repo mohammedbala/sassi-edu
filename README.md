@@ -78,7 +78,9 @@ in the page (Pyodide); `python web/build.py` builds that static site for GitHub 
 for structural engineers who design with fixed-base models (fundamentals, design applications,
 advanced). Each step runs real commands next to their plots and listings and explains what they do,
 why they matter for ISRS, member forces and displacements, their technical basis and the ANSYS
-analogy; any command line can be explained argument by argument ([GUI.md §13](docs/user/GUI.md)).
+analogy; any command line can be explained argument by argument ([GUI.md §13](docs/user/GUI.md)). Every
+lesson also has a short narrated motion-graphics **explainer video** for newcomers (HTML/JavaScript with a
+recorded voiceover: `sassi/ui/static/videos/index.html`, or Learn > Explainer Videos).
 
 The shape of a model file (`.pre`, or the same lines typed in the console):
 

@@ -12,6 +12,8 @@ Web Worker. The same front end (`sassi/ui/static`) and the same API (`sassi/ui/a
 | `boot.js` | page side: starts the worker, loading overlay with the disclaimer, `window.SASSI_TRANSPORT`, pushes |
 | `worker.js` | the Web Worker: Pyodide 314.0.7 from the jsDelivr CDN, NumPy, SciPy, the bundle, `sassi.web.bridge` |
 | `test_pyodide.mjs` | Node test: the built bundle in Pyodide, driven like the page (lesson 01, all lessons headless) |
+| `test_videos.mjs` | Node test: every beat of every explainer video (`sassi/ui/static/videos`) in headless Chrome, optional screenshots |
+| `voice_videos.mjs` | records the explainer videos' narration with ElevenLabs (`ELEVENLABS_API_KEY`): one MP3 per sentence and the manifests `aNN.js` |
 | `package.json` | the pinned `pyodide` npm package for that test |
 | `../sassi/web/bridge.py` | the Python side: requests, inline module runs, pushes |
 | `../.github/workflows/pages.yml` | builds and deploys the site on every push to `main` |

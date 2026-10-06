@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Explainer videos · SASSI-EDU</title>
+<style>
+:root {
+  --bg0: #0a111d; --bg1: #0f1a2b; --card: #111d30; --line: #22334a;
+  --ink: #eef3f9; --ink2: #c3cfdd; --muted: #8197b0;
+  --wave: #4cc3ff; --ssi: #ffb547; --violet: #a993ff;
+  --ui: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { background: radial-gradient(ellipse 80% 50% at 20% 0%, rgba(76,195,255,.10), transparent 70%), linear-gradient(170deg, var(--bg1), var(--bg0) 60%); background-attachment: fixed; color: var(--ink); font: 16px/1.5 var(--ui); min-height: 100vh; }
+main { max-width: 1180px; margin: 0 auto; padding: 48px 16px 80px; }
+.kicker { font-size: 13px; font-weight: 650; letter-spacing: .16em; text-transform: uppercase; color: var(--wave); }
+h1 { font-size: clamp(32px, 5vw, 54px); line-height: 1.05; margin: 10px 0 16px; letter-spacing: -.015em; }
+.lead { font-size: clamp(16px, 2vw, 19px); color: var(--ink2); max-width: 760px; margin: 0 0 22px; }
+.row { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+.btn { display: inline-flex; align-items: center; gap: 8px; background: var(--wave); color: #04111c; font-weight: 650; text-decoration: none; padding: 11px 20px; border-radius: 8px; }
+.btn svg { width: 16px; height: 16px; fill: currentColor; }
+.note { font-size: 14px; color: var(--muted); max-width: 640px; }
+h2 { font-size: 13px; letter-spacing: .16em; text-transform: uppercase; color: var(--muted); margin: 48px 0 14px; padding-bottom: 8px; border-bottom: 1px solid var(--line); }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 16px; }
+.card { position: relative; display: flex; flex-direction: column; background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 20px 20px 18px; text-decoration: none; color: inherit; overflow: hidden; transition: border-color .2s, transform .2s; min-height: 250px; }
+.card:hover, .card:focus-visible { border-color: var(--wave); transform: translateY(-2px); outline: none; }
+.num { position: absolute; right: 14px; top: 2px; font-family: "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 84px; font-weight: 700; line-height: 1; color: transparent; -webkit-text-stroke: 2px rgba(76,195,255,.35); pointer-events: none; }
+.part { align-self: flex-start; font-size: 11px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; padding: 3px 8px; border-radius: 4px; background: #1a2a40; color: var(--ink2); }
+.card[data-part="Design applications"] .part { color: var(--ssi); }
+.card[data-part="Advanced"] .part { color: var(--violet); }
+.title { font-size: 20px; font-weight: 700; line-height: 1.25; margin: 14px 64px 8px 0; }
+.sum { font-size: 14.5px; color: var(--ink2); margin: 0 0 14px; flex: 1; }
+.meta { display: flex; align-items: center; gap: 10px; font-size: 13.5px; color: var(--muted); }
+.meta .play { margin-left: auto; display: inline-flex; align-items: center; gap: 6px; color: var(--wave); font-weight: 650; }
+.meta .play svg { width: 13px; height: 13px; fill: currentColor; }
+.chap { font-size: 13px; color: var(--muted); margin: 0 0 12px; }
+.missing { opacity: .55; }
+footer { margin-top: 56px; font-size: 13px; color: var(--muted); }
+footer a { color: var(--wave); }
+</style>
+</head>
+<body>
+<main>
+  <div class="kicker">SASSI-EDU · guided course</div>
+  <h1>Explainer videos</h1>
+  <p class="lead">From fixed-base seismic design to soil-structure interaction with SASSI, in eleven short
+    narrated explainers, one per lesson. Each one gives you the big idea of its lesson in plain words, with the
+    numbers and curves of the lesson's own runs; the lesson itself is where you run the commands.</p>
+  <div class="row">
+    <a class="btn" href="01.html"><svg viewBox="0 0 24 24"><path d="M7 4.5v15l13-7.5z"/></svg>Start with lesson 1</a>
+    <span class="note">Short, plain-language explainers for newcomers, 3 to 4 minutes each, narrated with captions
+      and a transcript. Change the voice or the speed in the player (⚙).</span>
+  </div>
+  <div id="list"></div>
+  <footer>Keyboard in the player: space play / pause, ← → previous / next sentence, shift ← → chapters, c captions,
+    m voice, t transcript, f full screen. SASSI-EDU is an educational re-implementation of the SASSI methodology
+    and is not affiliated with the developers of ACS SASSI.</footer>
+</main>
+<script>
+"use strict";
+// The lessons (front matter of sassi/ui/lessons/*.md).
+const LESSONS = [
+  [1, "Fundamentals", "From fixed base to SSI: what changes and why", "Run a complete SSI analysis of a stick on a surface mat, then compare it with the same stick on a fixed base and on a massless foundation."],
+  [2, "Fundamentals", "The site: layers, half-space and free-field motion", "Build the layered site of example 1, run SITE, and check its free-field transfer functions against a one-dimensional SHAKE solution."],
+  [3, "Fundamentals", "Foundation impedance: soil springs and dashpots", "Compute the springs and dashpots of a rigid square mat on a half-space, compare them with the closed-form solutions you know, and see radiation damping at work."],
+  [4, "Fundamentals", "Your first SSI analysis: a stick on a surface mat", "Build example 1 command by command, run the SASSI chain, read transfer functions, ISRS, relative displacements and member forces, and explain the SSI frequency."],
+  [5, "Fundamentals", "Embedded structures and the flexible-volume method", "Model an embedded basement with its excavated soil, compare the FV, FI-FSIN, FI-EVBN and FFV interaction sets, and isolate kinematic interaction."],
+  [6, "Design applications", "Seismic input: spectrum-compatible motion and strain-compatible soil", "Turn a design spectrum into an SSI input: a spectrum-compatible record, a strain-compatible soil profile, and soil cases for property variation."],
+  [7, "Design applications", "Three earthquake directions and design ISRS", "X, Y and Z input as SV, SH and P waves in one ANALYS run, cross-coupling of an eccentric mass, SRSS and 100-40-40, and a broadened design ISRS."],
+  [8, "Design applications", "From SSI results to design: forces, displacements, ANSYS", "Member forces, basemat section resultants and relative displacements from an SSI run, and the Option A hand-off to a refined ANSYS model (LOADGEN)."],
+  [9, "Advanced", "Nonlinear soil and cracked concrete by iteration", "Soil and concrete nonlinearity through equivalent-linear iterations: free-field and near-field soil, then cracking shear walls with Option NON."],
+  [10, "Advanced", "Good practice, checks and the limits of SSI models", "Model checks, the low-frequency check, computed against interpolated transfer functions and CRITFREQ, the cut-off frequency, model size and method choice."],
+  [11, "Advanced", "An embedded building: the subtraction methods against FV", "A shear-wall building with a two-level basement run with FV, FI-FSIN and FI-EVBN: where the subtraction method goes wrong, why, and how to validate."],
+];
+const pad = (n) => String(n).padStart(2, "0");
+const PLAY = '<svg viewBox="0 0 24 24"><path d="M7 4.5v15l13-7.5z"/></svg>';
+function el(tag, cls, text) { const e = document.createElement(tag); if (cls) e.className = cls; if (text !== undefined) e.textContent = text; return e; }
+
+const list = document.getElementById("list");
+const cards = {};
+let part = "";
+let grid = null;
+for (const [n, p, title, sum] of LESSONS) {
+  if (p !== part) { part = p; list.appendChild(el("h2", "", p)); grid = el("div", "grid"); list.appendChild(grid); }
+  const a = el("a", "card missing");
+  a.href = pad(n) + ".html";
+  a.dataset.part = p;
+  a.appendChild(el("div", "num", pad(n)));
+  a.appendChild(el("span", "part", "Lesson " + n));
+  a.appendChild(el("div", "title", title));
+  a.appendChild(el("p", "sum", sum));
+  const chap = el("p", "chap");
+  a.appendChild(chap);
+  const meta = el("div", "meta");
+  const len = el("span", "", "");
+  meta.appendChild(len);
+  const play = el("span", "play");
+  play.innerHTML = PLAY + "Watch";
+  meta.appendChild(play);
+  a.appendChild(meta);
+  grid.appendChild(a);
+  cards[pad(n)] = {a, len, chap};
+}
+
+// Read every video in catalog mode (SV.catalog): its length and chapters, without playing it.
+function load(src) {
+  return new Promise((res) => { const s = document.createElement("script"); s.src = src; s.onload = () => res(true); s.onerror = () => res(false); document.body.appendChild(s); });
+}
+(async () => {
+  window.SV = window.SV || {};
+  SV.catalog = [];
+  await load("../figures.js");
+  if (!(await load("player.js")) || !(await load("kit.js"))) return;
+  SV.catalog = [];
+  for (const [n] of LESSONS) {
+    const id = pad(n), c = cards[id];
+    const before = SV.catalog.length;
+    try {
+      await load("d" + id + ".js");
+      await load("a" + id + ".js");
+      await load("v" + id + ".js");
+    } catch (e) { /* listed without details */ }
+    const def = SV.catalog.length > before ? SV.catalog[SV.catalog.length - 1] : null;
+    if (!def) { c.len.textContent = "coming soon"; c.a.removeAttribute("href"); continue; }
+    c.a.classList.remove("missing");
+    try { c.len.textContent = `≈ ${Math.round(SV.estimateMinutes(def))} min · ${def.scenes.length} chapters`; } catch (e) { c.len.textContent = `${def.scenes.length} chapters`; }
+    c.chap.textContent = def.scenes.map((s) => s.title).filter((t) => t && !/^Lesson \d+$/.test(t)).slice(0, 5).join(" · ") + (def.scenes.length > 6 ? " …" : "");
+  }
+})();
+</script>
+</body>
+</html>

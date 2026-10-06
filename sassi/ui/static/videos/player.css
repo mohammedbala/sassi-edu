@@ -1,0 +1,205 @@
+/* SASSI-EDU explainer videos -- the player and the visual language of the motion graphics.
+ *
+ * The stage is a 1920 x 1080 box scaled to fit (player.js); every scene draws in those logical pixels.
+ * Colours are semantic and shared by all eleven videos (docs/internal/explainer_videos.md):
+ *   --wave   free field, incoming waves, ground motion        --ssi    SSI result, inertial interaction
+ *   --ref    fixed-base reference                             --spring soil springs (real part of X_ff)
+ *   --dash   dashpots, radiation damping (imaginary part)     --kin    kinematic interaction
+ *   --good / --bad   checks passed / anomalies                 --sand --gravel --rock --deep  soil layers */
+
+.sv-page {
+  --bg0: #0a111d; --bg1: #0f1a2b; --bg2: #15233a;
+  --ink: #eef3f9; --ink2: #c3cfdd; --muted: #8197b0; --faint: #3a4d66; --line: #22334a;
+  --wave: #4cc3ff; --ssi: #ffb547; --ref: #93a1b3; --spring: #ffd166; --dash: #ff6fa5; --kin: #5fe1d0;
+  --good: #63e6a4; --bad: #ff6b6b; --violet: #a993ff;
+  --sand: #c8a46b; --gravel: #9a7a55; --rock: #6e6357; --deep: #4a433c;
+  --concrete: #b9c4d0; --concrete-fill: #283546; --steel: #dfe6ee;
+  --ui: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --mono: "SF Mono", Menlo, Consolas, "DejaVu Sans Mono", monospace;
+}
+html, body { margin: 0; height: 100%; }
+body.sv-page { background: #05090f; color: var(--ink); font-family: var(--ui); overflow: hidden; }
+.sv-page * { box-sizing: border-box; }
+
+/* ------------------------------------------------------------------ player layout */
+.sv-player { position: fixed; inset: 0; display: flex; flex-direction: column; background: #05090f; }
+.sv-main { flex: 1; display: flex; min-height: 0; }
+.sv-viewport { flex: 1; min-width: 0; display: flex; align-items: center; justify-content: center; position: relative; overflow: hidden; }
+.sv-frame { position: relative; overflow: hidden; border-radius: 6px; box-shadow: 0 10px 40px rgba(0,0,0,.6); background: var(--bg0); }
+.sv-stage { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; transform-origin: 0 0; overflow: hidden;
+  background:
+    radial-gradient(ellipse 80% 70% at 30% 20%, rgba(76,195,255,.07), transparent 70%),
+    radial-gradient(ellipse 70% 60% at 85% 90%, rgba(255,181,71,.05), transparent 70%),
+    linear-gradient(160deg, var(--bg1), var(--bg0) 70%);
+  font-family: var(--ui); color: var(--ink); }
+.sv-stage::before { content: ""; position: absolute; inset: 0; pointer-events: none;
+  background-image: linear-gradient(rgba(130,160,200,.045) 1px, transparent 1px), linear-gradient(90deg, rgba(130,160,200,.045) 1px, transparent 1px);
+  background-size: 60px 60px; }
+.sv-scene { position: absolute; inset: 0; transition: opacity .45s ease; }
+.sv-scene.sv-leaving { opacity: 0; }
+.sv-scene > svg.sv-svg { position: absolute; inset: 0; width: 1920px; height: 1080px; overflow: visible; }
+.sv-brand { position: absolute; left: 60px; bottom: 34px; font: 600 22px var(--ui); color: rgba(195,207,221,.38); letter-spacing: .08em; text-transform: uppercase; pointer-events: none; z-index: 5; }
+.sv-chap { position: absolute; right: 60px; bottom: 34px; font: 500 22px var(--ui); color: rgba(195,207,221,.38); pointer-events: none; z-index: 5; }
+
+/* caption line under the frame */
+.sv-caption { min-height: 3.3em; display: flex; align-items: center; justify-content: center; padding: 8px 24px; font-size: clamp(14px, 1.7vw, 21px); line-height: 1.35; color: #f3f6fa; text-align: center; background: #05090f; }
+.sv-caption span { max-width: 1100px; }
+.sv-caption.off { display: none; }
+.sv-caption .sv-cap-faint { color: #6f8197; }
+
+/* control bar */
+.sv-controls { display: flex; align-items: center; gap: 6px; padding: 6px 12px 10px; background: #05090f; color: #d6dee8; font-size: 13px; user-select: none; }
+.sv-btn { background: transparent; border: 1px solid transparent; color: #d6dee8; border-radius: 6px; height: 34px; min-width: 34px; padding: 0 8px; cursor: pointer; font: inherit; display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
+.sv-btn:hover { background: #142033; }
+.sv-btn:focus-visible { outline: 2px solid var(--wave); outline-offset: 1px; }
+.sv-btn.on { color: var(--wave); }
+.sv-btn svg { width: 18px; height: 18px; fill: currentColor; }
+.sv-time { font-variant-numeric: tabular-nums; color: #9fb0c3; min-width: 92px; text-align: center; white-space: nowrap; }
+.sv-bar { flex: 1; height: 26px; position: relative; cursor: pointer; min-width: 60px; }
+.sv-bar-track { position: absolute; left: 0; right: 0; top: 11px; height: 4px; background: #1f2c3f; border-radius: 2px; }
+.sv-bar-fill { position: absolute; left: 0; top: 11px; height: 4px; background: var(--wave); border-radius: 2px; width: 0; }
+.sv-bar-tick { position: absolute; top: 8px; width: 2px; height: 10px; background: #05090f; }
+.sv-bar-knob { position: absolute; top: 6px; width: 14px; height: 14px; margin-left: -7px; border-radius: 50%; background: #fff; box-shadow: 0 0 0 3px rgba(76,195,255,.35); }
+.sv-bar:hover .sv-bar-track, .sv-bar:hover .sv-bar-fill { height: 6px; top: 10px; }
+.sv-bar-tip { position: absolute; bottom: 28px; transform: translateX(-50%); background: #142033; border: 1px solid #2a3b52; padding: 4px 8px; border-radius: 5px; white-space: nowrap; font-size: 12px; pointer-events: none; display: none; }
+.sv-bar:hover .sv-bar-tip { display: block; }
+.sv-menu { position: absolute; bottom: 52px; right: 12px; background: #0f1828; border: 1px solid #2a3b52; border-radius: 8px; padding: 12px 14px; display: none; z-index: 30; width: 320px; box-shadow: 0 10px 30px rgba(0,0,0,.5); }
+.sv-menu.open { display: block; }
+.sv-menu label { display: block; font-size: 12px; color: #8ea1b7; margin: 8px 0 4px; }
+.sv-menu select { width: 100%; background: #142033; color: #e6edf5; border: 1px solid #2a3b52; border-radius: 5px; padding: 5px; font: inherit; }
+.sv-menu .sv-note { font-size: 12px; color: #8ea1b7; margin-top: 10px; line-height: 1.4; }
+.sv-menu a { color: var(--wave); }
+
+/* transcript side panel */
+.sv-transcript { width: 360px; flex: none; overflow-y: auto; background: #08101b; border-left: 1px solid #1a2638; padding: 14px 16px 40px; display: none; font-size: 14px; line-height: 1.45; }
+.sv-transcript.open { display: block; }
+.sv-transcript h3 { font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: var(--wave); margin: 18px 0 6px; }
+.sv-transcript p { margin: 0 0 6px; padding: 3px 6px; border-radius: 4px; color: #b7c4d3; cursor: pointer; }
+.sv-transcript p:hover { background: #111c2c; }
+.sv-transcript p.now { background: #13243a; color: #fff; }
+
+/* start / end overlays */
+.sv-overlay { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px; background: rgba(5,9,15,.72); backdrop-filter: blur(3px); z-index: 20; text-align: center; padding: 20px; }
+.sv-overlay[hidden] { display: none; }
+.sv-overlay .sv-o-kicker { font-size: clamp(11px, 1.3vw, 16px); letter-spacing: .14em; text-transform: uppercase; color: var(--wave); }
+.sv-overlay .sv-o-title { font-size: clamp(20px, 3.4vw, 46px); font-weight: 700; max-width: 900px; line-height: 1.15; }
+.sv-overlay .sv-o-sub { font-size: clamp(12px, 1.5vw, 18px); color: #a9b8c9; max-width: 760px; line-height: 1.4; }
+.sv-overlay .sv-o-play { width: clamp(56px, 8vw, 96px); height: clamp(56px, 8vw, 96px); border-radius: 50%; border: none; background: var(--wave); color: #04111c; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 0 10px rgba(76,195,255,.18); }
+.sv-overlay .sv-o-play svg { width: 42%; height: 42%; fill: currentColor; margin-left: 6%; }
+.sv-overlay .sv-o-play:hover { transform: scale(1.05); }
+.sv-overlay .sv-o-row { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; }
+.sv-overlay .sv-o-btn { background: #142033; color: #e6edf5; border: 1px solid #2a3b52; border-radius: 8px; padding: 10px 18px; font: inherit; font-size: clamp(12px, 1.4vw, 16px); cursor: pointer; text-decoration: none; }
+.sv-overlay .sv-o-btn.primary { background: var(--wave); color: #04111c; border-color: var(--wave); font-weight: 600; }
+.sv-overlay .sv-o-voice { font-size: clamp(11px, 1.2vw, 14px); color: #7f93ab; }
+
+.sv-shot .sv-caption, .sv-shot .sv-controls, .sv-shot .sv-transcript, .sv-shot .sv-debug { display: none !important; }
+.sv-shot .sv-frame { border-radius: 0; box-shadow: none; }
+.sv-debug { position: absolute; top: 8px; left: 8px; z-index: 25; background: rgba(0,0,0,.6); color: #9fe; font: 12px var(--mono); padding: 3px 7px; border-radius: 4px; }
+
+/* ------------------------------------------------------------------ reveal system (k.show / k.hide) */
+.sv-in { opacity: 0; translate: 0 26px; transition: opacity .35s ease, translate .42s cubic-bezier(.2,.8,.2,1), scale .42s cubic-bezier(.2,.8,.2,1); }
+.sv-in.sv-left { translate: -48px 0; }
+.sv-in.sv-right { translate: 48px 0; }
+.sv-in.sv-down { translate: 0 -26px; }
+.sv-in.sv-fade { translate: none; }
+.sv-in.sv-pop { translate: none; scale: .55; transform-box: fill-box; transform-origin: center; transition: opacity .4s ease, scale .6s cubic-bezier(.3,1.6,.5,1); }
+.sv-in.sv-on { opacity: 1; translate: 0 0; scale: 1; }
+.sv-gone { opacity: 0 !important; transition: opacity .5s ease !important; }
+.sv-dim { opacity: .22 !important; transition: opacity .5s ease !important; }
+.sv-instant, .sv-instant * { transition: none !important; animation: none !important; }
+
+/* ------------------------------------------------------------------ HTML components on the stage (kit.js) */
+.sv-abs { position: absolute; }
+.sv-kicker { font-size: 26px; font-weight: 600; letter-spacing: .16em; text-transform: uppercase; color: var(--wave); }
+.sv-h1 { font-size: 76px; font-weight: 750; line-height: 1.08; letter-spacing: -.01em; }
+.sv-h2 { font-size: 54px; font-weight: 700; line-height: 1.12; letter-spacing: -.005em; }
+.sv-h3 { font-size: 38px; font-weight: 650; line-height: 1.2; }
+.sv-body { font-size: 34px; line-height: 1.4; color: var(--ink2); }
+.sv-small { font-size: 26px; line-height: 1.35; color: var(--muted); }
+.sv-label { font-size: 28px; font-weight: 600; color: var(--ink2); white-space: nowrap; }
+.sv-mono { font-family: var(--mono); }
+.sv-hl { color: var(--ssi); }
+.sv-hlb { color: var(--wave); }
+
+.sv-title-card { position: absolute; left: 150px; top: 300px; width: 1620px; }
+.sv-title-card .sv-num { font-family: "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 230px; font-weight: 700; line-height: .8; color: transparent; -webkit-text-stroke: 3px rgba(76,195,255,.55); position: absolute; right: 0; top: -40px; }
+.sv-title-card .sv-part { display: inline-block; font-size: 24px; font-weight: 600; letter-spacing: .14em; text-transform: uppercase; color: #04111c; background: var(--wave); padding: 6px 14px; border-radius: 4px; }
+.sv-title-card .sv-t { font-size: 92px; font-weight: 800; line-height: 1.04; margin-top: 30px; max-width: 1180px; letter-spacing: -.015em; }
+.sv-title-card .sv-st { font-size: 40px; color: var(--ink2); margin-top: 26px; max-width: 1180px; line-height: 1.3; }
+.sv-title-card .sv-rule { height: 6px; width: 180px; background: linear-gradient(90deg, var(--wave), var(--ssi)); border-radius: 3px; margin-top: 46px; }
+
+.sv-bullets { position: absolute; list-style: none; margin: 0; padding: 0; }
+.sv-bullets li { position: relative; padding-left: 52px; margin: 0 0 26px; font-size: 38px; line-height: 1.3; color: var(--ink); }
+.sv-bullets li::before { content: ""; position: absolute; left: 6px; top: 16px; width: 18px; height: 18px; border-radius: 4px; background: var(--wave); transform: rotate(45deg); }
+.sv-bullets li .sv-sub { display: block; font-size: 28px; color: var(--muted); margin-top: 4px; }
+.sv-bullets.num { counter-reset: n; }
+.sv-bullets.num li::before { counter-increment: n; content: counter(n); transform: none; width: 38px; height: 38px; top: 2px; left: 0; border-radius: 50%; font-size: 24px; font-weight: 700; color: #04111c; display: flex; align-items: center; justify-content: center; }
+
+.sv-card { position: absolute; background: rgba(20,32,51,.82); border: 1px solid #2a3b52; border-radius: 16px; padding: 30px 36px; box-shadow: 0 16px 40px rgba(0,0,0,.35); }
+.sv-card .sv-card-t { font-size: 24px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--wave); margin-bottom: 12px; }
+.sv-card .sv-card-b { font-size: 32px; line-height: 1.4; color: var(--ink); }
+.sv-card.ansys { border-color: rgba(255,181,71,.55); }
+.sv-card.ansys .sv-card-t { color: var(--ssi); }
+.sv-card.check { border-color: rgba(99,230,164,.55); }
+.sv-card.check .sv-card-t { color: var(--good); }
+.sv-card.warn { border-color: rgba(255,107,107,.6); }
+.sv-card.warn .sv-card-t { color: var(--bad); }
+
+.sv-stat { position: absolute; text-align: center; }
+.sv-stat .sv-stat-v { font-size: 120px; font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; letter-spacing: -.02em; }
+.sv-stat .sv-stat-u { font-size: 48px; font-weight: 600; color: var(--ink2); margin-left: 8px; }
+.sv-stat .sv-stat-l { font-size: 28px; color: var(--muted); margin-top: 10px; }
+
+.sv-code { position: absolute; background: #070d16; border: 1px solid #22334a; border-radius: 12px; padding: 22px 28px 24px; font-family: var(--mono); font-size: 30px; line-height: 1.5; color: #dfe8f2; box-shadow: 0 16px 40px rgba(0,0,0,.4); }
+.sv-code .sv-code-h { font-family: var(--ui); font-size: 20px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; color: #6f86a1; margin-bottom: 10px; }
+.sv-code .ln { white-space: pre; min-height: 1.5em; }
+.sv-code .ln.c { color: #63b37a; }
+.sv-code .ln .cmd { color: var(--wave); font-weight: 600; }
+.sv-code .ln.typing::after { content: ""; display: inline-block; width: .55em; height: 1.05em; background: var(--wave); vertical-align: -0.15em; margin-left: 2px; animation: sv-blink 1s steps(1) infinite; }
+@keyframes sv-blink { 50% { opacity: 0; } }
+
+.sv-eq { position: absolute; font-size: 46px; color: var(--ink); }
+.sv-eq .katex { font-size: 1em; }
+.sv-eq-box { background: rgba(20,32,51,.75); border: 1px solid #2a3b52; border-radius: 14px; padding: 18px 30px; }
+
+.sv-table { position: absolute; border-collapse: collapse; font-size: 32px; font-variant-numeric: tabular-nums; }
+.sv-table th { font-size: 24px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); text-align: left; padding: 10px 26px; border-bottom: 2px solid #2a3b52; }
+.sv-table td { padding: 14px 26px; border-bottom: 1px solid #1d2b3f; color: var(--ink); }
+.sv-table td:first-child { color: var(--ink2); }
+.sv-table tr.sv-in { translate: -30px 0; }
+.sv-table tr.sv-in.sv-on { translate: 0 0; }
+
+.sv-tag { display: inline-block; font-size: 22px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; padding: 5px 12px; border-radius: 5px; background: #1a2a40; color: var(--ink2); }
+.sv-pill { position: absolute; font-size: 26px; font-weight: 650; padding: 10px 22px; border-radius: 999px; border: 2px solid currentColor; background: rgba(10,17,29,.85); white-space: nowrap; }
+
+/* ------------------------------------------------------------------ SVG classes (kit.js) */
+.sv-svg text { font-family: var(--ui); fill: var(--ink2); }
+.sv-svg .t-label { font-size: 28px; font-weight: 600; fill: var(--ink2); }
+.sv-svg .t-small { font-size: 23px; fill: var(--muted); }
+.sv-svg .t-big { font-size: 40px; font-weight: 700; fill: var(--ink); }
+.sv-svg .t-mono { font-family: var(--mono); }
+.sv-svg .ax { stroke: #50657f; stroke-width: 2; fill: none; }
+.sv-svg .grid { stroke: rgba(130,160,200,.12); stroke-width: 1.5; fill: none; }
+.sv-svg .tick { font-size: 22px; fill: #8197b0; }
+.sv-svg .axlab { font-size: 26px; fill: var(--ink2); font-weight: 600; }
+.sv-svg .curve { fill: none; stroke-width: 5; stroke-linejoin: round; stroke-linecap: round; }
+.sv-svg .glow { filter: drop-shadow(0 0 8px currentColor); }
+.sv-svg .struct { stroke: var(--steel); stroke-width: 7; fill: none; stroke-linecap: round; stroke-linejoin: round; }
+.sv-svg .mass { fill: var(--steel); stroke: #0a111d; stroke-width: 3; }
+.sv-svg .mat { fill: #3b4a5e; stroke: var(--concrete); stroke-width: 3; }
+.sv-svg .concrete { fill: var(--concrete-fill); stroke: var(--concrete); stroke-width: 3; }
+.sv-svg .ghost { stroke: rgba(147,161,179,.45); stroke-dasharray: 10 8; fill: none; }
+.sv-svg .spring { stroke: var(--spring); stroke-width: 4.5; fill: none; stroke-linejoin: round; stroke-linecap: round; }
+.sv-svg .dashpot { stroke: var(--dash); stroke-width: 4.5; fill: none; stroke-linecap: round; }
+.sv-svg .wave { stroke: var(--wave); fill: none; stroke-width: 4; stroke-linecap: round; }
+.sv-svg .node { fill: var(--wave); }
+.sv-svg .hatch { stroke: #6a7e96; stroke-width: 2.5; }
+
+/* equation terms marked \htmlClass{name}{...}: k.cls(".name", "eqhl") highlights, "eqdim" fades */
+.sv-eq [class*="t-"] { transition: color .5s ease, opacity .5s ease, text-shadow .5s ease; }
+.sv-eq .eqhl { color: var(--ssi); text-shadow: 0 0 22px rgba(255,181,71,.45); }
+.sv-eq .eqhl2 { color: var(--wave); text-shadow: 0 0 22px rgba(76,195,255,.45); }
+.sv-eq .eqhl3 { color: var(--spring); text-shadow: 0 0 22px rgba(255,209,102,.45); }
+.sv-eq .eqdim { opacity: .3; }
+.sv-x { position: absolute; font-size: 26px; font-weight: 800; letter-spacing: .06em; color: var(--bad); border: 3px solid var(--bad); border-radius: 8px; padding: 2px 12px; rotate: -8deg; background: rgba(10,17,29,.9); }
+.sv-ok { position: absolute; font-size: 26px; font-weight: 800; letter-spacing: .06em; color: var(--good); border: 3px solid var(--good); border-radius: 8px; padding: 2px 12px; rotate: -6deg; background: rgba(10,17,29,.9); }

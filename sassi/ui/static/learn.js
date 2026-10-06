@@ -65,6 +65,14 @@
   };
   L.lessons = () => (L.outline ? L.outline.parts.flatMap((p) => p.lessons) : []);
   L.lessonNumber = (id) => L.lessons().findIndex((x) => x.id === id) + 1;
+  /** The explainer video of a lesson (static/videos/NN.html, NN = its number in the course) or the list of
+   *  them; it opens in a browser tab of its own (narrated by the browser's text-to-speech). */
+  L.videoUrl = (id) => (id ? `static/videos/${String(L.lessonNumber(id)).padStart(2, "0")}.html` : "static/videos/index.html");
+  L.watchVideo = function (id) {
+    const w = window.open(L.videoUrl(id), "_blank");
+    if (w) w.opener = null;
+    else S.local("WARNING", `The browser blocked the new tab: open ${L.videoUrl(id)} yourself.`);
+  };
   L.findLesson = (id) => L.lessons().find((x) => x.id === id) || null;
 
   // ------------------------------------------------------------------ progress (per browser)
@@ -437,7 +445,9 @@
         el("label", {class: "learn-auto"}, showAtStart, " Show this page when the GUI starts")));
   }
   function coursePanel() {
-    const sec = el("section", {class: "learn-sec", id: "learn-course"}, el("h2", {text: "The course"}));
+    const sec = el("section", {class: "learn-sec", id: "learn-course"}, el("h2", {text: "The course"}),
+      el("p", {}, "Every lesson has a short narrated explainer video (3-4 minutes) with its big idea in plain words: ",
+        btn("▶ Explainer videos", () => L.watchVideo(null), {class: "btn small linkbtn"})));
     const o = L.outline || {parts: []};
     if (!o.parts.length) sec.appendChild(el("p", {class: "empty", text: "No lessons are installed yet (sassi/ui/lessons/*.md). The examples below can be loaded and run already."}));
     let n = 0;
@@ -465,6 +475,7 @@
         p.done.length || p.last ? btn("Reset progress", async () => {
           if (await D().confirm("Reset progress", `Forget the completed steps of "${les.title}" in this browser?`, "Reset", "Cancel")) { L.resetProgress(les.id); renderStart(); if (S.rebuildMenus) S.rebuildMenus(); }
         }, {class: "btn small linkbtn"}) : null,
+        btn("▶ Explainer", () => L.watchVideo(les.id), {class: "btn small linkbtn", title: "the narrated explainer video of this lesson (new browser tab)"}),
         btn(state, () => L.openLesson(les.id, {step: state === "Continue" ? p.last : 0}), {class: "btn small primary"})));
     return card;
   }
@@ -847,7 +858,8 @@
       el("div", {class: "lesson-meta"},
         les.minutes ? el("span", {text: `About ${les.minutes} min`}) : null,
         les.example ? el("span", {}, "Example ", el("code", {text: les.example})) : null,
-        pre.length ? el("span", {class: "lesson-pre"}, "Builds on: ", ...pre) : null),
+        pre.length ? el("span", {class: "lesson-pre"}, "Builds on: ", ...pre) : null,
+        btn("▶ Watch the explainer video", () => L.watchVideo(les.id), {class: "btn small", title: "a narrated motion-graphics explainer of this lesson, in a new browser tab"})),
       intro,
       el("p", {class: "lesson-ws"}, "Workspace: ", el("code", {text: ws})),
       el("section", {class: "lpanel lpanel-how"}, el("h4", {text: "How to use the lesson panel"}),
@@ -1057,6 +1069,7 @@
     if (!parts.length) items.push({label: "(no lessons installed)", disabled: true});
     items.push("-",
       {label: "How SASSI Works", action: () => L.openStart({section: "how"})},
+      {label: "Explainer Videos", action: () => L.watchVideo(null), tip: "one narrated motion-graphics video per lesson (new browser tab)"},
       {label: "Examples Gallery", action: () => L.openStart({section: "examples"})},
       {label: "Open Example...", action: () => L.examplesDialog()},
       {label: "Explain a Command...", action: () => L.askExplain(), tip: "the arguments of a command line explained"},

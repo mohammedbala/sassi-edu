@@ -180,7 +180,7 @@ that the folder stays one argument when the history is replayed.
 
 The guided course (section 13): **Start Page** (the Learn tab), **Continue: <lesson>**, the lessons by
 part (Fundamentals, Design applications, Advanced) with the steps completed (`3/7`), **How SASSI Works**,
-**Examples Gallery**, **Open Example...**, **Explain a Command...**, **Lesson Layout** (full width or side
+**Explainer Videos** (section 13.7), **Examples Gallery**, **Open Example...**, **Explain a Command...**, **Lesson Layout** (full width or side
 panel), **Course Workspace Folder...**, **Free Disk Space...** and **Reset Course Progress**.
 
 ### 3.8 Help
@@ -688,7 +688,8 @@ this off) and from **Learn > Start Page** or the toolbar button with the graduat
   ANSYS analogy where there is one, and buttons for the lesson that teaches it, the Theory Manual section
   and the explanation of its `RUN<MODULE>` command;
 * **The course**: the lessons grouped by part, each with its number, title, summary, time, objectives,
-  example, prerequisites and a progress bar (steps completed), and **Start**, **Continue** or **Review**;
+  example, prerequisites and a progress bar (steps completed), **▶ Explainer** (the lesson's video,
+  section 13.7) and **Start**, **Continue** or **Review**;
 * **Examples**: one card per `examples/*.pre` (section 13.5);
 * **While you work**: how to explain commands and try your own variations.
 
@@ -845,6 +846,24 @@ dialog.
 The lessons are Markdown files in `sassi/ui/lessons/` (format: `docs/internal/lesson_format.md`). The GUI
 re-reads them on every request, so a lesson being written appears in the course at once; a file that
 cannot be parsed is listed under the course with its error instead of hiding the others.
+
+### 13.7 Explainer videos
+
+Every lesson has a narrated **motion-graphics explainer video** (about 3-4 minutes) for newcomers: the one
+big idea of the lesson in plain words and everyday pictures, how SASSI computes it, and what it changes
+for a design, with the lesson's own results (the curves are the lesson's runs, `python -m sassi.ui.video_data`). They open in
+a browser tab of their own from **▶ Explainer** on a lesson card, **▶ Watch the explainer video** on a
+lesson's introduction, or **Learn > Explainer Videos** (the list of all eleven); the files are
+`sassi/ui/static/videos/NN.html` and also open directly from disk.
+
+The videos are HTML, SVG and JavaScript; the **voiceover is recorded** with ElevenLabs (one small MP3 per
+sentence, `web/voice_videos.mjs`), with the browser's text-to-speech as an alternative voice (⚙) and as the
+fallback for a sentence without a recording. The player has captions (**c**), a
+transcript with the chapters (**t**; a click on a sentence jumps there), play / pause (**space**),
+previous / next sentence (**← →**) and chapter (**shift ← →**), voice on / off (**m**, captions only),
+full screen (**f**), and ⚙ for the voice and the speed (1× to 1.6×; 1.15× by default). Authoring contract:
+`docs/internal/explainer_videos.md`; `node web/test_videos.mjs` plays every beat of every video in
+headless Chrome.
 
 ## 14. How the GUI is tested
 

@@ -244,6 +244,25 @@ class Handler(BaseHTTPRequestHandler):
                 return
             self._send(200, p.read_bytes(), "image/png")
             return
+        m = re.match(r"^/static/videos/audio/(\d\d)/([0-9a-f]{8})\.mp3$", path)
+        if m:
+            # the recorded narration of the explainer videos (web/voice_videos.mjs): one clip per sentence
+            p = STATIC_DIR / "videos" / "audio" / m.group(1) / (m.group(2) + ".mp3")
+            if not p.is_file():
+                self._json(404, {"error": "not found"})
+                return
+            self._send(200, p.read_bytes(), "audio/mpeg", {"Cache-Control": "max-age=86400"})
+            return
+        m = re.match(r"^/static/videos/([A-Za-z0-9][A-Za-z0-9_\-]*\.(?:html|js|css))$", path)
+        if m:
+            # the explainer videos of the course (sassi/ui/static/videos: pages, scripts, data)
+            p = STATIC_DIR / "videos" / m.group(1)
+            if not p.is_file():
+                self._json(404, {"error": "not found"})
+                return
+            ctype = mimetypes.guess_type(p.name)[0] or "application/octet-stream"
+            self._send(200, p.read_bytes(), ctype + "; charset=utf-8")
+            return
         if path.startswith("/static/"):
             name = path[len("/static/"):]
             if not name or "/" in name or "\\" in name or name.startswith("."):
