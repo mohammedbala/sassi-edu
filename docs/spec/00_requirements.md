@@ -978,6 +978,7 @@ default, directly after the base command, so default models produce manual-ident
 | BUILDFILE77 | `BUILDFILE77,<out>,<in1>,…,<inN>` | P1 | Build_FILE77 for per-level incoherency |
 | COMBXYZTHD | `COMBXYZTHD,<inpfile>` | P2 | COMB_XYZ_THD |
 | VERIFY | `VERIFY,[id\|P0\|ALL]` | P0 | Run verification problems of §6 and print pass/fail |
+| SHOWSOIL | `SHOWSOIL,[opt -1],[cut],[margin],[depth]` | P1 | The free-field soil drawn around the foundation in the element and node plots (display only; §7.20) |
 
 ---
 
@@ -2290,6 +2291,21 @@ module, `sassi/prep/defaults.py`, used by CHECK, AFWRITE, the RUN commands, `LIB
 | D-W5-13 | Decks | AFWRITE writes the default into the deck (Shown = used, like `<nrfreq>` and SITE `<freq2>`); a built-in file is written as its portable `@` name, which every module resolves. A module run from a hand-written deck with a blank input keeps the ACS module errors: the defaults are a preprocessor policy | module tests unchanged |
 | D-W5-14 | GUI | A blank file field shows its default as placeholder ("built-in: RG 1.60, 0.30 g (@rg160h_030g.acc)"), computed with the rules above on the values being edited (type, `<fopt>`, Δt, `<accopt>`, spectrum number); file fields have a Library button listing the built-in files that fit (records for THFILE / ACCIN / SOILX, loads for THFILE, spectra for RSIN, PSDs for TPSD); the soil-curve field and Select Dynamic Soil Property list the library curves; a model without SPRO shows the default profile on the layer pages, stored with the first page changed (as the implicit wave field) | `tests/unit/test_input_defaults.py` |
 
+
+### 7.20 Lead decisions: the soil island picture (wave 6, binding)
+
+The user expected to see a soil island. SASSI has none: the layered site (TOPL / L layers on the SITE
+half-space) is horizontally infinite and enters the analysis through the impedance at the interaction nodes;
+the only soil elements of a model are the excavated soil. An engineer used to a direct (box-of-soil) model
+still wants to see the model in its site, so SASSI-EDU draws the free-field profile around the foundation as a
+picture, and says on the plot that it is one.
+
+| ID | Subject | Decision | Evidence |
+|---|---|---|---|
+| D-W6-01 | Command | New extension command `SHOWSOIL,[opt],[cut],[margin],[depth]` (P1, full name, class ui): `opt` -1 toggle (default), 0 off, 1 on; `cut` -1 automatic (cut when the foundation is embedded), 0 none, 1 cut; `margin`, `depth` lengths, 0 = automatic. A blank field keeps its value. A 3D view setting like `SHOWMASS` (`View3D.show_soil`, `soil_cut`, `soil_margin`, `soil_depth`): it acts on the active MODELPLOT / NODEPLOT, else becomes the default of new 3D plots; the 3D Plot toolbar has a button. With a plot it prints what is drawn and that it is a display aid | user request; `tests/unit/test_soil_island.py` |
+| D-W6-02 | Geometry | `sassi.plotting.state.soil_island`: the foundation is the plan box of the interaction nodes (else of the element nodes at or below grade, else of all element nodes) and its lowest point; the top of the soil is the ground elevation (HOUSE `<gelev>`), each layer of `layer_table` at its depth, the half-space below. Automatic extent: margin = max(B/2, 0.3 × depth drawn, embedment); depth = the whole profile plus a half-space band of a quarter of the profile depth (a profile deeper than max(2.5 B, D + 1.5 B) is cut there, the plot says how many layers are not drawn); B = plan width, D = embedment. The plan box down to the lowest point is left open for the model (excavated soil, basement); the soil top under a surface foundation is not drawn (the model's face is there). The cut removes the quarter facing the viewer (sign of the view direction in X and Y; +X, -Y in the default view) through the centre of the foundation, down to the bottom. Only the boundary faces of the soil cells are drawn, with their outward normals; outline and crease lines, and the layer interfaces as thin lines | `tests/unit/test_soil_island.py` (face count and closure, opening, cut, depths, extents) |
+| D-W6-03 | Colours | One colour per layer from light sand (smallest Vs of the profile) to dark brown (largest), neighbouring layers alternating 7 % in shade so that equal sublayers stay distinct; the half-space grey. Hover (GUI) gives the layer, its depths, thickness, Vs, Vp, unit weight and damping; a click prints them | `sassi/ui/static/plots.js` `soilTraces` |
+| D-W6-04 | Fit and rendering | The plot box, the rotation centre and the camera fit include the soil (toggling re-fits). GUI: one plotly mesh per layer; the node plot draws the soil see-through. Headless renderer (CAPTUREPLOT, batch): the soil faces that face the viewer join the model faces and the beams (as screen-plane ribbons) in one depth-sorted collection; interaction markers inside the soil are not drawn | `tests/unit/test_soil_island.py` (PNG rendering) |
 ---
 
 ## 8. Implementation order and acceptance gates (informative)

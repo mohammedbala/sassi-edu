@@ -15,6 +15,8 @@ Contents
 * :func:`model_scene` -- nodes, faces, lines and markers of a model for MODELPLOT / NODEPLOT /
   CUTPLOT and the animations (spec 06 sections 2-4).
 * :func:`layer_table`, :func:`soil_property_curves` -- LAYERPLOT / SOILPROPPLOT data.
+* :func:`soil_island` -- the free-field soil layers drawn around the foundation (SHOWSOIL, a display
+  aid of SASSI-EDU, requirements 7.20).
 * Frame files (D-FIL-03), the frame store written by PROCFRAME (requirements 5.8: one ``.npy`` per
   frame + ``index.json``) and the ``SASSIani.xml`` animation database (D-UI-15).
 * Animation maths: frame sequence, jet colour map with clamping, bubble size (D-UI-14), vector
@@ -78,6 +80,7 @@ CAPABILITY: Dict[str, frozenset] = {
     "NODENUM": THREE_D,
     "SHOWDOF": frozenset({"MODELPLOT", "NODEPLOT"}),
     "SHOWMASS": frozenset({"MODELPLOT", "NODEPLOT"}),
+    "SHOWSOIL": frozenset({"MODELPLOT", "NODEPLOT"}),
     "CNGVIEW": THREE_D, "RSTVIEW": THREE_D, "CNGCENTER": THREE_D, "RSTCENTER": THREE_D,
     "DEBUG": THREE_D,
     "PAUSE": ANIMATIONS,
@@ -85,7 +88,7 @@ CAPABILITY: Dict[str, frozenset] = {
 #: setting commands that become session defaults for new plots when no plot is active
 DEFAULTABLE_2D = frozenset({"AXES", "PLOTRANGE", "XTITLE", "YTITLE", "YTITLE2", "STIPPLE"})
 DEFAULTABLE_3D = frozenset({"ELECOLOR", "SHRINK", "WIREFRAME", "ELENUM", "GROUPNUM", "NODENUM", "SHOWDOF",
-                            "SHOWMASS", "CNGVIEW", "RSTVIEW", "CNGCENTER", "RSTCENTER", "DEBUG"})
+                            "SHOWMASS", "SHOWSOIL", "CNGVIEW", "RSTVIEW", "CNGCENTER", "RSTCENTER", "DEBUG"})
 
 #: SHOWDOF labels -> DOF indices 0..5 (UX UY UZ ROTX ROTY ROTZ); spec 10 section 4.6
 SHOWDOF_LABELS: Dict[str, Tuple[int, ...]] = {
@@ -284,6 +287,10 @@ class View3D:
     wireframe: bool = False       # WIREFRAME (element plot)
     show_dof: List[int] = field(default_factory=list)   # SHOWDOF: DOF indices 0..5 marked
     show_mass: bool = False       # SHOWMASS
+    show_soil: bool = False       # SHOWSOIL (SASSI-EDU): the free-field layers drawn around the foundation
+    soil_cut: int = -1            # SHOWSOIL <cut>: -1 automatic (embedded), 0 none, 1 the quarter facing the viewer
+    soil_margin: float = 0.0      # SHOWSOIL <margin>: soil drawn beyond the foundation (0 = automatic)
+    soil_depth: float = 0.0       # SHOWSOIL <depth>: depth below grade drawn (0 = automatic)
     debug: bool = False           # DEBUG overlay (view values, animation info)
     paused: bool = False          # PAUSE (animations): False = running
     direction: str = "X"          # vector plot Output Direction X / Y / Z / ALL (Window Options)
@@ -835,16 +842,19 @@ def to_screen(points: np.ndarray, basis: np.ndarray, center: Sequence[float]) ->
     return P[:, 0:1] * R[:, 0] + P[:, 1:2] * R[:, 1] + P[:, 2:3] * R[:, 2]
 
 
-def view_frame(view: View3D, scene: Dict[str, Any]) -> Dict[str, Any]:
+def view_frame(view: View3D, scene: Dict[str, Any], extra: Optional[np.ndarray] = None) -> Dict[str, Any]:
     """Resolved camera of a 3D plot: rotation, centre, screen extent (orthographic).
 
     ``basis``: rows right / up / toward-viewer in model coordinates (plotly: ``up`` = basis[1],
     ``eye`` direction = basis[2]); ``extent`` [x0, x1, y0, y1] of the screen window in model length
-    units (fit of the rotated bounding box, divided by ``zoom``, shifted by the pan).
+    units (fit of the rotated bounding box, divided by ``zoom``, shifted by the pan).  ``extra``
+    (k, 3): further points the fit includes (the corners of the soil island, SHOWSOIL).
     """
     R = rotation_matrix(view.rx, view.ry, view.rz)
     c = np.asarray(view.center if view.center is not None else scene["center"], dtype=float)
     xyz = scene["xyz"]
+    if extra is not None and len(extra):
+        xyz = np.vstack([np.asarray(xyz, dtype=float).reshape(-1, 3), np.asarray(extra, dtype=float).reshape(-1, 3)])
     if len(xyz):
         s = to_screen(xyz, R, c)
         half = max(float(np.max(np.abs(s[:, 0]))), float(np.max(np.abs(s[:, 1]))), 1e-9) * 1.08
@@ -933,6 +943,281 @@ def soil_property_curves(model, name: str) -> Dict[str, Any]:
             "g_strain": [float(a) for a, _ in g], "g": [float(b) for _, b in g],
             "d_strain": [float(a) for a, _ in d], "d": [float(b) for _, b in d],
             "points": len(pts)}
+
+
+# ======================================================================================
+# Soil island (SHOWSOIL; SASSI-EDU display aid, requirements 7.20)
+# ======================================================================================
+#: soil colours: light sand for the softest layer of the profile to dark brown for the stiffest;
+#: neighbouring layers alternate slightly in shade so that equal sublayers stay distinct
+SOIL_SOFT = (0.894, 0.816, 0.659)
+SOIL_STIFF = (0.553, 0.396, 0.239)
+SOIL_HALFSPACE = "#8f8c84"
+SOIL_EDGE = "#4b3b2a"
+SOIL_SEAM = "#6f5a41"
+
+
+def _soil_color(vs: float, vmin: float, vmax: float, parity: int) -> str:
+    t = 0.0 if vmax <= vmin else min(max((vs - vmin) / (vmax - vmin), 0.0), 1.0)
+    rgb = [(a + t * (b - a)) * (0.93 if parity else 1.0) for a, b in zip(SOIL_SOFT, SOIL_STIFF)]
+    return _hex(rgb)
+
+
+def _intervals(lines: Sequence[float], hmax: float) -> List[float]:
+    """Sorted grid lines with every interval longer than ``hmax`` split evenly (depth sorting of the
+    headless renderer works face by face: smaller faces sort better)."""
+    out: List[float] = []
+    for a, b in zip(lines[:-1], lines[1:]):
+        n = max(1, int(math.ceil((b - a) / hmax - 1e-9))) if hmax > 0 else 1
+        out.extend(a + (b - a) * k / n for k in range(n))
+    out.append(lines[-1])
+    return out
+
+
+def _unique(vals: Iterable[float], tol: float) -> List[float]:
+    out: List[float] = []
+    for v in sorted(float(x) for x in vals):
+        if not out or v - out[-1] > tol:
+            out.append(v)
+    return out
+
+
+def soil_island(model, basis: Optional[np.ndarray] = None, cut: int = -1, margin: float = 0.0,
+                depth: float = 0.0) -> Dict[str, Any]:
+    """The free-field soil drawn as a block of layers around the foundation (SHOWSOIL).
+
+    SASSI has no soil island: the layered site (TOPL / L, the SITE half-space) is horizontally infinite and
+    enters the analysis through the impedance at the interaction nodes; the only soil elements of the model
+    are the excavated soil.  This picture places the layers of the free-field profile around the foundation,
+    so that a learner sees where the model sits in the site: the top of the soil at the ground elevation
+    (HOUSE ``<gelev>``), each layer at its depth, the half-space below.
+
+    * Foundation: the plan box of the interaction nodes (else of the element nodes at or below grade, else of
+      all element nodes) and its lowest point; when it lies below grade the foundation is embedded and the box
+      down to that point is left open for the model (excavated soil, basement).
+    * Extent: ``margin`` beyond the foundation on every side (0 = automatic: the largest of half the plan
+      width, 0.3 x the depth drawn and the embedment); ``depth`` below grade (0 = automatic: the whole profile
+      and a band of half-space a quarter of the profile depth thick, the profile cut at max(2.5 B, D + 1.5 B)
+      when it is deeper, B the plan width and D the embedment).
+    * ``cut`` -1 (automatic: when embedded), 0, 1: the quarter facing the viewer (``basis`` row 3; the
+      default view looks from +X, -Y) is cut away down to the bottom, through the centre of the foundation.
+
+    Returns ``quads`` (nq, 4, 3) boundary faces, ``quad_band`` (index into ``bands``), ``quad_normal``
+    (nq, 3); ``edges`` (ne, 2, 3) outline and crease lines, ``seams`` (ns, 2, 3) layer interfaces on the
+    outer and cut faces; ``bands`` (one per layer drawn and the half-space: depths, properties, colour);
+    ``bbox``, ``corners`` (8, 3), ``hole``, ``cut`` (quadrant signs or None), ``margin``, ``depth``,
+    ``summary`` and ``note`` (the text the plot and the command show).  Raises :class:`PlotError` when the
+    model has no soil layers.
+    """
+    table = layer_table(model)                      # PlotError when there are no layers
+    gelev = float(model.ground_elevation)
+    rows = table["layers"]
+    total = float(table["total_depth"])
+    half = table["halfspace"]
+    # ---- the foundation: plan box and lowest point
+    nodes = model.nodes
+    used = sorted(set(n for g, e in model.iter_elements() for n in element_nodes(g.type, e.nodes) if n in nodes))
+    inter = [n for n, nd in nodes.items() if 0 in nd.flags]
+    source = "interaction nodes"
+    pick = inter
+    if not pick and used:
+        _, xyz_u = model.global_coordinates(used)
+        xyz_u = np.asarray(xyz_u, dtype=float).reshape(-1, 3)
+        span = float(np.ptp(xyz_u, axis=0).max()) if len(xyz_u) else 1.0
+        below = [n for n, p in zip(used, xyz_u) if p[2] <= gelev + 1e-6 * max(span, 1.0)]
+        pick, source = (below, "element nodes at or below grade") if below else (used, "element nodes")
+    if pick:
+        _, xyz = model.global_coordinates(pick)
+        xyz = np.asarray(xyz, dtype=float).reshape(-1, 3)
+        fx0, fy0 = float(xyz[:, 0].min()), float(xyz[:, 1].min())
+        fx1, fy1 = float(xyz[:, 0].max()), float(xyz[:, 1].max())
+        zlow = float(xyz[:, 2].min())
+    else:
+        fx0 = fy0 = fx1 = fy1 = 0.0
+        zlow = gelev
+        source = "none (no nodes): the soil around the origin"
+    B = max(fx1 - fx0, fy1 - fy0)
+    scale = max(B, total, 1.0)
+    tol = 1e-6 * scale
+    if B <= tol:
+        B = max(0.2 * total, 1.0)
+    embed = max(gelev - zlow, 0.0)
+    embedded = embed > tol
+    # ---- depth drawn
+    hs_band = 0.0
+    truncated = 0
+    if depth and depth > 0:
+        bottom_d = float(depth)
+    else:
+        cap = max(2.5 * B, embed + 1.5 * B) if pick else math.inf     # no foundation: the whole column
+        if total <= cap or total <= tol:
+            hs_band = max(0.25 * total, 0.1 * B) if half is not None else 0.0
+            bottom_d = total + hs_band
+        else:
+            bottom_d = cap
+    if embedded and bottom_d < 1.25 * embed:
+        bottom_d = 1.25 * embed
+    if bottom_d <= tol:
+        bottom_d = max(0.1 * B, 1.0)
+    if bottom_d > total + tol and half is None:
+        bottom_d = total                            # no half-space layer (rigid base): the profile ends there
+    if bottom_d <= tol:
+        raise PlotError("the soil profile has no thickness")
+    if margin and margin > 0:
+        m = float(margin)
+    else:
+        m = max(0.5 * B, 0.3 * bottom_d, embed)
+    X0, X1, Y0, Y1 = fx0 - m, fx1 + m, fy0 - m, fy1 + m
+    zbot = gelev - bottom_d
+    # ---- bands: the layers (and the half-space) between the ground and the bottom
+    vs_all = [float(r["vs"]) for r in rows]
+    vmin, vmax = (min(vs_all), max(vs_all)) if vs_all else (0.0, 1.0)
+    bands: List[Dict[str, Any]] = []
+    for r in rows:
+        top, bot = float(r["top"]), float(r["top"]) + float(r["thick"])
+        if top >= bottom_d - tol:
+            truncated += 1
+            continue
+        bands.append({"kind": "layer", "index": int(r["index"]), "layer": int(r["layer"]), "z_top": gelev - top,
+                      "z_bot": gelev - min(bot, bottom_d), "thick": float(r["thick"]), "clipped": bot > bottom_d + tol,
+                      "vs": float(r["vs"]), "vp": float(r["vp"]), "weight": float(r["weight"]),
+                      "sdamp": float(r["sdamp"]), "pdamp": float(r["pdamp"]),
+                      "color": _soil_color(float(r["vs"]), vmin, vmax, int(r["index"]) % 2)})
+    if half is not None and bottom_d > total + tol:
+        bands.append({"kind": "halfspace", "index": 0, "layer": int(half["layer"]), "z_top": gelev - total,
+                      "z_bot": zbot, "thick": 0.0, "clipped": True, "vs": float(half["vs"]), "vp": float(half["vp"]),
+                      "weight": float(half["weight"]), "sdamp": float(half["sdamp"]), "pdamp": float(half["pdamp"]),
+                      "color": SOIL_HALFSPACE})
+    if not bands:
+        raise PlotError("no soil layer lies above the depth drawn")
+    # ---- the cut-away quarter
+    cut_on = embedded if cut == -1 else bool(cut)
+    cx, cy = 0.5 * (fx0 + fx1), 0.5 * (fy0 + fy1)
+    sx, sy = 1.0, -1.0                              # the default view looks from +X, -Y
+    if basis is not None:
+        toward = np.asarray(basis, dtype=float)[2]
+        if abs(toward[0]) > 1e-6:
+            sx = 1.0 if toward[0] > 0 else -1.0
+        if abs(toward[1]) > 1e-6:
+            sy = 1.0 if toward[1] > 0 else -1.0
+    # ---- grid: plan lines at the island edges, the foundation box and the cut; depth lines at the layer
+    # interfaces, the foundation bottom and the island bottom
+    feat_x = _unique([X0, X1, fx0, fx1] + ([cx] if cut_on else []), tol)
+    feat_y = _unique([Y0, Y1, fy0, fy1] + ([cy] if cut_on else []), tol)
+    hplan = (max(X1 - X0, Y1 - Y0)) / 8.0
+    gx = _intervals(feat_x, hplan)
+    gy = _intervals(feat_y, hplan)
+    zl = [b["z_top"] for b in bands] + [zbot] + ([zlow] if embedded else [])
+    feat_z = _unique([z for z in zl if zbot - tol <= z <= gelev + tol], tol)
+    gz = _intervals(feat_z, (gelev - zbot) / 6.0)
+    nx, ny, nz = len(gx) - 1, len(gy) - 1, len(gz) - 1
+    xm = 0.5 * (np.asarray(gx[:-1]) + np.asarray(gx[1:]))
+    ym = 0.5 * (np.asarray(gy[:-1]) + np.asarray(gy[1:]))
+    zm = 0.5 * (np.asarray(gz[:-1]) + np.asarray(gz[1:]))
+    band_of = np.zeros(nz, dtype=np.int64)
+    for k, z in enumerate(zm):
+        for bi, b in enumerate(bands):
+            if b["z_bot"] - tol <= z <= b["z_top"] + tol:
+                band_of[k] = bi
+                break
+    in_x = (xm >= fx0 - tol) & (xm <= fx1 + tol)
+    in_y = (ym >= fy0 - tol) & (ym <= fy1 + tol)
+    hole = np.zeros((nx, ny, nz), dtype=bool)
+    if embedded:
+        hole = in_x[:, None, None] & in_y[None, :, None] & (zm > zlow)[None, None, :]
+    removed = np.zeros((nx, ny, nz), dtype=bool)
+    if cut_on:
+        q = ((xm - cx) * sx > 0)[:, None] & ((ym - cy) * sy > 0)[None, :]
+        removed = np.broadcast_to(q[:, :, None], (nx, ny, nz)).copy()
+    soil = ~hole & ~removed
+    # ---- boundary faces of the soil cells (not against the opening, which the model fills)
+    quads: List[List[List[float]]] = []
+    qband: List[int] = []
+    qnorm: List[Tuple[float, float, float]] = []
+    edge_use: Dict[Tuple[Tuple[int, int, int], Tuple[int, int, int]], List[Tuple[Tuple[float, float, float], int]]] = {}
+    G = (gx, gy, gz)
+
+    def face(i, j, k, axis, side):
+        lo = [i, j, k]
+        if side > 0:
+            lo[axis] += 1
+        a1, a2 = [ax for ax in range(3) if ax != axis]
+        corners = []
+        for d1, d2 in ((0, 0), (1, 0), (1, 1), (0, 1)):
+            c = list(lo)
+            c[a1] += d1
+            c[a2] += d2
+            corners.append(tuple(c))
+        n = [0.0, 0.0, 0.0]
+        n[axis] = float(side)
+        b = int(band_of[k])
+        quads.append([[G[0][c[0]], G[1][c[1]], G[2][c[2]]] for c in corners])
+        qband.append(b)
+        qnorm.append(tuple(n))
+        for r in range(4):
+            e = tuple(sorted((corners[r], corners[(r + 1) % 4])))
+            edge_use.setdefault(e, []).append((tuple(n), b))
+
+    for i in range(nx):
+        for j in range(ny):
+            for k in range(nz):
+                if not soil[i, j, k]:
+                    continue
+                for axis, size in ((0, nx), (1, ny), (2, nz)):
+                    for side in (-1, 1):
+                        nb = [i, j, k]
+                        nb[axis] += side
+                        if 0 <= nb[axis] < size:
+                            if soil[tuple(nb)] or hole[tuple(nb)]:
+                                continue
+                        elif axis == 2 and side > 0 and in_x[i] and in_y[j]:
+                            continue                # the ground under a surface foundation: the model's own face
+                        face(i, j, k, axis, side)
+    edges: List[List[List[float]]] = []
+    seams: List[List[List[float]]] = []
+    for (p, q2), uses in edge_use.items():
+        seg = [[G[0][p[0]], G[1][p[1]], G[2][p[2]]], [G[0][q2[0]], G[1][q2[1]], G[2][q2[2]]]]
+        normals = set(u[0] for u in uses)
+        if len(uses) != 2 or len(normals) > 1:
+            edges.append(seg)
+        elif uses[0][1] != uses[1][1]:               # two layers of the profile meet here
+            seams.append(seg)
+    corners8 = np.array([[x, y, z] for x in (X0, X1) for y in (Y0, Y1) for z in (zbot, gelev)], dtype=float)
+    # ---- the text of the plot and of the command
+    lay = [b for b in bands if b["kind"] == "layer"]
+    vs_shown = [b["vs"] for b in lay]
+    parts = [f"{len(lay)} layer{'s' if len(lay) != 1 else ''} ({table['source']})"]
+    if vs_shown:
+        lo_v, hi_v = min(vs_shown), max(vs_shown)
+        parts.append(f"Vs {_g(lo_v)}" + (f" to {_g(hi_v)}" if hi_v > lo_v else ""))
+    if bands[-1]["kind"] == "halfspace":
+        parts.append(f"on the half-space (Vs {_g(bands[-1]['vs'])}) at depth {_g(total)}")
+    elif truncated or any(b["clipped"] for b in lay):
+        parts.append(f"cut at depth {_g(bottom_d)} ({truncated} deeper layer{'s' if truncated != 1 else ''} "
+                     f"and the half-space not drawn)")
+    else:
+        parts.append(f"to depth {_g(total)} on a rigid base")
+    summary = (", ".join(parts) + f"; drawn {_g(m)} beyond the foundation"
+               + (", the quarter facing the viewer cut away" if cut_on else "")
+               + (f", the foundation embedded {_g(embed)}" if embedded else ""))
+    note = ("display only: in SASSI the layers extend to infinity horizontally and act through the "
+            "impedance at the interaction nodes")
+    return {
+        "quads": np.asarray(quads, dtype=float).reshape(-1, 4, 3), "quad_band": np.asarray(qband, dtype=np.int64),
+        "quad_normal": np.asarray(qnorm, dtype=float).reshape(-1, 3),
+        "edges": np.asarray(edges, dtype=float).reshape(-1, 2, 3),
+        "seams": np.asarray(seams, dtype=float).reshape(-1, 2, 3),
+        "bands": bands, "bbox": [X0, X1, Y0, Y1, zbot, gelev], "corners": corners8,
+        "hole": [fx0, fx1, fy0, fy1, zlow] if embedded else None, "cut": [sx, sy] if cut_on else None,
+        "center": [cx, cy], "ground": gelev, "margin": m, "depth": bottom_d, "profile_depth": total,
+        "embedment": embed, "footprint": source, "truncated": truncated, "summary": summary, "note": note,
+        "edge_color": SOIL_EDGE, "seam_color": SOIL_SEAM,
+    }
+
+
+def _g(v: float) -> str:
+    """Short number for the soil island text (4 significant digits)."""
+    return f"{float(v):.4g}"
 
 
 def cut_elements(interp, cut: int) -> Optional[List[Tuple[int, int]]]:
@@ -1560,9 +1845,26 @@ def plot_data(state: PlotState, plot: Plot, interp=None, raw: bool = False) -> D
     v = plot.view
     scene = model_scene(model, color_by=v.color_by, show_dof=v.show_dof, show_mass=v.show_mass, cut=cut,
                         palettes=state.palettes)
-    cam = view_frame(v, scene)
+    soil = None
+    if v.show_soil and plot.kind in CAPABILITY["SHOWSOIL"]:
+        try:
+            soil = soil_island(model, rotation_matrix(v.rx, v.ry, v.rz), cut=v.soil_cut, margin=v.soil_margin,
+                               depth=v.soil_depth)
+        except PlotError as exc:
+            d["soil_note"] = str(exc)
+    if soil is not None:
+        # the plot box, the default rotation centre and the fit take the soil in (the model's own box when
+        # every element is hidden is not extended: there is nothing to draw)
+        b, sb = scene["bbox"], soil["bbox"]
+        if scene["n_elements"]:
+            b = [min(b[0], sb[0]), max(b[1], sb[1]), min(b[2], sb[2]), max(b[3], sb[3]), min(b[4], sb[4]),
+                 max(b[5], sb[5])]
+            scene["bbox"] = [float(x) for x in b]
+            scene["center"] = [0.5 * (b[0] + b[1]), 0.5 * (b[2] + b[3]), 0.5 * (b[4] + b[5])]
+    cam = view_frame(v, scene, extra=soil["corners"] if soil is not None else None)
     d["scene"] = scene
     d["camera"] = cam
+    d["soil"] = soil
     if fam == "anim":
         store = FrameStore(plot.params["buffer_dir"])
         d["animation"] = {k: plot.params[k] for k in ("buffer_dir", "frames", "current", "col", "vmin", "vmax",

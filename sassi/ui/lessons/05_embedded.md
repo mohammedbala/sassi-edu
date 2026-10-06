@@ -308,6 +308,7 @@ POINT,0,5,2.25
 
 ```action
 plot-nodes
+plot-soil
 open-doc: docs/user/USER_GUIDE.md#83-choosing-the-interaction-node-set-fv-fi-and-ffv
 explain: POINT,0,5,2.25
 ```
@@ -356,6 +357,15 @@ the structure were identical to the excavated soil, $U = U'$ everywhere, the fre
 verifies this zero-SSI identity to 2e-15
 ([Theory §3](docs/theory/THEORY_MANUAL.md#3-flexible-volume-substructuring),
 [VP-16](docs/verification/VERIFICATION_MANUAL.md#vp-16)).
+
+### In ANSYS terms
+A direct ANSYS model would mesh a soil island around the basement, several basement widths across
+and deep, with absorbing (viscous) boundaries on its sides and base. SASSI meshes no soil outside the
+excavation: the layered site is horizontally infinite, and its whole effect enters through the
+impedance $X$ on these 150 interaction nodes. **Plot the model in its soil** (`SHOWSOIL`, the soil
+button of the 3D Plot toolbar) draws the free-field layers around the basement as such an island, with
+the quarter facing you cut away, for orientation only: hover over a layer for its depth and
+properties.
 
 ## Run the FV analysis
 

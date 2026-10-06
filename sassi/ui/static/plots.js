@@ -21,7 +21,7 @@
   const CAP = {
     ELECOLOR: ["MODELPLOT"], SHRINK: ["MODELPLOT"], WIREFRAME: ["MODELPLOT"],
     ELENUM: ELEMENT_PLOTS, GROUPNUM: ELEMENT_PLOTS, NODENUM: THREE_D,
-    SHOWDOF: ["MODELPLOT", "NODEPLOT"], SHOWMASS: ["MODELPLOT", "NODEPLOT"],
+    SHOWDOF: ["MODELPLOT", "NODEPLOT"], SHOWMASS: ["MODELPLOT", "NODEPLOT"], SHOWSOIL: ["MODELPLOT", "NODEPLOT"],
     CNGVIEW: THREE_D, RSTVIEW: THREE_D, CNGCENTER: THREE_D, RSTCENTER: THREE_D, DEBUG: THREE_D, PAUSE: ANIMS,
   };
   P.CAP = CAP;
@@ -450,6 +450,55 @@
     if (sc.selected.length) out.push(markerTrace(sc, sc.selected, {marker: {size: 8, color: "rgba(0,0,0,0)", line: {color: "#0060ff", width: 2}, symbol: "square-open"}, hover: " (selected)"}));
     return out;
   }
+  /** One soil band (a layer of the free-field profile or the half-space) as hover / click text. */
+  function bandText(b) {
+    const f = (x) => S.fmt(x, 4);
+    const head = b.kind === "halfspace" ? `Half-space (L ${b.layer}) below z = ${f(b.z_top)}`
+      : `Layer ${b.index} (L ${b.layer}): z = ${f(b.z_top)} to ${f(b.z_bot)}${b.clipped ? " (continues deeper)" : ""}, thickness ${f(b.thick)}`;
+    return `${head}<br>Vs ${f(b.vs)}, Vp ${f(b.vp)}, unit weight ${f(b.weight)}<br>damping: shear ${f(b.sdamp)}, P-wave ${f(b.pdamp)}`;
+  }
+  /** The soil island (SHOWSOIL): one mesh per soil band (hover and click: the layer's properties), the outline
+   *  and crease lines, the layer interfaces.  The node plot draws it see-through, behind the nodes. */
+  function soilTraces(d, nodePlot) {
+    const so = d.soil;
+    if (!so || !so.quads || !so.quads.length) return [];
+    const out = [], byBand = new Map();
+    so.quads.forEach((q, k) => {
+      const b = so.quad_band[k];
+      if (!byBand.has(b)) byBand.set(b, []);
+      byBand.get(b).push(q);
+    });
+    for (const [b, qs] of byBand) {
+      const band = so.bands[b];
+      const x = [], y = [], z = [], I = [], J = [], K = [];
+      for (const q of qs) {
+        const o = x.length;
+        for (const pt of q) { x.push(pt[0]); y.push(pt[1]); z.push(pt[2]); }
+        I.push(o, o); J.push(o + 1, o + 2); K.push(o + 2, o + 3);
+      }
+      const text = bandText(band);
+      out.push({type: "mesh3d", x, y, z, i: I, j: J, k: K, color: band.color, flatshading: true, opacity: nodePlot ? 0.25 : 1,
+        lighting: {ambient: 0.72, diffuse: 0.5, specular: 0.02, roughness: 1, fresnel: 0.02},
+        hovertemplate: `${text}<extra>soil</extra>`, showscale: false, meta: {role: "soil", text: text.replace(/<br>/g, "; ")}});
+    }
+    const lines = (segs, color, width) => {
+      const x = [], y = [], z = [];
+      for (const sg of segs) { for (const pt of sg) { x.push(pt[0]); y.push(pt[1]); z.push(pt[2]); } x.push(null); y.push(null); z.push(null); }
+      return {type: "scatter3d", mode: "lines", x, y, z, line: {color, width}, hoverinfo: "skip", opacity: nodePlot ? 0.35 : 1};
+    };
+    if (so.seams && so.seams.length) out.push(lines(so.seams, so.seam_color || "#6f5a41", 1));
+    if (so.edges && so.edges.length) out.push(lines(so.edges, so.edge_color || "#4b3b2a", 2));
+    return out;
+  }
+  /** The plot note of the soil island: what is drawn, and that it is a picture only. */
+  function soilNote(d) {
+    let text = "";
+    if (d.soil) text = `<b>Soil</b>: ${S.esc(d.soil.summary).replace(/; /g, "<br>")}<br><i>${S.esc(d.soil.note)}</i>`;
+    else if (d.soil_note) text = `SHOWSOIL: ${S.esc(d.soil_note)}`;
+    if (!text) return null;
+    return {annotations: [{text, showarrow: false, xref: "paper", yref: "paper", x: 0.005, y: 0.005, xanchor: "left", yanchor: "bottom",
+      align: "left", font: {size: 11, color: "#5a4a36"}, bgcolor: "rgba(255,255,255,0.8)"}]};
+  }
   function debugBox(t, d, extra) {
     t.host.querySelectorAll(".debug-box").forEach((b) => b.remove());
     if (!d.view.debug) return;
@@ -480,6 +529,8 @@
       const tr = pt.data;
       if (tr.meta && tr.meta.role === "nodes" && pt.customdata !== undefined) {
         S.local("INFO", `Node ${pt.customdata}: (${S.fmt(pt.x)}, ${S.fmt(pt.y)}, ${S.fmt(pt.z)})`);
+      } else if (tr.meta && tr.meta.role === "soil") {
+        S.local("INFO", `Soil: ${tr.meta.text} (display only: the SASSI layers are horizontally infinite)`);
       } else if (tr.meta && tr.meta.role === "mesh" && tr._tri2e && pt.pointNumber !== undefined) {
         const sc = t.data.scene, e = tr._tri2e[pt.pointNumber];
         if (e !== undefined) S.local("INFO", `Element ${sc.elem_id[e]}, Group ${sc.elem_group[e]} (material ${sc.elem_mat[e]}, property ${sc.elem_prop[e]})`);
@@ -494,6 +545,7 @@
       Plotly.react(div0, [], sceneLayout(d, {annotations: [{text: "nothing to draw (all elements hidden?)", showarrow: false}]}, false, div0), PLOT_CONFIG);
       return;
     }
+    if (d.kind === "MODELPLOT" || d.kind === "NODEPLOT") traces.push(...soilTraces(d, d.kind === "NODEPLOT"));
     if (d.kind === "MODELPLOT") {
       const shrink = v.shrink ? (d.shader.shrink || 0.06) : 0;
       const faces = faceList(sc, {all: !!shrink});
@@ -513,7 +565,7 @@
     }
     traces.push(...labelTraces(d, sc));
     const div = plotDiv(t);
-    Plotly.react(div, traces, layoutKeepingZoom(t, d, null, false, div), PLOT_CONFIG);
+    Plotly.react(div, traces, layoutKeepingZoom(t, d, soilNote(d), false, div), PLOT_CONFIG);
     attachClick(t);
     debugBox(t, d);
   }
@@ -790,6 +842,7 @@
     elemnum: '<rect x="2" y="6" width="7" height="8" fill="#9db9e6" stroke="#2c4f86"/><text x="8.5" y="8" font-size="8" font-weight="700" fill="#e07000">E</text>',
     groupnum: '<rect x="2" y="6" width="7" height="8" fill="#9db9e6" stroke="#2c4f86"/><text x="8.5" y="8" font-size="8" font-weight="700" fill="#c62828">G</text>',
     showdof: '<path d="M8 3.5 3.5 10h9z" fill="#c8e6c9" stroke="#2e7d32"/><path d="M2.5 12.5h11" stroke="#2e7d32" stroke-width="1.5"/><circle cx="8" cy="3.5" r="1.6" fill="#333"/>',
+    soil: '<path d="M1.5 7.5h13v2.4h-13z" fill="#e4d0a8" stroke="#6f5a41"/><path d="M1.5 9.9h13v2.3h-13z" fill="#bf9d70" stroke="#6f5a41"/><path d="M1.5 12.2h13v2.3h-13z" fill="#8d653d" stroke="#6f5a41"/><path d="M5.5 2.5h5v8h-5z" fill="#9db9e6" stroke="#2c4f86"/>',
     showmass: '<circle cx="6" cy="10" r="2" fill="#333"/><path d="M11 2l1 2.3 2.5.2-1.9 1.6.6 2.4-2.2-1.3-2.2 1.3.6-2.4L7.5 4.5 10 4.3z" fill="#9000c0"/>',
     pause: '<path d="M2 2.5v11l6-5.5z" fill="#2e7d32"/><path d="M10 3h1.8v10H10zM13 3h1.8v10H13z" fill="#c62828"/>',
     learn: '<path d="M8 2.2 0.8 5.6 8 9l7.2-3.4z" fill="#1f5fbf" stroke="#123c7a" stroke-width=".7"/><path d="M3.6 7.3v3.3c0 1.3 2 2.4 4.4 2.4s4.4-1.1 4.4-2.4V7.3L8 9.4z" fill="#8fb3ea" stroke="#123c7a" stroke-width=".7"/><path d="M14.4 6v4.6" stroke="#123c7a" stroke-width="1.1"/><circle cx="14.4" cy="11.3" r="1" fill="#123c7a"/>',
@@ -848,6 +901,7 @@
     ["groupnum", "Show group labels (GROUPNUM)", () => S.command("GROUPNUM"), "GROUPNUM", (v) => v.group_labels],
     ["showdof", "show fixed degrees of freedom (SHOWDOF)", () => D().showDof(), "SHOWDOF", (v) => v.show_dof && v.show_dof.length > 0],
     ["showmass", "show lumped masses (SHOWMASS)", () => S.command("SHOWMASS"), "SHOWMASS", (v) => v.show_mass],
+    ["soil", "Show the soil around the foundation (SHOWSOIL)", () => S.command("SHOWSOIL"), "SHOWSOIL", (v) => v.show_soil],
     "|",
     ["pause", "Pause Start Animation (PAUSE)", () => P.togglePause(), "PAUSE", (v) => !v.paused],
     ["debug", "Show Debug info (DEBUG)", () => S.command("DEBUG"), "DEBUG", (v) => v.debug],

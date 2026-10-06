@@ -453,6 +453,7 @@ CALCM
 
 ```action
 plot-model
+plot-soil
 explain: NCOM
 ```
 
@@ -514,6 +515,12 @@ Look inside: `WINDOWSETTINGS,VOLUME,,,1` keeps only the elements with a node at 
 building cut open just north of the wall $y = 0$: the basemat, the two basement levels, the floors and
 the interior walls of the rooms, the tower. `WINDOWSETTINGS,VOLUME` without values
 restores the whole building.
+
+See the building in its site: **Plot the model in its soil** (`MODELPLOT`, then `SHOWSOIL,1`) draws
+the 22 free-field layers and the half-space around the basement, the quarter facing you cut away so
+that the basement walls show; the softer layers are lighter. `SHOWSOIL,1,0` closes the cut and
+`SHOWSOIL,0` takes the soil away. The picture changes nothing in the analysis: SASSI's layers are
+horizontally infinite.
 
 ### Check yourself
 Why are the basement nodes of the interior structure numbered from 1092 upwards before `NCOM`, and

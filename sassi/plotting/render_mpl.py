@@ -15,11 +15,15 @@ works without a display and does not interfere with a GUI process.
 * MODELPLOT / NODEPLOT / CUTPLOT and the animations: mplot3d poly collections.  The model is
   rotated by the CNGVIEW matrix ``R`` (:func:`sassi.plotting.state.rotation_matrix`) and viewed
   from the top with an orthographic camera, so the screen coordinates of a node are exactly
-  ``R (p - centre)``; mplot3d sorts the faces by depth (painter's algorithm).
+  ``R (p - centre)``; mplot3d sorts the faces by depth (painter's algorithm).  With the soil island
+  (SHOWSOIL) the element plot draws the model faces, the soil faces that face the viewer and the
+  beams in one collection, so that they are depth-sorted together; the node plot draws the soil
+  see-through behind the nodes.
 """
 from __future__ import annotations
 
 import io
+import math
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
 
@@ -277,6 +281,83 @@ def _screen(xyz: np.ndarray, cam: Dict[str, Any]) -> np.ndarray:
     return to_screen(xyz, cam["basis"], cam["center"])
 
 
+#: flat shading of the soil faces by direction (top, X faces, Y faces): the creases show without lines
+SOIL_SHADE = {2: 1.0, 0: 0.86, 1: 0.74}
+
+
+def _soil_polys(soil: Optional[Dict[str, Any]], cam: Dict[str, Any], alpha: float = 1.0
+                ) -> Tuple[List[np.ndarray], List[Tuple[float, float, float, float]]]:
+    """Screen polygons and colours of the soil faces that face the viewer (the island is closed except at
+    the opening the model fills, so the faces turned away are never seen)."""
+    if not soil or not len(soil.get("quads", [])):
+        return [], []
+    from matplotlib.colors import to_rgb
+    Q = np.asarray(soil["quads"], float).reshape(-1, 4, 3)
+    N = np.asarray(soil["quad_normal"], float).reshape(-1, 3)
+    band = np.asarray(soil["quad_band"], dtype=np.int64)
+    toward = np.asarray(cam["basis"], float)[2]
+    front = (N[:, 0] * toward[0] + N[:, 1] * toward[1] + N[:, 2] * toward[2]) > 1e-9
+    S = _screen(Q[front].reshape(-1, 3), cam).reshape(-1, 4, 3)
+    cols = []
+    for n, b in zip(N[front], band[front]):
+        f = SOIL_SHADE[int(np.argmax(np.abs(n)))]
+        r, g, bl = to_rgb(soil["bands"][int(b)]["color"])
+        cols.append((r * f, g * f, bl * f, alpha))
+    return list(S), cols
+
+
+def _ribbons(segments: Sequence[np.ndarray], width: float, piece: float) -> Tuple[List[np.ndarray], List[int]]:
+    """Screen-plane quadrilaterals of ``width`` along line segments (2, 3) in screen coordinates, each
+    segment split into pieces at most ``piece`` long (short pieces depth-sort well against the faces);
+    returns the quadrilaterals and the segment of each."""
+    out, owner = [], []
+    for s_, seg in enumerate(segments):
+        a, b = np.asarray(seg[0], float), np.asarray(seg[1], float)
+        dx, dy = b[0] - a[0], b[1] - a[1]
+        L = math.hypot(dx, dy)
+        if L <= 1e-12:                          # a segment along the view direction: a small square
+            nx_, ny_ = 0.5 * width, 0.0
+        else:
+            nx_, ny_ = -dy / L * 0.5 * width, dx / L * 0.5 * width
+        off = np.array([nx_, ny_, 0.0])
+        n = max(1, int(math.ceil(float(np.linalg.norm(b - a)) / piece))) if piece > 0 else 1
+        for k in range(n):
+            p0, p1 = a + (b - a) * (k / n), a + (b - a) * ((k + 1) / n)
+            out.append(np.array([p0 + off, p1 + off, p1 - off, p0 - off]))
+            owner.append(s_)
+    return out, owner
+
+
+def _soil_hidden(xyz: np.ndarray, soil: Optional[Dict[str, Any]]) -> np.ndarray:
+    """Nodes inside the soil drawn around them (below grade, in the island, not in the cut-away quarter):
+    the markers of the element plot skip them."""
+    hidden = np.zeros(len(xyz), dtype=bool)
+    if not soil or not len(xyz):
+        return hidden
+    X0, X1, Y0, Y1, zb, zg = soil["bbox"]
+    tol = 1e-6 * max(X1 - X0, Y1 - Y0, zg - zb, 1.0)
+    hidden = ((xyz[:, 0] > X0) & (xyz[:, 0] < X1) & (xyz[:, 1] > Y0) & (xyz[:, 1] < Y1)
+              & (xyz[:, 2] < zg - tol) & (xyz[:, 2] > zb))
+    if soil.get("cut"):
+        sx, sy = soil["cut"]
+        cx, cy = soil["center"]
+        in_cut = ((xyz[:, 0] - cx) * sx >= -tol) & ((xyz[:, 1] - cy) * sy >= -tol)
+        hidden &= ~in_cut
+    return hidden
+
+
+def _soil_note(fig, d: Dict[str, Any]) -> None:
+    import textwrap
+    soil = d.get("soil")
+    if soil:
+        text = f"Soil: {soil['summary']}. {soil['note'][0].upper()}{soil['note'][1:]}."
+    elif d.get("soil_note"):
+        text = f"SHOWSOIL: {d['soil_note']}"
+    else:
+        return
+    fig.text(0.13, 0.012, "\n".join(textwrap.wrap(_txt(text), 135)), fontsize=6.5, color="#5a5040", va="bottom")
+
+
 def model_figure(d: Dict[str, Any], dpi: int = DPI):
     """MODELPLOT / NODEPLOT / CUTPLOT and animation figures (mplot3d, orthographic)."""
     from mpl_toolkits.mplot3d import Axes3D  # noqa: F401  (registers the projection)
@@ -308,6 +389,10 @@ def model_figure(d: Dict[str, Any], dpi: int = DPI):
     wire = bool(v.get("wireframe")) and kind == "MODELPLOT"
     show_all = shrink > 0 or wire
     sel = np.nonzero(boundary | show_all)[0] if len(faces) else np.zeros(0, dtype=np.int64)
+    soil = d.get("soil") if kind in ("MODELPLOT", "NODEPLOT") else None
+    soil_polys, soil_fc = _soil_polys(soil, cam, alpha=0.3 if kind == "NODEPLOT" else 1.0)
+    merged = bool(soil_polys) and kind == "MODELPLOT"
+    edges = np.asarray(sc["edges"], dtype=np.int64).reshape(-1, 2)
 
     def polys_of(idx, pts):
         out = []
@@ -321,8 +406,11 @@ def model_figure(d: Dict[str, Any], dpi: int = DPI):
         return out
 
     outline = palette_color("ELEMENT", 2)
+    if soil_polys:
+        ax.computed_zorder = False              # drawn in the order added: the soil first, the markers on top
     if kind == "NODEPLOT":
-        pass
+        if soil_polys:
+            ax.add_collection3d(Poly3DCollection(soil_polys, facecolors=soil_fc, linewidths=0.0))
     elif kind == "CUTPLOT":
         incut = np.asarray(sc["elem_in_cut"], dtype=bool)
         cutf = [r for r in range(len(faces)) if incut[face_elem[r]]]
@@ -350,17 +438,29 @@ def model_figure(d: Dict[str, Any], dpi: int = DPI):
     elif kind in ("BUBBLEPLOT", "VECTORPLOT") and len(sel):
         ax.add_collection3d(Poly3DCollection(polys_of(sel, P), facecolors=NOFILL, edgecolors="#c8c8c8",
                                              linewidths=0.3))
+    elif merged:
+        # model faces, soil faces and beams in one depth-sorted collection; the beams are drawn as narrow
+        # ribbons in the screen plane (mplot3d re-orders the face and edge colours of a sorted collection,
+        # not a per-polygon line width)
+        n = len(sel)
+        half_ = float(cam["half"])
+        ribbons, owner = _ribbons([P[e] for e in edges], 0.009 * half_, 0.04 * half_)
+        ecol = [ecolor[k] for k in np.asarray(sc["edge_elem"], dtype=np.int64)]
+        bcol = [ecol[k] for k in owner]
+        polys = polys_of(sel, P) + soil_polys + ribbons
+        fcs = ([NOFILL] * n if wire else [ecolor[face_elem[r]] for r in sel]) + soil_fc + bcol
+        ecs = ([ecolor[face_elem[r]] for r in sel] if wire else [outline] * n) + soil_fc + bcol
+        ax.add_collection3d(Poly3DCollection(polys, facecolors=fcs, edgecolors=ecs, linewidths=0.8 if wire else 0.4))
     elif len(sel):
         fc = NOFILL if wire else [ecolor[face_elem[r]] for r in sel]
         ec = [ecolor[face_elem[r]] for r in sel] if wire else outline
         ax.add_collection3d(Poly3DCollection(polys_of(sel, P), facecolors=fc, edgecolors=ec,
                                              linewidths=0.8 if wire else 0.4))
     # beams, springs, GENERAL elements as lines
-    edges = np.asarray(sc["edges"], dtype=np.int64).reshape(-1, 2)
     if len(edges) and kind == "DEFORMPLOT" and v.get("show_undeformed"):
         ax.add_collection3d(Line3DCollection([P0[e] for e in edges], colors=palette_color("DEFORMED", 4),
                                              linewidths=1.2))
-    if len(edges) and kind != "NODEPLOT":
+    if len(edges) and kind != "NODEPLOT" and not merged:
         segs = [P[e] for e in edges]
         cols = [ecolor[k] for k in np.asarray(sc["edge_elem"], dtype=np.int64)]
         if kind == "CUTPLOT":
@@ -393,6 +493,8 @@ def model_figure(d: Dict[str, Any], dpi: int = DPI):
                        edgecolors=palette_color("NODE", 4), linewidths=1.2, depthshade=False)
     elif kind in ("MODELPLOT", "CUTPLOT") and len(P):
         ii = np.asarray(sc["interaction"], dtype=np.int64)
+        if merged and len(ii):
+            ii = ii[~_soil_hidden(xyz[ii], soil)]
         if len(ii) and kind == "MODELPLOT":
             ax.scatter(P[ii, 0], P[ii, 1], P[ii, 2], s=msize * 0.8, color=palette_color("ELEMENT", 10),
                        depthshade=False)
@@ -451,7 +553,11 @@ def model_figure(d: Dict[str, Any], dpi: int = DPI):
     x0, x1, y0, y1 = cam["extent"]
     ax.set_xlim(x0, x1)
     ax.set_ylim(y0, y1)
-    if len(P):
+    if soil_polys:
+        allz = np.concatenate([P[:, 2]] + [q[:, 2] for q in soil_polys]) if len(P) else \
+            np.concatenate([q[:, 2] for q in soil_polys])
+        z0, z1 = float(allz.min()), float(allz.max())
+    elif len(P):
         z0, z1 = float(P[:, 2].min()), float(P[:, 2].max())
     else:
         z0, z1 = -1.0, 1.0
@@ -460,6 +566,8 @@ def model_figure(d: Dict[str, Any], dpi: int = DPI):
     ax.set_zlim(z0, z1)
     ax.set_box_aspect((1.0, (y1 - y0) / (x1 - x0), max((z1 - z0) / (x1 - x0), 0.01)), zoom=1.3)
     _triad(fig, np.asarray(cam["basis"], float))
+    if kind in ("MODELPLOT", "NODEPLOT"):
+        _soil_note(fig, d)
     title = d.get("title") or d.get("caption", "")
     if kind in ANIMATIONS and frame.get("label"):
         title = f"{title}   [{frame['label']}]"

@@ -31,13 +31,13 @@ Every command of the ACS SASSI V3 manual and of the SASSI-EDU dialect is listed 
 | [3.4.O Option NON and nonlinear soil](#34o-option-non-and-nonlinear-soil) | 32 | 29 | 0 | 3 |
 | [3.4.P Binary databases](#34p-binary-databases) | 15 | 0 | 1 | 14 |
 | [3.4.Q Thick shell](#34q-thick-shell) | 2 | 2 | 0 | 0 |
-| [3.4.R Extension commands of SASSI-EDU](#34r-extension-commands-of-sassi-edu) | 40 | 40 | 0 | 0 |
-| **Total** | 364 | 341 | 1 | 22 |
+| [3.4.R Extension commands of SASSI-EDU](#34r-extension-commands-of-sassi-edu) | 41 | 41 | 0 | 0 |
+| **Total** | 365 | 342 | 1 | 22 |
 
 | Tier | Commands | Implemented |
 |---|---:|---:|
 | P0 | 162 | 161 |
-| P1 | 124 | 124 |
+| P1 | 125 | 125 |
 | P2 | 78 | 56 |
 
 ## 3.4.A Session, files, models and global options
@@ -488,6 +488,7 @@ Every command of the ACS SASSI V3 manual and of the SASSI-EDU dialect is listed 
 | **RELDX** | `RELDX,<saverot>,<rstframes>` | - | P1 | yes | Save Rotations for ANSYS; Restart for Frame Generation (P1). |
 | **REMOVEFREQ** | `REMOVEFREQ,<infile>,<outfile>,<n1>,...` | - | P1 | yes | Remove_Frequencies_from_FILE8 (P1). |
 | **RUNLOADGEN** | `RUNLOADGEN,[STATIC\|DYNAMIC],[model]` | - | P2 | yes | Write &lt;model>.lgn from the LOADGEN records and run LOADGEN in the model directory (the Ok of the ANSYS Eq. Static Load / ANSYS Dynamic Load dialogs; STATIC by default). |
+| **SHOWSOIL** | `SHOWSOIL,[opt],[cut],[margin],[depth]` | - | P1 | yes | The free-field soil drawn around the foundation (SASSI-EDU, display only). |
 | **SITEX** | `SITEX,<soilmode>` | - | P0 | yes | 0 Linear Soil (L table), 1 Non-Linear Soil (FILE88 from SOIL), D-SIT-06. |
 | **SOILX** | `SOILX,<indir>,<mult>,<max>,[<cl>],[<file>]` | - | P0 | yes | SOIL input direction, SOIL scaling (exactly one of mult/max non-zero) and optional SOIL-only control layer and history file (D-SOL-11, D-SOL-13). |
 | **STRESSX** | `STRESSX,<pzadj>,<smo>,<skip>,<savemax>,<saveth>,<rstns>,<rstsp>` | - | P0 | yes | STRESS dialog fields. |

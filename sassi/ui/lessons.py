@@ -35,7 +35,7 @@ SECTION_KEYS = {
 }
 #: GUI action verbs -> True when the argument list names files that must exist after the step
 ACTION_VERBS = {
-    "plot-model": False, "plot-nodes": False, "plot-layers": False, "plot-soilprops": False,
+    "plot-model": False, "plot-nodes": False, "plot-soil": False, "plot-layers": False, "plot-soilprops": False,
     "plot-spectrum": True, "plot-history": True, "open-file": True, "open-listing": False,
     "open-dialog": False, "open-doc": False, "explain": False, "animate": True,
 }

@@ -6810,6 +6810,48 @@
    }
   ]
  },
+ "SHOWSOIL": {
+  "summary": "Draws the free-field soil around the foundation in the element and node plots: the soil layers of the profile (TOPL / L) and the SITE half-space as a block, with the opening the model fills and, for an embedded foundation, the quarter facing the viewer cut away (SASSI-EDU extension, a display aid).",
+  "configures": "Plots",
+  "source": "requirements §7.20 (D-W6-01 to D-W6-04); handler docstring",
+  "notes": "Display only: SASSI has no soil island. The layered site is horizontally infinite and acts through the impedance at the interaction nodes; nothing of the analysis changes. The block extends from the plan box of the interaction nodes (else of the element nodes at or below grade); its top is the ground elevation (HOUSE <gelev>). Colours: light (soft) to dark (stiff) by Vs, the half-space grey. Hover over a layer for its depth and properties; the node plot draws the soil see-through.",
+  "args": [
+   {
+    "pos": 1,
+    "name": "opt",
+    "meaning": "the soil around the foundation",
+    "default": "-1",
+    "values": {
+     "-1": "toggle",
+     "0": "off",
+     "1": "on"
+    }
+   },
+   {
+    "pos": 2,
+    "name": "cut",
+    "meaning": "cut-away quarter",
+    "default": "blank (keeps the value; initially -1)",
+    "values": {
+     "-1": "automatic: cut when the foundation is embedded",
+     "0": "no cut",
+     "1": "cut away the quarter facing the viewer, through the centre of the foundation"
+    }
+   },
+   {
+    "pos": 3,
+    "name": "margin",
+    "meaning": "width of soil drawn beyond the foundation on every side, length units; 0 = automatic (the largest of half the plan width, 0.3 x the depth drawn and the embedment)",
+    "default": "blank (keeps the value; initially 0)"
+   },
+   {
+    "pos": 4,
+    "name": "depth",
+    "meaning": "depth below the ground surface drawn, length units; 0 = automatic (the whole profile and a band of half-space a quarter of its depth; a very deep profile is cut at max(2.5 B, D + 1.5 B))",
+    "default": "blank (keeps the value; initially 0)"
+   }
+  ]
+ },
  "SHRINK": {
   "summary": "Shrinks the element faces of the element plot so that element boundaries are visible, like ANSYS /SHRINK.",
   "configures": "Plots",

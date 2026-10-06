@@ -3,7 +3,7 @@
 Plot creation: SPECPLOT, THPLOT, LAYERPLOT, SOILPROPPLOT, MODELPLOT, NODEPLOT, CUTPLOT, BUBBLEPLOT,
 VECTORPLOT, CONTOURPLOT, DEFORMPLOT (+ PROCFRAME, which fills the frame store the animations
 read).  Plot settings: AXES, PLOTRANGE, PLOTTITLE, XTITLE, YTITLE, YTITLE2, LINENAME, MARKERS,
-STIPPLE, ELECOLOR, ELENUM, GROUPNUM, NODENUM, NODESEL, SHOWDOF, SHOWMASS, SHRINK, WIREFRAME,
+STIPPLE, ELECOLOR, ELENUM, GROUPNUM, NODENUM, NODESEL, SHOWDOF, SHOWMASS, SHOWSOIL, SHRINK, WIREFRAME,
 CNGVIEW, RSTVIEW, CNGCENTER, RSTCENTER, PAUSE, DEBUG, SHADEROPTIONS, COLOR, WINDOWSETTINGS.
 Output: CAPTUREPLOT, CLOSEPLOT.  Tabs: ACTIVATEPLOT (SASSI-EDU extension, rule L17).
 
@@ -30,7 +30,7 @@ from typing import List, Optional
 from ...plotting.lines import LineError
 from ...plotting.state import (ALL_KINDS, ANIMATIONS, LINE_PALETTES, PALETTES, SHOWDOF_LABELS, THREE_D, FrameStore,
                                PlotError, cut_elements, frame_sequence, layer_table, model_scene, plot_state,
-                               process_frames, soil_property_curves)
+                               process_frames, rotation_matrix, soil_island, soil_property_curves)
 from ..registry import CommandError, command
 
 
@@ -666,6 +666,45 @@ def cmd_nodenum(c):
 def cmd_showmass(c):
     """SHOWMASS,[opt]: lumped-mass markers (-1 toggle, 0 off, 1 on); red X, green Y, blue Z."""
     _label_toggle(c, "SHOWMASS", "show_mass")
+
+
+@plot_command("SHOWSOIL", max_args=4)
+def cmd_showsoil(c):
+    """SHOWSOIL,[opt],[cut],[margin],[depth]: the free-field soil drawn around the foundation (SASSI-EDU, display only).
+
+    ``opt`` -1 toggle (default), 0 off, 1 on (element and node plots).  ``cut`` -1 automatic (the quarter
+    facing the viewer is cut away when the foundation is embedded), 0 no cut, 1 cut; ``margin`` the soil
+    drawn beyond the foundation and ``depth`` the depth below grade drawn, 0 = automatic.  A blank field
+    keeps its value.  Display only: SASSI's layers are horizontally infinite and act through the impedance
+    at the interaction nodes; nothing of the analysis changes (requirements 7.20, D-W6-01).
+    """
+    plot, v = _view_target(c, "SHOWSOIL")
+    if v is None:
+        return
+    on = toggle(c, 1, v.show_soil)
+    cut = c.int(2) if c.given(2) else v.soil_cut
+    if cut not in (-1, 0, 1):
+        raise CommandError("<cut> must be -1 (automatic), 0 (no cut) or 1 (the quarter facing the viewer cut away)")
+    sizes = {}
+    for k, attr, what in ((3, "soil_margin", "margin"), (4, "soil_depth", "depth")):
+        x = c.float(k) if c.given(k) else getattr(v, attr)
+        if x < 0:
+            raise CommandError(f"<{what}> must be 0 (automatic) or a positive length")
+        sizes[attr] = float(x)
+    v.show_soil, v.soil_cut = on, cut
+    for attr, x in sizes.items():
+        setattr(v, attr, x)
+    if plot is not None and on:
+        model = c.interp.models.get(plot.model)
+        try:
+            soil = soil_island(model, rotation_matrix(v.rx, v.ry, v.rz), cut=v.soil_cut, margin=v.soil_margin,
+                               depth=v.soil_depth) if model is not None else None
+        except PlotError as exc:
+            c.warn(f"no soil to draw: {exc}")
+        else:
+            if soil is not None:
+                c.info(f"SHOWSOIL: {soil['summary']} ({soil['note']})")
+    _done(c, plot, "SHOWSOIL", "3D")
 
 
 @plot_command("SHRINK", max_args=1)

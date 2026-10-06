@@ -902,7 +902,7 @@
     }
     return bar;
   }
-  const NEEDS_RUN = ["plot-model", "plot-nodes", "plot-layers", "plot-soilprops", "plot-spectrum", "plot-history", "open-file", "open-listing", "animate"];
+  const NEEDS_RUN = ["plot-model", "plot-nodes", "plot-soil", "plot-layers", "plot-soilprops", "plot-spectrum", "plot-history", "open-file", "open-listing", "animate"];
   async function doAction(st, k, a, anchor) {
     if (NEEDS_RUN.includes(a.verb) && st.commands.length && !P.ran.has(k)) {
       const yes = await D().confirm("Run the step first?", `"${a.label}" shows what step ${k} produces, and the step has not run in this workspace yet.`, "Run the step, then show", "Show anyway");

@@ -212,7 +212,8 @@ is on): Change View (dialog: rotations about X, Y, Z in degrees, pan X / Y, zoom
 `CNGCENTER,<X>,<Y>,<Z>`), Reset Centre (`RSTCENTER`), Wireframe (`WIREFRAME`), Shrink (`SHRINK`),
 colours by Group / Material / Property (`ELECOLOR,1|2|3`), Node / Element / Group labels (`NODENUM`,
 `ELENUM`, `GROUPNUM`), Show DOF (Boundary Conditions dialog: `SHOWDOF,<X ... ZZ>` or `SHOWDOF,NONE`),
-Show Mass (`SHOWMASS`), Pause / Start (animations, section 6.3) and Debug (`DEBUG`: the view values on
+Show Mass (`SHOWMASS`), Show Soil (`SHOWSOIL`: the free-field soil layers drawn around the foundation, a display
+aid; [User Guide §11.4](USER_GUIDE.md#114-plots)), Pause / Start (animations, section 6.3) and Debug (`DEBUG`: the view values on
 the plot). The keyboard rotates the active 3D plot by 5 degrees per press: Insert / Delete (X),
 Home / End (Y), PageUp / PageDown (Z), each as a `CNGVIEW`.
 

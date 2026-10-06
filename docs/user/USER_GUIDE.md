@@ -1121,6 +1121,30 @@ available as commands: `MODELPLOT`, `NODEPLOT`, `LAYERPLOT`, `SOILPROPPLOT,<labe
 `CAPTUREPLOT,<file.png>`. Line objects are created by `READSPEC` (spectrum files) and `READTH`
 (histories).
 
+**The model in its soil (`SHOWSOIL`, SASSI-EDU extension).** SASSI has no soil island: the layered site
+is horizontally infinite and acts on the model only through the impedance at the interaction nodes, and
+the only soil the model contains is the excavated soil. To see where the model sits in its site, `SHOWSOIL`
+(the soil button of the 3D Plot toolbar) draws the free-field layers (TOPL / L) and the SITE half-space as a
+block around the foundation in the element and node plots: the top at the ground elevation (HOUSE
+`<gelev>`), the opening of an embedded foundation left for the model, and the quarter facing the viewer cut
+away so that the embedded part shows. The softer layers are lighter, the half-space grey; hovering over a
+layer gives its depth, thickness, Vs, Vp, unit weight and damping. The plot says that the picture is a display
+aid; nothing of the analysis changes.
+
+```
+MODELPLOT
+* on, the cut chosen automatically (cut when the foundation is embedded), the extent automatic
+SHOWSOIL,1
+* no cut, 15 of soil beyond the foundation, 40 deep
+SHOWSOIL,1,0,15,40
+* off again (SHOWSOIL alone toggles)
+SHOWSOIL,0
+```
+
+`SHOWSOIL,[opt],[cut],[margin],[depth]`: `<cut>` -1 automatic, 0 none, 1 cut; `<margin>` and `<depth>` in
+length units, 0 = automatic (the whole profile and a band of half-space, the soil about half the plan width
+beyond the foundation); a blank field keeps its value.
+
 Animations play frame files on the model: the restart frames of MOTION, RELDISP and STRESS, or the
 steady-state motion at one SSI frequency that `HARMFRAME` (SASSI-EDU extension) writes from FILE8,
 u(t) = Re(H e^{iωt}) per unit control motion over one period:

@@ -76,6 +76,7 @@ Action verbs (paths are relative to the lesson workspace):
 |---|---|---|
 | `plot-model` | — | Plot ▸ Model ▸ Elements of the active model |
 | `plot-nodes` | — | Plot ▸ Model ▸ Nodes |
+| `plot-soil` | — | Plot ▸ Model ▸ Elements, then `SHOWSOIL,1`: the model in the free-field soil layers (soil island) |
 | `plot-layers` | — | Plot ▸ Soil Layers (LAYERPLOT) |
 | `plot-soilprops` | `<DYNP label>` | Plot ▸ Soil Properties |
 | `plot-spectrum` | `file1, file2, ... [| log]` | READSPEC each file and SPECPLOT them (log frequency axis with `| log`) |

@@ -490,6 +490,7 @@ def action_label(verb: str, args: str) -> str:
     return {
         "plot-model": "Plot the model (elements)",
         "plot-nodes": "Plot the nodes",
+        "plot-soil": "Plot the model in its soil",
         "plot-layers": "Plot the soil layers",
         "plot-soilprops": f"Plot soil curves {a}".strip(),
         "plot-spectrum": f"Plot {names}" + (" (log f)" if log else ""),
@@ -616,6 +617,8 @@ def resolve_action(verb: str, args: str, ws: Path, interp, lines_in_memory: Sequ
         return {"kind": "commands", "lines": ["MODELPLOT"]}
     if verb == "plot-nodes":
         return {"kind": "commands", "lines": ["NODEPLOT"]}
+    if verb == "plot-soil":                         # the element plot with the soil island (SHOWSOIL)
+        return {"kind": "commands", "lines": ["MODELPLOT", "SHOWSOIL,1"]}
     if verb == "plot-layers":
         return {"kind": "commands", "lines": ["LAYERPLOT"]}
     if verb == "plot-soilprops":
