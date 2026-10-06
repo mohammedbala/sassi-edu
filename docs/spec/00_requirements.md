@@ -2292,13 +2292,16 @@ module, `sassi/prep/defaults.py`, used by CHECK, AFWRITE, the RUN commands, `LIB
 | D-W5-14 | GUI | A blank file field shows its default as placeholder ("built-in: RG 1.60, 0.30 g (@rg160h_030g.acc)"), computed with the rules above on the values being edited (type, `<fopt>`, Δt, `<accopt>`, spectrum number); file fields have a Library button listing the built-in files that fit (records for THFILE / ACCIN / SOILX, loads for THFILE, spectra for RSIN, PSDs for TPSD); the soil-curve field and Select Dynamic Soil Property list the library curves; a model without SPRO shows the default profile on the layer pages, stored with the first page changed (as the implicit wave field) | `tests/unit/test_input_defaults.py` |
 
 
-### 7.20 Lead decisions: the soil island picture (wave 6, binding)
+### 7.20 Lead decisions: display aids, the soil island and deformed shapes from the results (wave 6, binding)
 
 The user expected to see a soil island. SASSI has none: the layered site (TOPL / L layers on the SITE
 half-space) is horizontally infinite and enters the analysis through the impedance at the interaction nodes;
 the only soil elements of a model are the excavated soil. An engineer used to a direct (box-of-soil) model
 still wants to see the model in its site, so SASSI-EDU draws the free-field profile around the foundation as a
-picture, and says on the plot that it is one.
+picture, and says on the plot that it is one. The user also found that deformed shapes did not load: an
+animation plays frames, the modules write frames only on a restart option and no example asks for them, so
+after an analysis Load Frame Data was empty; a deformed shape needed `HARMFRAME` and `PROCFRAME` typed by
+hand (only the lessons' Animate buttons did it).
 
 | ID | Subject | Decision | Evidence |
 |---|---|---|---|
@@ -2306,6 +2309,8 @@ picture, and says on the plot that it is one.
 | D-W6-02 | Geometry | `sassi.plotting.state.soil_island`: the foundation is the plan box of the interaction nodes (else of the element nodes at or below grade, else of all element nodes) and its lowest point; the top of the soil is the ground elevation (HOUSE `<gelev>`), each layer of `layer_table` at its depth, the half-space below. Automatic extent: margin = max(B/2, 0.3 × depth drawn, embedment); depth = the whole profile plus a half-space band of a quarter of the profile depth (a profile deeper than max(2.5 B, D + 1.5 B) is cut there, the plot says how many layers are not drawn); B = plan width, D = embedment. The plan box down to the lowest point is left open for the model (excavated soil, basement); the soil top under a surface foundation is not drawn (the model's face is there). The cut removes the quarter facing the viewer (sign of the view direction in X and Y; +X, -Y in the default view) through the centre of the foundation, down to the bottom. Only the boundary faces of the soil cells are drawn, with their outward normals; outline and crease lines, and the layer interfaces as thin lines | `tests/unit/test_soil_island.py` (face count and closure, opening, cut, depths, extents) |
 | D-W6-03 | Colours | One colour per layer from light sand (smallest Vs of the profile) to dark brown (largest), neighbouring layers alternating 7 % in shade so that equal sublayers stay distinct; the half-space grey. Hover (GUI) gives the layer, its depths, thickness, Vs, Vp, unit weight and damping; a click prints them | `sassi/ui/static/plots.js` `soilTraces` |
 | D-W6-04 | Fit and rendering | The plot box, the rotation centre and the camera fit include the soil (toggling re-fits). GUI: one plotly mesh per layer; the node plot draws the soil see-through. Headless renderer (CAPTUREPLOT, batch): the soil faces that face the viewer join the model faces and the beams (as screen-plane ribbons) in one depth-sorted collection; interaction markers inside the soil are not drawn | `tests/unit/test_soil_island.py` (PNG rendering) |
+| D-W6-05 | Deformed shape from the results | Load Frame Data of Plot > Deformed Shape also offers the steady-state motion at one computed frequency of the active model's FILE8-type files (`FILE8[A-Z0-9_]*` in the model folder that read as FILE8 containers), total or relative to the free field (seismic only). **Animate** submits command text (L17): `HARMFRAME,<file>,<f>,HARM_<f>[,,0]` (folder `HARM_<f with p>[R]`), then the lines of a lesson's `animate` action for that folder (`PROCFRAME` into `<folder>_ani`, `DEFORMPLOT` with the automatic scale 0.15 × model size / largest displacement, the undeformed shape, the title). API: `GET /api/harmonic`, `POST /api/harmonic/plan`, `POST /api/harmonic/show` (`sassi/ui/harmonic.py`) | user report; `tests/unit/test_harmonic_dialog.py` |
+| D-W6-06 | Preselected frequency | The computed frequency of the largest node-to-node spread of the motion, max over nodes of the absolute value of H_n - mean_n H, in the control direction (seismic) or per translation (vibration). The largest absolute H would pick the rigid translation at the lowest frequency for an embedded box that never exceeds the free field; the spread picks 3.49 Hz for example 1 (the lessons' SSI frequency), 3.98 / 4.37 Hz for example 9 SSI / fixed base (its first frequencies) and 12 Hz for example 2 (FV) | `sassi/ui/harmonic.py` `_summary` |
 ---
 
 ## 8. Implementation order and acceptance gates (informative)

@@ -450,6 +450,15 @@ The dialog of spec 06 section 5.2:
 3. **Plot > Bubble / Vector / Contour / Deformed Shape**: choose the animation in Load Frame Data, the
    frame range and stride, the colour range (Bubble, Contour) or scale (Vector, Deformed).
 
+**The shortcut for a deformed shape** (SASSI-EDU): after an analysis, **Plot > Deformed Shape** (or the
+toolbar's Deformed button) also offers *Or animate the analysis results*: the FILE8-type files of the active
+model (FILE8, or FILE8001 ... of the load cases of a vibration analysis), the computed frequencies with the
+one of the largest deformation preselected (where the motion differs most from node to node: the SSI
+resonance of a structure), and total motion or relative to the free field. **Animate** submits the three
+steps above as command text, `HARMFRAME,FILE8,<f>,HARM_<f>`, `PROCFRAME` into `HARM_<f>_ani` and `DEFORMPLOT`
+with the automatic scale (the largest displacement drawn as 15 % of the model size), so the Command History
+replays it. Without results the dialog says to run the analysis first.
+
 The animation tab has **Pause / Start**, `−` / `+` (one frame, while paused) and a frame slider.
 **Pause** keeps the frame on the screen and records it: `PAUSE` + `WINDOWSETTINGS,FRAME,<k>`, so a
 replayed session (and `CAPTUREPLOT`) shows the same frame; moving the slider while paused submits

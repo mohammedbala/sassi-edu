@@ -729,6 +729,9 @@
   D.loadFrameData = async function (kind) {
     let db = {entries: []};
     try { db = await S.get("/api/animations"); } catch (e) { /* none */ }
+    // a deformed shape can also be made from the analysis results (FILE8: sassi/ui/harmonic.py)
+    let hs = {sources: []};
+    if (kind === "DEFORMPLOT") { try { hs = await S.get("/api/harmonic"); } catch (e) { /* none */ } }
     let sel = null;
     const tbody = el("tbody");
     const start = txt("1", {class: "num"}), end = txt("", {class: "num"}), stride = txt("1", {class: "num"});
@@ -736,7 +739,7 @@
     const colour = kind === "BUBBLEPLOT" || kind === "CONTOURPLOT";
     const draw = () => {
       tbody.innerHTML = "";
-      if (!db.entries.length) tbody.appendChild(el("tr", {}, el("td", {colspan: 4, class: "l", text: "no processed animation: Plot > Process Animation Frame List"})));
+      if (!db.entries.length) tbody.appendChild(el("tr", {}, el("td", {colspan: 4, class: "l", text: "no processed animation yet" + (kind === "DEFORMPLOT" ? (hs.sources.length ? ": animate the analysis results below" : "") : ": Plot > Process Animation Frame List")})));
       for (const e of db.entries) {
         const tr = el("tr", {class: sel === e ? "sel" : ""}, el("td", {class: "l", text: e.description || ""}), el("td", {class: "l", text: e.directory}),
           el("td", {class: "l", text: ({0: "Bubble", 1: "Vector", 2: "Contour", 3: "Time History"})[e.type] || e.type}), el("td", {text: e.frames}));
@@ -760,6 +763,7 @@
         }}), el("span", {class: "opt-note", text: db.path || ""}))),
       fieldset("Animation Control", row("Start", start, el("label", {text: "End"}), end, el("label", {text: "Stride"}), stride),
         colour ? row("Colormap Min", cmin, el("label", {text: "Max"}), cmax, el("label", {text: "Col"}), col) : row("Scale Factor", scale)));
+    if (kind === "DEFORMPLOT") body.appendChild(fromResults(hs, () => api));
     const api = D.modal({title: "Load Frame Data", body, buttons: [
       {label: "Ok", primary: true, action: (a) => {
         if (!sel) { a.setMessage("click an animation of the list"); return false; }
@@ -770,6 +774,48 @@
       {label: "Cancel", action: () => true}]});
     draw();
   };
+
+  /** Load Frame Data (Deformed Shape): the steady-state motion at one computed frequency of the active model's
+   *  analysis results, as command text -- HARMFRAME into a frame folder of its own, then PROCFRAME and
+   *  DEFORMPLOT with the automatic scale (the server writes the lines: /api/harmonic/plan and /show). */
+  function fromResults(hs, getApi) {
+    if (!hs.sources.length) {
+      return el("div", {class: "opt-note", text: "No analysis results to animate yet: run the analysis (ANALYS writes the transfer " +
+        "functions, FILE8), then this dialog animates the motion at any computed frequency. The lessons' Animate buttons do the same."});
+    }
+    const srcSel = el("select", {}, ...hs.sources.map((s, i) => el("option", {value: String(i), text: s.file + (s.title ? `: ${s.title}` : "")})));
+    const fSel = el("select");
+    const relSel = el("select", {}, el("option", {value: "0", text: "Total motion"}), el("option", {value: "1", text: "Relative to the free field"}));
+    const cur = () => hs.sources[Number(srcSel.value) || 0];
+    const fill = () => {
+      const s = cur();
+      fSel.innerHTML = "";
+      for (const f of s.freqs) fSel.appendChild(el("option", {value: String(f), text: `${S.fmt(f, 4)} Hz` + (f === s.peak ? ` (largest deformation: node ${s.peak_node} ${s.peak_dir})` : "")}));
+      fSel.value = String(s.peak);
+      relSel.disabled = !s.seismic;
+      if (!s.seismic) relSel.value = "0";
+    };
+    srcSel.addEventListener("change", fill);
+    fill();
+    const go = el("button", {class: "btn small primary", text: "Animate", onclick: async () => {
+      const api = getApi(), s = cur(), f = Number(fSel.value), rel = relSel.value === "1";
+      go.disabled = true;
+      api.setMessage("Writing the frames ...", true);
+      try {
+        const p = await S.post("/api/harmonic/plan", {file: s.file, freq: f, relative: rel});
+        if (!(await cmdOk(p.lines, api))) { go.disabled = false; return; }
+        const title = `${hs.model || "Model"} at ${S.fmt(f, 4)} Hz` + (rel ? ", relative to the free field" : "");
+        const sh = await S.post("/api/harmonic/show", {folder: p.folder, title});
+        if (!(await cmdOk(sh.lines, api))) { go.disabled = false; return; }
+        api.close();
+      } catch (e) { api.setMessage(e.message); go.disabled = false; }
+    }});
+    return fieldset("Or animate the analysis results: steady-state motion at one frequency",
+      row("Transfer functions", srcSel), row("Frequency", fSel), row("Motion", relSel, go),
+      el("div", {class: "opt-note", text: "HARMFRAME writes one period of the motion at the chosen computed frequency, PROCFRAME stores it and " +
+        "DEFORMPLOT plays it; the largest displacement is drawn as 15 % of the model size. The preselected frequency is where the motion differs " +
+        "most from node to node (the largest deformation and rocking)."}));
+  }
 
   // ================================================================== settings windows of the active plot
   D.windowSettings = function () {

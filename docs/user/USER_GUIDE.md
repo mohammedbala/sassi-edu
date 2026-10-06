@@ -1161,6 +1161,12 @@ WINDOWSETTINGS,UNDEFORMED,1
 prints it; `<Ref>` 0 gives the motion relative to the free field, a node number the motion relative to
 that node ([GUI §6.3](GUI.md#63-animations-requirements-58)).
 
+In the GUI the same three commands come from one button: after any analysis, **Plot > Deformed Shape**
+lists the model's FILE8 with its computed frequencies, preselects the one where the motion differs most
+from node to node (the largest deformation: the SSI resonance of a structure), and **Animate** runs
+`HARMFRAME`, `PROCFRAME` and `DEFORMPLOT` for it. The examples write no frames of their own, so this is the
+way to see their deformed shapes.
+
 ### 11.5 Line mathematics and spectrum broadening
 
 Line operations work on the union of the abscissas of their sources:
