@@ -451,7 +451,9 @@ def test_front_end_quotes_path_tokens_and_handles_new_events():
     dlg = (static / "dialogs.js").read_text(encoding="utf-8")
     plots = (static / "plots.js").read_text(encoding="utf-8")
     assert "`INP,${S.q(p)}`" in app and "`INP,${S.q(d.path)}`" in app
-    for tok in ("`CD,${q(cwd.value)}`", "`WRITE,${q(file.value)},${q(dir.value)}`", "`ANSYS,${q(file.value)},${q(dir.value)}`",
+    # Export to ANSYS submits a bare ANSYS (<model>.inp in the model folder, no path tokens) and downloads it
+    assert 'S.command("ANSYS")' in dlg and "APDL written to " in dlg
+    for tok in ("`CD,${q(cwd.value)}`", "`WRITE,${q(file.value)},${q(dir.value)}`",
                 "`CAPTUREPLOT,${q(name.value)}`", "`READSPEC,${q(fname)}", "`READTH,${q(fname)}", "`SOILPROPPLOT,${q(cur)}`",
                 "`PROCFRAME,${q(lf.value)},${q(dir.value)},${q(desc.value)}", "`${kind},${q(sel.directory)}",
                 '["SSI", model.value.trim(), q(file.value), q(pre.value)]'):

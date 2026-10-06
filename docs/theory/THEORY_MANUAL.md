@@ -246,8 +246,9 @@ dense matrix) much smaller:
 
 In SASSI-EDU the variants differ **only** by the interaction set (INT/INTGEN); the equations and the
 code are the same. Example 2 shows the SM anomaly at 6 Hz on a 10 × 10 × 5 m box and its removal by
-FI-EVBN; example 8 shows it at 16 Hz on a 24 × 24 m shear-wall building embedded 8 m, whose interior
-structure has nodes of its own, so that the anomaly comes from the enclosed excavated soil alone.
+FI-EVBN; example 8 shows it at 15.5-16 Hz on a 24 × 24 m shear-wall building embedded 8 m, whose
+interior structure has nodes of its own, so that the anomaly comes from the enclosed excavated soil alone
+(its first natural frequency with the FI-FSIN nodes fixed is 15.45 Hz).
 Screening frequencies used in practice (DOE/STP 2011): the soil-layer frequency $V_s/(4H)$
 for embedment $H$ and the excavated-volume frequency $f_\text{EV}$.
 

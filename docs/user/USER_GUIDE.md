@@ -743,7 +743,8 @@ ASCE 4-16 and SRP 3.7.2 require that a non-FV method be **validated against FV**
 EDU-12): compare the transfer functions at the common structure/excavation nodes. Example 2 shows the
 spurious peak of FI-FSIN at 6 Hz (roof amplitude 1.34 against 0.85 with FV, +58 %) and its removal by
 FI-EVBN. Example 8 does the same comparison on a full shear-wall building with a two-level basement:
-FI-FSIN resonates at 16 Hz (2 to 3 times the FV transfer functions), FI-EVBN stays within 2.4 % of FV.
+FI-FSIN resonates at 15.5-16 Hz (about 2 to 4 times the FV transfer functions, ISRS up to 31 % too high),
+FI-EVBN stays within 3.7 % of FV.
 
 ### 8.4 The central-zone radius
 
@@ -1578,7 +1579,7 @@ check.
 | ex05 | X, Y and Z input in one ANALYS run | SITE ×3 POINT HOUSE ANALYS MOTION ×3 RELDISP | ~4 s |
 | ex06 | loose backfill behind a wall: near-field soil iterations | SOIL SITE ×3 POINT HOUSE ANALYS STRESS ×3, then 6 iterations HOUSE ANALYS STRESS ×3; MOTION | ~5 s |
 | ex07 | Option NON: shear-wall building with cracking wall panels | SITE ×3 POINT HOUSE ANALYS MOTION ×3 RELDISP ×3 NONLINEAR, then 7 iterations; MOTION | 30-120 s |
-| ex08 | embedded shear-wall building: FV against FI-FSIN (SM) and FI-EVBN (MSM) | SITE POINT HOUSE ANALYS MOTION STRESS (3 models) | ~60 s |
+| ex08 | embedded shear-wall building with a tower: FV against FI-FSIN (SM) and FI-EVBN (MSM) | SITE POINT HOUSE ANALYS MOTION STRESS (3 models) | 60-90 s |
 
 ### 15.1 Example 1: stick on a surface mat (the basic workflow)
 
@@ -1716,24 +1717,28 @@ the hysteresis loops). [OPTION_NON.md §11](OPTION_NON.md#11-tutorial-example-7)
 ### 15.8 Example 8: an embedded shear-wall building, FV against the subtraction methods
 
 *Model.* A 24 m × 24 m reinforced-concrete shear-wall building embedded 8 m: a 2 m basemat, 1.0 m outer
-basement walls, 0.6 m interior walls on the axes x = 0 and y = 0, a 0.6 m basement slab and a 0.8 m grade
-slab, three storeys of 5 m above grade (0.8 m outer walls, 0.6 m floors, 0.5 m roof), 830 t of equipment
-(`MT`); 15,063 t in all. Site: 8 m of sand and gravel (Vs 300 m/s) over dense gravels and rock. The
-excavated soil (256 SOLID elements, 3 m × 3 m × 2 m: 20 Hz by the λ/5 rule) shares nodes with the
-basemat and the outer walls only; the interior walls and slabs have nodes of their own (manual rule 11,
-`EXCSTRCHK`), generated as "excavation node + 1000" and renumbered by `RMVUNUSED` and `NCOM`. `INTGEN`
-builds the FV (405 nodes), FI-FSIN (209) and FI-EVBN (258) sets on copies of the model (`CPMODEL`,
-`FCOPY` of FILE1 and FILE3).
+basement walls, 0.6 m interior walls on x, y = −6, 0, 6 m (sixteen rooms of 6 m × 6 m), a 0.6 m
+basement slab and a 0.8 m grade slab; above grade a main block of two 5 m storeys (0.8 m outer walls,
+0.5 m floor and roof) whose four central rooms continue as a tower to 20 m; a stair opening; 810 t of
+equipment (`MT`); 16,556 t in all. The structural groups (basemat, outer basement walls, interior walls,
+slabs, roofs, outer walls above grade) are numbered for distinct colours in the 3D view, and the four
+excavated-soil groups are hidden there (`WINDOWSETTINGS,HIDEGROUP`), so the element plot shows the closed
+building. Site: 8 m of sand and gravel (Vs 300 m/s) over dense gravels and rock. The excavated soil (256
+SOLID elements, 3 m × 3 m × 2 m: 20 Hz by the λ/5 rule) shares nodes with the basemat and the outer walls
+only; the interior walls and slabs have nodes of their own (manual rule 11, `EXCSTRCHK`), generated as
+"excavation node + 1000" and renumbered by `RMVUNUSED` and `NCOM`. `INTGEN` builds the FV (405 nodes),
+FI-FSIN (209) and FI-EVBN (258) sets on copies of the model (`CPMODEL`, `FCOPY` of FILE1 and FILE3).
 
-*Results to look at.* FV: roof transfer function 2.44 at 6.5 Hz, 5 % ISRS ZPA 0.277 g at the basemat,
-0.322 g at grade and 0.420 g at the roof. FI-FSIN follows FV within 2 % below 10 Hz but resonates at
-16 Hz (roof 0.88 against 0.32, the soil enclosed by the basement 12.4 against 1.8) with a dip at 15 Hz:
-the excavated soil inside the interface, which carries no impedance, has its own natural frequency
-there. Its ISRS differ by up to +9.5 % / −8 % at 14-16 Hz and the wall forces by less than 2 %, because
-the resonance is narrow and far above the 6.5 Hz SSI mode. FI-EVBN follows FV within 2.4 % (ISRS 0.7 %).
-On this small model the reduced sets save little time (ANALYS 18 s FV, 13 s FI-FSIN, 15 s FI-EVBN): the
-structure's equations cost as much as the impedance. Lesson 11 of the guided course builds the example
-step by step, animates the spurious resonance, runs FFV and discusses the validation against FV.
+*Results to look at.* FV: tower roof transfer function 2.82 at 6.5 Hz (fixed base 12.4-12.5 Hz), 5 % ISRS
+ZPA 0.280 g at the basemat, 0.320 g at grade and 0.464 g at the tower roof. FI-FSIN follows FV within
+2.4 % below 10 Hz but resonates at 15.5-16 Hz (basemat 0.68 against 0.33, tower roof 1.22 against 0.60,
+the soil enclosed by the basement 12.6 against 1.6): the excavated soil inside the interface, which
+carries no impedance, has its own natural frequency there (15.45 Hz). Its ISRS are up to 31 % too high
+at 15.5 Hz; the wall forces change by about 1 %, because they come from the 6.5 Hz SSI mode. FI-EVBN
+follows FV within 3.7 % (ISRS 1.0 %). On this small model the reduced sets save little time (FV takes
+about 1.25 times as long as FI-FSIN in ANALYS): the structure's equations cost as much as the impedance.
+Lesson 11 of the guided course builds the example step by step, shows the soil, the interaction nodes
+and a cutaway, animates the spurious resonance and discusses the validation against FV.
 
 ---
 

@@ -303,6 +303,13 @@
     return {eye: {x: n[0] + B[2][0] * k, y: n[1] + B[2][1] * k, z: n[2] + B[2][2] * k}, up: viewUp(B).up,
       center: {x: n[0], y: n[1], z: n[2]}, projection: {type: "orthographic"}};
   }
+  /** The commanded view of a 3D plot: the view values, the view counter (CNGVIEW / RSTVIEW / ... ) and the
+   *  extents of what is drawn (a hide / show / display-volume change re-fits).  A new key replaces a view
+   *  rotated or zoomed with the mouse. */
+  function viewKey(d) {
+    const v = (d && d.view) || {}, b = (d && d.scene && d.scene.bbox) || [];
+    return JSON.stringify([v.rx, v.ry, v.rz, v.zoom, v.px, v.py, v.center, v.view_rev, b]);
+  }
   /** sceneLayout keeping the learner's mouse view across re-renders of the same commanded view: a toggle
    *  such as NODENUM or the next animation frame re-renders the plot, and the rotation (the live camera)
    *  and the orthographic zoom (the aspect ratio) would otherwise go back to the commanded view.  Plotly's
@@ -311,7 +318,7 @@
     const lay = sceneLayout(d, extra, fixed, div);
     const a = lay.scene.aspectratio, fl = div && div._fullLayout && div._fullLayout.scene;
     const v = d.view || {};
-    const key = JSON.stringify([v.rx, v.ry, v.rz, v.zoom, v.px, v.py, v.center, v.view_rev]);
+    const key = viewKey(d);
     if (t.userView && t.viewKey === key && fl && fl.aspectratio && t.fitAspectX) {
       const f = fl.aspectratio.x / t.fitAspectX;
       if (isFinite(f) && f > 0) lay.scene.aspectratio = {x: a.x * f, y: a.y * f, z: a.z * f};
@@ -324,7 +331,7 @@
     const v = d.view;
     d._geo = sceneGeometry(d, fixed, div);
     const g = d._geo;
-    const key = JSON.stringify([v.rx, v.ry, v.rz, v.zoom, v.px, v.py, v.center, v.view_rev]);
+    const key = viewKey(d);
     const ax = (t, r) => ({title: {text: t}, showbackground: false, gridcolor: "#e6e6e6", zerolinecolor: "#ccc", showspikes: false,
       range: r, autorange: false});
     const scene = {aspectmode: "manual", aspectratio: g.aspect, camera: cameraOf(d), xaxis: ax("X", g.ranges[0]), yaxis: ax("Y", g.ranges[1]),
@@ -454,7 +461,7 @@
    *  new view from the server (CNGVIEW, RSTVIEW, CNGCENTER: another view key) clears the mark. */
   function trackView(t, div) {
     const v = (t.data && t.data.view) || {};
-    const key = JSON.stringify([v.rx, v.ry, v.rz, v.zoom, v.px, v.py, v.center, v.view_rev]);
+    const key = viewKey(t.data || {});
     if (t.viewKey !== key) { t.viewKey = key; t.userView = false; }
     if (!div || div._sassiView) return;
     div._sassiView = true;

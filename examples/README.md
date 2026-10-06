@@ -15,7 +15,7 @@ next to the results.
 | `ex05_xyz_simultaneous.pre` | X, Y and Z input in one ANALYS run (simultaneous cases) | SITE (x3) POINT HOUSE ANALYS MOTION (x3) RELDISP | ~4 s |
 | `ex06_nonlinear_soil.pre` | loose backfill behind an embedded wall: near-field soil nonlinearity by equivalent-linear SSI iterations | SOIL SITE (x3) POINT HOUSE ANALYS STRESS (x3), then 6 iterations of HOUSE ANALYS (New Structure) STRESS (x3); MOTION | ~5 s |
 | `ex07_option_non.pre` | Option NON: two-storey shear-wall building with cracking wall panels | SITE (x3) POINT HOUSE ANALYS MOTION (x3) RELDISP (x3) NONLINEAR, then 7 iterations; MOTION | 30-120 s |
-| `ex08_embedded_building.pre` | embedded shear-wall building with a two-level basement: FV against the subtraction (FI-FSIN) and modified subtraction (FI-EVBN) methods | SITE POINT HOUSE ANALYS MOTION STRESS (3 models) | ~60 s |
+| `ex08_embedded_building.pre` | embedded shear-wall building with a two-level basement and a tower: FV against the subtraction (FI-FSIN) and modified subtraction (FI-EVBN) methods | SITE POINT HOUSE ANALYS MOTION STRESS (3 models) | 60-90 s |
 
 `data/` holds the input data:
 
@@ -51,7 +51,7 @@ control-motion file would not be found (CHECK Error 73), and MOTION would be blo
 example `exNN` are written to `examples/exNN/` (examples 2 and 8 also write to `examples/ex02_fsin/`,
 `examples/ex02_evbn/`, `examples/ex08_fsin/` and `examples/ex08_evbn/`). Example 6 also reads the soil curves `../sassi/data/dynp_library.pre`, so keep
 the repository layout. Example 7 leaves about 95 MB in `examples/ex07/` (60 MB of binary inter-module
-files such as the ANALYS restart files `COOTKnnn`, which can be deleted after the run); example 8 about 55 MB
+files such as the ANALYS restart files `COOTKnnn`, which can be deleted after the run); example 8 about 57 MB
 in its three folders. Each example ends with `WRITE`, which saves the complete model as
 commands (`examples/exNN/<model>.pre`). `INP` of that file rebuilds the same model.
 
@@ -390,23 +390,26 @@ sections 8 and 11 discuss both.
 
 ## Example 8: an embedded shear-wall building, FV against the subtraction methods
 
-**Model.** A reinforced-concrete shear-wall building, 24 m x 24 m in plan, with two basement levels
-and three storeys above grade:
+**Model.** A reinforced-concrete shear-wall building, 24 m x 24 m in plan, embedded 8 m. Shear walls on
+x, y = -12, -6, 0, 6, 12 m make sixteen rooms of 6 m x 6 m below and above grade; the main block rises
+two storeys of 5 m and its four central rooms continue as a tower two storeys higher (roof at 20 m).
 
-| Member | Thickness | Elements |
+| Member (group, colour in the 3D view) | Thickness | Elements |
 |---|---|---|
-| basemat at z = -8 m | 2.0 m | 64 SHELL (3 m x 3 m) on the bottom face of the excavation |
-| outer basement walls | 1.0 m | 128 SHELL (3 m x 2 m) on its lateral faces |
-| interior basement walls x = 0 and y = 0 | 0.6 m | 64 SHELL |
-| basement slab z = -4 m, grade slab z = 0 | 0.6 m, 0.8 m | 128 SHELL |
-| outer walls above grade (storeys of 5 m) | 0.8 m | 96 SHELL (3 m x 5 m) |
-| interior walls above grade | 0.6 m | 48 SHELL |
-| floors z = 5 and 10 m, roof z = 15 m | 0.6 m, 0.5 m | 192 SHELL |
+| basemat at z = -8 m (5, purple) | 2.0 m | 64 SHELL (3 m x 3 m) on the bottom face of the excavation |
+| outer basement walls (12, brown) | 1.0 m | 128 SHELL (3 m x 2 m) on its lateral faces |
+| interior walls on x, y = -6, 0, 6 m, basement, main block and tower (10, teal) | 0.6 m | 304 SHELL |
+| floor slabs: basement z = -4 m, grade, z = 5 m, tower z = 10 and 15 m (9, pink) | 0.6, 0.8, 0.5 m | 221 SHELL |
+| roofs: main roof z = 10 m around the tower, tower roof z = 20 m (11, lavender) | 0.5 m | 64 SHELL |
+| outer walls above grade: main block (0.8 m), tower (0.6 m) (13, cream) | | 96 SHELL (3 m x 5 m) |
 
-Concrete E = 30 GPa, nu = 0.2, 24 kN/m3, 4 % damping (ASCE 4 response level 1 as the manual's Damping
-Cutoff note quotes it: uncracked stiffness, 4 %); the slabs carry 4 kN/m3 more for distributed
-equipment, piping and live load. Nine equipment items of 50 to 150 t (830 t) sit at room centres (`MT`).
-CALCM: 1.396E5 kN of elements, 15,063 t with the equipment; the excavated soil weighs 8,925 t.
+The group numbers are chosen for the colours of the 3D view (group g is drawn in colour g of the element
+palette). Concrete E = 30 GPa, nu = 0.2, 24 kN/m3, 4 % damping (ASCE 4 response level 1 as the manual's
+Damping Cutoff note quotes it: uncracked stiffness, 4 %); slabs and roofs carry 4 kN/m3 more for
+distributed equipment, piping and live load. A 3 m x 3 m stair opening passes the basement slab, the grade
+slab and the first floor (`EDEL`, then `ECOMPR`, because CHECK treats a missing element number as an error).
+Ten equipment items of 25 to 150 t (810 t) sit at room centres (`MT`). CALCM: 1.545E5 kN of elements,
+16,556 t with the equipment; the excavated soil weighs 8,925 t.
 
 The site: 8 m of sand and gravel (Vs 300 m/s, four 2 m embedment layers with their own L numbers), 12 m
 of dense gravel (Vs 450 m/s, 1 m sublayers), 12 m of very dense gravel (Vs 650 m/s, 2 m sublayers) on
@@ -418,60 +421,65 @@ input is the RG 1.60 record as a vertically incident SV wave (control motion in 
 The building touches the excavated soil only on the foundation-soil interface (basemat and outer
 walls). The interior walls and the two slabs inside the basement have nodes of their own at the
 coordinates of the excavated-soil nodes (manual 1.5.1 rule 11; `EXCSTRCHK` finds no shared interior
-node): they are generated as "excavation node + 1000", then `RMVUNUSED` and `NCOM` number the 772 nodes
-without gaps (1-405 excavation, 406-648 above grade, 649-772 basement interior). `FIXROT` restrains the
-shell drilling rotations of the shell-only nodes, `D` in `FOREACH` loops those of the face-interior
-nodes shared with the soil. `WINDOWSETTINGS,HIDEELEM` cuts the south and east outer walls away in the
-3D view (display only). `INTGEN` builds the interaction sets on the same model and `CPMODEL` / `FCOPY`
-reuse the free field and the point-load solutions, as in example 2:
+node): they are generated as "excavation node + 1000", then `RMVUNUSED` and `NCOM` number the 781 nodes
+without gaps (1-405 excavation, 406-567 main block, 568-617 tower, 618-781 basement interior). `FIXROT`
+restrains the shell drilling rotations of the shell-only nodes, `D` in `FOREACH` loops those of the
+face-interior nodes shared with the soil. `WINDOWSETTINGS,HIDEGROUP` hides the four soil groups in the 3D
+views (display only), so the element plot and the gallery picture show the building closed, with the
+interaction nodes on its basement walls; `WINDOWSETTINGS,SHOWGROUP,1` ... shows the soil again and
+`WINDOWSETTINGS,VOLUME,,,1` cuts the building open north of y = 0 (lesson 11). `INTGEN` builds the
+interaction sets on the same model and `CPMODEL` / `FCOPY` reuse the free field and the point-load
+solutions, as in example 2:
 * model 0 `ex08`: FV, 405 interaction nodes (1215 DOFs);
 * model 2 `ex08fsin`: FI-FSIN (subtraction method, SM), 209 nodes;
 * model 3 `ex08evbn`: FI-EVBN (modified subtraction method, MSM), 258 nodes.
 
-FFV (`INTGEN,5`, 307 nodes) is not run here: on this model it costs as much as FV (lesson 11 runs it).
+FFV (`INTGEN,5`, 307 nodes) is not run here: on this model it costs as much as FV (lesson 11 has it as
+a Try this).
 
-**Look at.** The FILE8 of each folder, or the transfer functions `00608TR_X.TFU` (roof centre),
-`00748TR_X.TFU` (grade slab centre), `00041TR_X.TFU` (basemat centre), `00045TR_Z.TFU` (basemat edge,
-rocking) and `00365TR_X.TFU` (the excavated soil at the centre of the excavation top face, inside the
-basement); the 5 % ISRS `000nnTR_X01.RS` and `000nnTR_Z01.RS`; the wall histories
-`SHELL_006_00004_FXY.THS` (south wall, in-plane shear) and `SHELL_006_00069_MYY.THS` (west wall,
-bending); `ex08fsin.err` (EDU-12); the ANALYS listings (interaction DOFs, memory estimate, time per
-frequency).
+**Look at.** The FILE8 of each folder, or the transfer functions `00605TR_X.TFU` (tower roof centre),
+`00567TR_X.TFU` (main roof corner), `00757TR_X.TFU` (grade slab centre), `00041TR_X.TFU` (basemat centre),
+`00045TR_Z.TFU` (basemat edge, rocking), `00739TR_Z.TFU` (grade slab under a 150 t item) and
+`00365TR_X.TFU` (the excavated soil at the centre of the excavation top face, inside the basement); the
+5 % ISRS `000nnTR_X01.RS` and `000nnTR_Z01.RS`; the wall histories `SHELL_012_00004_FXY.THS` (south wall,
+in-plane shear) and `SHELL_012_00069_MYY.THS` (west wall, bending); `ex08fsin.err` (EDU-12); the ANALYS
+listings (interaction DOFs, memory estimate, time per frequency).
 
 **Model checks.**
 * CHECK: no error and no warning for FV; FI-FSIN and FI-EVBN only EDU-12 (Non-FV Method Selected:
   Validate Against FV). `EXCSTRCHK`, `FIXEDINT` and `HINGED` find nothing.
-* At 0.1 Hz every transfer function is 1.000 (ANALYS low-frequency check: largest deviation 0.032 %).
+* At 0.1 Hz every transfer function is 1.000 (ANALYS low-frequency check: largest deviation 0.033 %).
 * Fixed-base frequencies (an eigenvalue analysis of the HOUSE structural matrices `COOSK`/`COOSM`, done
-  outside the program): with the basemat clamped the first lateral modes are at 10.7 and 10.9 Hz in X
-  (74 % of the mass together: the X sway couples with the antisymmetric vertical mode of the z = 5 m
-  floor that carries the two 80 t items) and 10.8 Hz in Y (70 %), with vertical slab modes from 10 to
-  13 Hz; with the whole basement clamped, 16 Hz. These are in the range of squat shear-wall buildings.
+  outside the program): with the basemat clamped the first lateral modes are at 12.4 Hz (Y) and 12.5 Hz
+  (X), 65 % of the mass each, the next lateral ones at 21-23 Hz, the first strong vertical mode at
+  31 Hz; with the whole basement clamped, 16.4 Hz. These are in the range of squat shear-wall buildings.
 
 **Expected results** (`tests/integration/test_examples.py`, marked `slow`):
-* Run time about 60 s: ANALYS 18 s (FV), 13 s (FI-FSIN) and 15 s (FI-EVBN) for 41 frequencies. The
-  dense impedance is 23.6 MB per matrix for FV and 6.3 MB for FI-FSIN, but on a model this small the
-  3756 equations of the structure and the excavation cost as much as the impedance: FV takes only 1.45
-  times as long as FI-FSIN. The manual's tens of times apply to excavations with thousands of nodes.
-* FV: the roof X transfer function peaks at **2.44 at 6.5 Hz** (the SSI frequency, about 60 % of the
-  fixed-base one); the basemat never moves more than the free surface. 5 % ISRS zero-period
-  accelerations: 0.277 g at the basemat (kinematic interaction: below the 0.324 g control motion),
-  0.322 g at grade and 0.420 g at the roof; the roof ISRS peaks at 1.89 g at 6.8 Hz. South basement
-  wall FXY 510 kPa, west wall MYY 52.6 kN m/m (bottom panels).
-* **FI-FSIN** follows FV within 2.0 % (complex difference, relative to the FV peak) below 10 Hz and
-  within 6.4 % from 10 to 14 Hz, then has a **spurious resonance at 16 Hz**: roof X 0.881 against 0.315
-  (FV), floor z = 10 m 0.736 against 0.219, grade slab 0.721 against 0.344, basemat 0.716 against 0.333,
-  roof corner Z 0.833 against 0.420, and the soil inside the basement (node 365) 12.4 against 1.8. It is
-  preceded by a dip at 15 Hz (roof 0.143 against 0.333, floor z = 10 m 0.017 against 0.203). `CRITFREQ`
-  flags the interpolated SM peaks near 15.8 Hz as not supported by computed values; adding 15.75 Hz
-  (frequency number 645) gives 1.12 at the basemat and 1.06 at the roof (FV 0.334 and 0.317).
-* The 5 % ISRS of FI-FSIN differ from FV by at most 1.4 % below 10 Hz, by +0.9 % to +9.5 % at
-  15.1-16.2 Hz and -2.6 % to -8.0 % at 13.8-14.8 Hz, and by up to 9.1 % above 17 Hz; the peak wall forces
-  by less than 1.5 % (FXY -0.9 %, MYY +1.4 %). The resonance is narrow and lies far above the 6.5 Hz
-  mode that carries most of the response, so the ISRS change much less than the transfer functions.
-* **FI-EVBN** follows FV within **2.4 %** at every computed frequency and output (the largest
-  difference is the basemat edge Z at 20 Hz; X within 1.1 %), the ISRS within 0.7 %, the wall forces
-  within 1.1 %.
+* Run time about 60-90 s on a laptop: ANALYS 26 s (FV), 21 s (FI-FSIN) and 25 s (FI-EVBN) for 41
+  frequencies, measured with other applications loading the machine. The dense impedance is 23.6 MB per
+  matrix for FV and 6.3 MB for FI-FSIN, but on a model this small the 3930 equations of the structure
+  and the excavation cost as much as the impedance: FV takes only 1.25 times as long as FI-FSIN. The
+  manual's tens of times apply to excavations with thousands of nodes. About 57 MB in the three folders.
+* FV: the tower roof X transfer function peaks at **2.82 at 6.5 Hz** (the SSI frequency, about half the
+  fixed-base one), the main roof corner at 1.71; the basemat never moves more than the free surface.
+  5 % ISRS zero-period accelerations: 0.280 g at the basemat (kinematic interaction: below the 0.324 g
+  control motion), 0.320 g at grade, 0.364 g at the main roof and 0.464 g at the tower roof; the tower
+  roof ISRS peaks at 2.27 g at 6.8 Hz. South basement wall FXY 374 kPa, west wall MYY 41.6 kN m/m
+  (bottom panels).
+* **FI-FSIN** follows FV within 2.4 % (complex difference, relative to the FV peak) below 10 Hz and
+  within 6.7 % from 10 to 14 Hz, then has a **spurious resonance at 15.5-16 Hz**: basemat 0.675 against
+  0.325 and grade slab 0.545 against 0.338 at 15.5 Hz, tower roof 1.223 against 0.598 at 16 Hz, and the
+  soil inside the basement (node 365) 12.6 against 1.6; a dip precedes it (the main roof corner 0.011
+  against 0.095 at 14.5 Hz). `CRITFREQ` flags the interpolated SM peaks near 15.7 Hz as not supported by
+  computed values. With 0.25 Hz steps (a scratch run) the computed peak is at 15.75 Hz: basemat 2.10,
+  tower roof 3.33, enclosed soil 41.7, against 0.31, 0.61 and 1.8 with FV.
+* The 5 % ISRS of FI-FSIN differ from FV by at most 4.9 % below 10 Hz, are **up to 31 % too high at
+  15.5 Hz** (basemat X +25 %, grade slab X +23 %, grade slab Z under the 150 t item +31 %; the tower roof
+  only +3 % / -9 %) and differ by up to 15 % above 17 Hz; the peak wall forces change by about 1 %
+  (FXY -1.2 %, MYY +0.9 %): they come from the 6.5 Hz SSI response.
+* **FI-EVBN** follows FV within **3.7 %** at every computed frequency and output (the largest difference
+  is the grade slab Z under the 150 t item at 20 Hz; X within 1.3 %), the ISRS within 1.0 %, the wall
+  forces within 1.2 %. FFV (lesson 11, Try this) gives the same 3.7 % at the same place, X within 1.5 %.
 
 **Why the subtraction method resonates.** In FI-FSIN the 196 excavated nodes inside the basement and
 on the excavation top face carry neither impedance nor free-field load: their rows keep only
@@ -479,18 +487,21 @@ on the excavation top face carry neither impedance nor free-field load: their ro
 comes from the soil alone: the enclosed soil, held at the walls and the basemat and free at the top,
 has natural frequencies of its own, and near the first one the subtracted soil resonates through the
 interface. An eigenvalue analysis of the HOUSE matrices `K_e`, `M_e` with the interaction DOFs fixed
-(done outside the program) gives 15.5 Hz for the FI-FSIN set, 22.4 Hz for FI-EVBN (above the 20 Hz
-cut-off: no anomaly) and 37.7 Hz for FFV. The frequency scales with the soil velocity. The same model
-with other embedment soils (L 1-4 changed, everything else equal):
-* Vs 600 m/s (stiff): FI-FSIN follows FV within 2.0 % up to 20 Hz, its ISRS within 1.4 %; FI-EVBN
-  within 1.2 %. This is the manual's statement that FI-FSIN agrees with FV on stiff soil and rock sites.
-* Vs 200 m/s (soft): FI-FSIN resonates at 10.5 Hz (roof 0.943 against 0.436), ISRS +16 % / -17 %;
-  FI-EVBN departs from FV by up to 5.4 % near 19 Hz, ISRS within 2.9 %. (The 3 m mesh passes only
-  13.3 Hz for this soil: the comparison of the methods holds, the absolute results above 13 Hz do not.)
+(done outside the program) gives 15.45 Hz for the FI-FSIN set, 22.35 Hz for FI-EVBN (above the 20 Hz
+cut-off: no anomaly) and 37.7 Hz for FFV; they depend on the excavation only, not on the building. How
+much of the anomaly reaches the ISRS depends on the building and on the input, not only on the soil:
+here the floor spectra take 20-31 % of error at 15.5 Hz. The frequency scales with the soil velocity. The same model with other
+embedment soils (L 1-4 changed, everything else equal; scratch runs):
+* Vs 600 m/s (stiff): FI-FSIN follows FV within 1.3 % up to 20 Hz, its ISRS within 1.3 %; FI-EVBN
+  within 0.9 %. This is the manual's statement that FI-FSIN agrees with FV on stiff soil and rock sites.
+* Vs 200 m/s (soft): FI-FSIN resonates at 10.5 Hz (basemat 1.31 against 0.57), ISRS +16 % / -16 %;
+  FI-EVBN departs from FV by up to 24 % near 19 Hz (its own enclosed-soil frequency falls to about
+  15 Hz), ISRS +3.1 % / -9.3 %. (The 3 m mesh passes only 13.3 Hz for this soil: the comparison of the
+  methods holds, the absolute results above 13 Hz do not.)
 
-Lesson 11 of the guided course builds this example step by step, animates the FV and FI-FSIN motion at
-16 Hz (`HARMFRAME`), runs FFV (within 2.7 % of FV) and discusses the validation a design engineer must
-document.
+Lesson 11 of the guided course builds this example step by step, shows the soil and the interaction
+nodes and a cutaway of the building, animates the FV and FI-FSIN motion at 16 Hz (`HARMFRAME`) and
+discusses the validation a design engineer must document.
 
 ## Tests
 
