@@ -148,7 +148,7 @@ def build(out: Path = DEFAULT_OUT) -> Dict[str, object]:
     zbytes = make_zip(rels)
     statics: List[Tuple[str, Path]] = [("static/" + p.relative_to(STATIC).as_posix(), p)
                                        for p in sorted(STATIC.rglob("*"))
-                                       if p.is_file() and p.name != "index.html"
+                                       if p.is_file() and p != STATIC / "index.html"     # the GUI page is built below
                                        and not _skip(p.relative_to(STATIC).as_posix())]
     statics.append(("static/plotly.min.js", plotly_js()))
     images = [(r, ROOT / r) for r in rels if r.startswith("docs/") and r.lower().endswith(IMAGE_SUFFIXES)]

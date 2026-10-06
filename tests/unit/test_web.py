@@ -269,6 +269,19 @@ def test_site_ships_the_example_pictures(site):
     assert not [f for f in summary["files"] if f.startswith("static/examples/") and not f.endswith(".png")]
 
 
+def test_site_ships_the_explainer_videos(site):
+    """Every file of sassi/ui/static/videos (pages, scripts, data, the list index.html and the recorded
+    narration audio/NN/*.mp3) is a file of the site, byte for byte; only the GUI's own static/index.html is
+    replaced by the built page."""
+    out, summary = site
+    videos = sorted(p for p in (STATIC / "videos").rglob("*") if p.is_file() and p.name != ".DS_Store")
+    assert videos and any(p.suffix == ".mp3" for p in videos)
+    for p in videos:
+        name = "static/" + p.relative_to(STATIC).as_posix()
+        assert name in summary["files"] and (out / name).read_bytes() == p.read_bytes(), name
+    assert "static/videos/index.html" in summary["files"] and "static/index.html" not in summary["files"]
+
+
 def test_site_service_worker_keeps_the_app_on_the_computer(site):
     """sw.js at the site root (its scope is the site folder), with this build and the Pyodide version of
     worker.js: the Pyodide cache is named by the version only (kept across deployments), the site cache by the
