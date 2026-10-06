@@ -61,7 +61,8 @@ Around the modules:
 ## Quick start
 
 ```bash
-python3 -m venv .venv && .venv/bin/pip install -e .[test]
+git clone https://github.com/mohammedbala/sassi-edu.git && cd sassi-edu
+python3 -m venv .venv && .venv/bin/pip install --upgrade pip && .venv/bin/pip install -e '.[test]'
 .venv/bin/sassi --cwd examples run ex01_surface_stick.pre    # batch run of the first tutorial model
 .venv/bin/sassi                                              # interactive command console
 .venv/bin/sassi-gui                                          # browser GUI; opens on Learn, the guided course (11 lessons)

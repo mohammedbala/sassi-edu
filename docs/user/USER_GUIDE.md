@@ -53,11 +53,13 @@ matplotlib and plotly. From the project root:
 
 ```bash
 python3 -m venv .venv
-.venv/bin/pip install -e .[test]        # installs the 'sassi' and 'sassi-gui' commands
+.venv/bin/pip install --upgrade pip     # an older pip (macOS Python 3.9 ships 21.2) cannot install it editable
+.venv/bin/pip install -e '.[test]'      # installs the 'sassi' and 'sassi-gui' commands
 .venv/bin/python -m pytest -q           # optional: unit tests and verification problems
 ```
 
-On Windows replace `.venv/bin/` by `.venv\Scripts\`. Everything runs locally; the GUI serves its
+The quotes around `.[test]` matter in zsh, the macOS default shell, which otherwise reads the brackets
+as a file pattern ("no matches found"). On Windows replace `.venv/bin/` by `.venv\Scripts\`. Everything runs locally; the GUI serves its
 page on `127.0.0.1` only and needs no internet connection.
 
 ### 1.2 Three ways to drive the program
