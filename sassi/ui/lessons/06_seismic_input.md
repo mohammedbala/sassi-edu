@@ -19,8 +19,8 @@ for ISRS). An SSI analysis in SASSI needs two more things before the structure i
    energy as it strains, and the strain depends on the motion. The low-strain shear-wave velocities of
    the geotechnical report are not the properties the structure sees.
 
-This lesson runs example 4, the free-field chain **EQUAKE → SOIL → SITE**, on a 22 m soil column
-(10 m of sand, 12 m of clay, on rock) with no structure. EQUAKE builds the record, SOIL runs the
+This lesson runs example 4, the free-field chain **EQUAKE → SOIL → SITE**, on a 72 ft soil column
+(30 ft of sand, 42 ft of clay, on rock) with no structure. EQUAKE builds the record, SOIL runs the
 SHAKE equivalent-linear analysis and SITE takes over the strain-compatible properties for the SSI
 analysis. The last two steps run the column again with softer and stiffer soil, the soil cases that
 design practice envelopes. The lesson runs in about 20 s (EQUAKE takes most of it).
@@ -34,10 +34,10 @@ The model directory `ex04` holds every file of this lesson. The soil column is e
 MDL,ex04,ex04
 TIT,Ex04 - free-field chain EQUAKE - SOIL - SITE (sand and clay on rock)
 * L,<nm>,<thick>,<weight>,<Vp>,<Vs>,<pdamp>,<sdamp>  (low-strain properties)
-L,1,1.0,19.0,400,200,0.01,0.01
-L,2,1.0,18.5,900,300,0.01,0.01
-L,3,1.0,22.0,2400,1200,0.01,0.01
-* 10 sublayers of sand, 12 of clay, 1 m each
+L,1,3.0,0.120,1300,650,0.01,0.01
+L,2,3.5,0.120,3000,1000,0.01,0.01
+L,3,3.0,0.140,8000,4000,0.01,0.01
+* 10 sublayers of sand 3 ft thick, 12 of clay 3.5 ft thick
 TOPL,1,1,1,1,1,1,1,1,1,1
 TOPL,2,2,2,2,2,2,2,2,2,2
 TOPL,2,2
@@ -46,17 +46,20 @@ FREQ,1,4,20,40,60,80,100,120,140,160,180
 FREQ,1,200,240,280,320,360,400,440,480,520,560
 SITE,0,1,0,20,3,1,0,1,4096,1,0,0.005,8192,1
 WAVE,2,1,1,1,0
-HOUSE,9.81,0,0,2,0,0,0,0,0
+HOUSE,32.2,0,0,2,0,0,0,0,0
 ```
 
 ### What this does
-* `L` defines three layer properties: sand ($V_s = 200\,\text{m/s}$), clay ($V_s = 300\,\text{m/s}$)
-  and rock ($V_s = 1200\,\text{m/s}$), all with 1 % damping, the small-strain values. `TOPL` stacks 22
-  sublayers of 1 m; L 3 is the half-space (SITE `<hs>` = 3).
+* `L` defines three layer properties: sand ($V_s = 650\,\text{ft/s}$), clay ($V_s = 1{,}000\,\text{ft/s}$),
+  both $0.120\,\text{kcf}$, and rock ($V_s = 4{,}000\,\text{ft/s}$, $0.140\,\text{kcf}$), all with 1 %
+  damping, the small-strain values. `TOPL` stacks 22 sublayers, 10 of 3 ft in the sand and 12 of
+  3.5 ft in the clay; L 3 is the half-space (SITE `<hs>` = 3), at 72 ft depth.
 * `SITE,0,1,0,20,3,1,0,1,4096,1,0,0.005,8192,1` owns the time grid shared by every module:
   `<delt>` = 0.005 s, `<nft>` = 8192 Fourier points, so $\Delta f = 0.0244\,\text{Hz}$ and the Fourier
   period is 41 s, twice the 20 s record. The control point is the top of TOPL layer 1 (`<cl>` = 1),
   direction $x'$ (`<cm>` = 0); `WAVE,2,...` is a vertically propagating SV wave.
+* `HOUSE,32.2,...` sets the gravity, 32.2 ft/s², and with it the British units (ft, kip, s) of the
+  model; EQUAKE and the free-field modules take it from here.
 * `FREQ` lists the SSI frequencies as integer numbers $n$ ($f = n\,\Delta f$): $n = 4$ (0.1 Hz), then
   multiples of 20, so that they fall on the 0.488 Hz grid of the SOIL amplification output used in
   step 6. The last one, $n = 560$ (13.7 Hz), is the cut-off.
@@ -64,9 +67,10 @@ HOUSE,9.81,0,0,2,0,0,0,0,0
 ### Why it matters
 The time step and NFFT you choose here fix the frequency grid of every result, the length of the
 quiet zone after the record (here 21 s) and the highest frequency the record carries (Nyquist
-100 Hz). The cut-off is not arbitrary: 1 m sublayers pass $V_s/(5h)$, and in step 5 the sand at
-7-10 m depth softens to about 75 m/s, which passes only 15 Hz. A frequency set chosen with the
-low-strain velocities would exceed what the softened mesh can carry.
+100 Hz). The cut-off is not arbitrary: 3 ft sublayers pass $V_s/(5h)$, and in step 5 the sand at
+21-30 ft depth softens to 240-260 ft/s, which passes only 16-17 Hz (650 ft/s before softening:
+43 Hz). A frequency set chosen with the low-strain velocities would exceed what the softened mesh
+can carry.
 
 ### Technical basis
 ```math
@@ -116,8 +120,9 @@ RUNEQUAKE
   (must equal the number of rows of the `.rsi` file), random seed 11975, target damping 5 %, duration
   20 s, no correlation between components, one seed trial.
 * `RSIN` names the target, `RSOUT` the spectrum of the generated record, `ACCOUT` the record itself
-  (EQUAKE also writes `.vel`, `.dis`, `.psd` and `.fft` with the same base name).
-* `AOPT,1,0,...` enables only EQUAKE for CHECK and AFWRITE; `RUNEQUAKE` runs the module (about 13 s).
+  in g (EQUAKE also writes `.vel`, `.dis`, `.psd` and `.fft` with the same base name; with the
+  gravity in ft/s², velocities are in in/s and displacements in inches).
+* `AOPT,1,0,...` enables only EQUAKE for CHECK and AFWRITE; `RUNEQUAKE` runs the module (about 15 s).
 
 ### Why it matters
 The record is the seismic input of everything that follows: the site response, the ISRS and the
@@ -185,7 +190,7 @@ record the listing reports:
 | adjacent points below the target | $\le 9$ | 7 |
 | strong-motion duration (Arias 5-75 %) | $\ge 6\,\text{s}$ | 9.03 s |
 
-$\mathrm{PGA} = 0.324\,\text{g}$, $\mathrm{PGV} = 57.2\,\text{cm/s}$, $\mathrm{PGD} = 40.7\,\text{cm}$;
+$\mathrm{PGA} = 0.324\,\text{g}$, $\mathrm{PGV} = 22.5\,\text{in/s}$, $\mathrm{PGD} = 16.0\,\text{in}$;
 $V/A = 0.180\,\text{s}$ and $AD/V^2 = 3.95$, which the
 listing says to compare with the controlling events. No target PSD was given, so the PSD criterion was
 not checked (give one with `TPSD` and the eighth EQUAKE argument).
@@ -200,7 +205,7 @@ cross-correlation $\lvert\rho\rvert \le 0.16$ between components and $\mathrm{PS
 target over 0.3-24 Hz, are the SRP 3.7.1 Rev. 4 checks as SASSI-EDU states them in
 [Theory §21](docs/theory/THEORY_MANUAL.md#21-spectrum-compatible-motions-equake) item 6
 (decision D-EQK-04: manual and SRP reported separately). The final velocity and displacement are zero
-to round-off (-7e-13 cm/s, -3e-12 cm): no baseline drift.
+to round-off (-3e-13 in/s, -1.5e-12 in): no baseline drift.
 
 ### Check yourself
 The spectrum of the record exceeds the target by up to 16.6 % (at 0.19 Hz). Is that a problem for the
@@ -287,7 +292,7 @@ strains in every sublayer, reads new properties from the curves and repeats.
 
 ```sassi
 * SOIL,<nrval>,<grav>,<header>,<outcrop>,<save>,<iter>,<ratio>,<gravmult>,<cof>
-SOIL,4000,9.81,1,1,1,8,0.65,1,0
+SOIL,4000,32.2,1,1,1,8,0.65,1,0
 * SOILX,<indir>,<mult>,<max>,<cl>: horizontal, factor 1, input at the top of sublayer 23
 SOILX,0,1,0,23
 THFILE,rg160h_eq.acc
@@ -308,9 +313,10 @@ RUNSOIL
 ```
 
 ### What this does
-* `SOIL,4000,9.81,1,1,1,8,0.65,1,0`: read 4000 values after 1 header line (the dt line of the EQUAKE
-  file), gravity 9.81, the input is an **outcrop** motion (`<outcrop>` 1), save the strain-compatible
-  properties to FILE88 (`<save>` 1), 8 iterations, effective strain
+* `SOIL,4000,32.2,1,1,1,8,0.65,1,0`: read 4000 values after 1 header line (the dt line of the EQUAKE
+  file), gravity 32.2 ft/s² (SOIL takes its units from it: ft, kcf, ksf, ft/s), the input is an
+  **outcrop** motion (`<outcrop>` 1), save the strain-compatible properties to FILE88
+  (`<save>` 1), 8 iterations, effective strain
   $\gamma_\text{eff} = 0.65\,\gamma_{\max}$ ($\gamma_{\max}$ the maximum strain).
 * `SOILX,0,1,0,23`: horizontal input ($V_s$ and shear damping), factor 1, applied at the top of
   sublayer 23, the rock.
@@ -322,20 +328,20 @@ RUNSOIL
 ### Why it matters
 The listing `ex04_SOIL.out` gives the profile the structure will actually sit on. For this record:
 
-* the iterations settle: the largest change of the shear modulus falls from 172 % (iteration 1) to
-  1.2 % (iteration 8), of the damping from 90 % to 0.7 %;
-* the sand softens with depth, from $V_s = 191\,\text{m/s}$ at the surface ($G/G_{\max} = 0.91$,
-  2.1 % damping) to **74 m/s at 9.5 m** ($G/G_{\max} = 0.14$, 17.9 % damping, effective strain
-  0.51 %); the clay keeps $V_s = 255\text{–}268\,\text{m/s}$ with 6.3-8.1 % damping;
-* the column period lengthens from 0.35 s (low strain) to 0.45 s; the surface / base (within)
-  amplification peaks at **4.65 at 1.83 Hz**, against 68 at 3.10 Hz with the low-strain properties
+* the iterations settle: the largest change of the shear modulus falls from 178 % (iteration 1) to
+  2.0 % (iteration 8), of the damping from 90 % to 0.7 %;
+* the sand softens with depth, from $V_s = 620\,\text{ft/s}$ at the surface ($G/G_{\max} = 0.91$,
+  2.0 % damping) to **242 ft/s at 28.5 ft** ($G/G_{\max} = 0.14$, 17.8 % damping, effective strain
+  0.49 %); the clay keeps $V_s = 843\text{–}903\,\text{ft/s}$ with 5.9-8.4 % damping;
+* the column period lengthens from 0.34 s (low strain) to 0.43 s; the surface / base (within)
+  amplification peaks at **4.96 at 1.97 Hz**, against 69 at 3.22 Hz with the low-strain properties
   and their 1 % damping;
-* the surface motion peaks at **0.605 g** for a rock-outcrop input of 0.324 g; its 5 % spectrum peaks
-  at 2.24 g at 1.86 Hz.
+* the surface motion peaks at **0.627 g** for a rock-outcrop input of 0.324 g; its 5 % spectrum peaks
+  at 2.64 g at 2.04 Hz.
 
 Applying the rock-outcrop design motion directly at the ground surface would miss this: the soil
-moves the spectral peak from 2.5 Hz (target) to 1.86 Hz and nearly doubles the peak acceleration at
-the ground surface ($0.605/0.324 = 1.87$), where a surface foundation would sit.
+moves the spectral peak from 2.5 Hz (target) to 2.04 Hz and nearly doubles the peak acceleration at
+the ground surface ($0.627/0.324 = 1.94$), where a surface foundation would sit.
 
 ### Technical basis
 In each sublayer a vertically propagating shear wave is the sum of an up-going and a down-going wave;
@@ -363,8 +369,8 @@ the previous pass, like a nonlinear material handled by repeated linear (harmoni
 secant properties instead of a Newton-Raphson time integration.
 
 ### Try this
-Change the effective strain ratio to 0.5 (`SOIL,4000,9.81,1,1,1,8,0.5,1,0`), run AFWRITE and RUNSOIL
-again, and compare the strain-compatible $V_s$ at 9.5 m and the surface PGA in the listing. Then restore
+Change the effective strain ratio to 0.5 (`SOIL,4000,32.2,1,1,1,8,0.5,1,0`), run AFWRITE and RUNSOIL
+again, and compare the strain-compatible $V_s$ at 28.5 ft and the surface PGA in the listing. Then restore
 0.65 and run AFWRITE and RUNSOIL once more before the next step: FILE88 and `ACC001.TH` always hold
 the last SOIL run, and the next steps use them.
 
@@ -373,7 +379,7 @@ open-listing: SOIL
 plot-spectrum: ex04/RS023_01.RS, ex04/RS001_01.RS | log
 plot-history: ex04/ACC001.TH
 plot-history: ex04/SN005.TH, ex04/SN015.TH
-explain: SOIL,4000,9.81,1,1,1,8,0.65,1,0
+explain: SOIL,4000,32.2,1,1,1,8,0.65,1,0
 ```
 
 ## Hand the strain-compatible soil to SITE (SITEX,1)
@@ -399,17 +405,17 @@ $f_\text{pass}$ of each sublayer.
 
 ### Why it matters
 * **Consistency.** The SSI free field (FILE1) must reproduce the site response that defined the
-  motion. Here it does: at 1.95 Hz the SITE surface / base amplification is $1/0.2411 = 4.147$, the
-  SOIL value (`SAF001W_023W.TFU`) 4.155, 0.2 % apart; examples/README.md reports below 0.5 % up to
-  7 Hz and 4.7 % at 13.7 Hz, the thin-layer discretisation error growing as $(kh)^2$.
-* **Passing frequency.** The SITE listing shows $f_\text{pass} = 14.8\,\text{Hz}$ for the softened sand
-  at 9-10 m:
-  the 13.7 Hz cut-off chosen in step 1 is just inside it.
+  motion. Here it does: at 1.95 Hz the SITE surface / base amplification is $1/0.2021 = 4.949$, the
+  SOIL value (`SAF001W_023W.TFU`) 4.954, 0.1 % apart; examples/README.md reports below 1 % up to
+  7.8 Hz and 3.4 % at 13.7 Hz, the thin-layer discretisation error growing as $(kh)^2$.
+* **Passing frequency.** The SITE listing shows $f_\text{pass} = 16.1\,\text{Hz}$ for the softened sand
+  at 27-30 ft:
+  the 13.7 Hz cut-off chosen in step 1 is inside it, 15 % below.
 * **The control motion of the SSI run.** The SSI control point here is the top of layer 1, the free
   surface (at the free surface the within and the outcrop motions coincide). FILE1 is normalised to a
   unit motion there, so the SSI analysis must be driven by the SOIL surface motion `ACC001.TH`
   (`THFILE,ACC001.TH` in MOTION), not by the rock-outcrop record. Driving it with the rock record is
-  a mistake, and here an unconservative one: 0.324 g instead of 0.605 g at the surface.
+  a mistake, and here an unconservative one: 0.324 g instead of 0.627 g at the surface.
 
 ### Technical basis
 FILE88 holds per sublayer the thickness, effective strain, $G$, $V_s$, $\beta_s$, $V_p$ and $\beta_p$.
@@ -423,7 +429,7 @@ embedded structure the excavated soil must also get these properties (lesson 09 
 ### Check yourself
 Your SSI model has its control point at the free surface (`SITE <cl>` = 1). Which record do you
 give to MOTION: `rg160h_eq.acc` or `ACC001.TH`? And what if the design spectrum were defined at the
-foundation level of a 10 m deep basement?
+foundation level of a 30 ft deep basement?
 
 Answer: `ACC001.TH`, the SOIL surface (within) motion, because FILE1 is normalised to a unit motion
 at the control point. For a spectrum defined at foundation level, put the control point at the TOPL
@@ -453,8 +459,8 @@ CPMODEL,2
 * lower bound: G_max / 1.5, i.e. Vs and Vp / 1.225
 ACTM,1
 MDL,ex04lb,../ex04lb
-L,1,1.0,19.0,327,163,0.01,0.01
-L,2,1.0,18.5,735,245,0.01,0.01
+L,1,3.0,0.120,1061,531,0.01,0.01
+L,2,3.5,0.120,2449,816,0.01,0.01
 THFILE,../ex04/rg160h_eq.acc
 AOPT,0,1,0,0,0,0,0,0,0,0,0,0,0,0
 AFWRITE
@@ -462,8 +468,8 @@ RUNSOIL
 * upper bound: G_max x 1.5, i.e. Vs and Vp x 1.225
 ACTM,2
 MDL,ex04ub,../ex04ub
-L,1,1.0,19.0,490,245,0.01,0.01
-L,2,1.0,18.5,1102,367,0.01,0.01
+L,1,3.0,0.120,1593,796,0.01,0.01
+L,2,3.5,0.120,3675,1225,0.01,0.01
 THFILE,../ex04/rg160h_eq.acc
 AOPT,0,1,0,0,0,0,0,0,0,0,0,0,0,0
 AFWRITE
@@ -487,25 +493,25 @@ Compare the three listings (`ex04_SOIL.out`, `ex04lb/ex04lb_SOIL.out`, `ex04ub/e
 
 | Soil case | Surface PGA | Peak of the 5 % surface spectrum | Surface / base amplification peak |
 |---|---|---|---|
-| lower bound | 0.544 g | 1.94 g at 1.48 Hz | 4.23 at 1.37 Hz |
-| best estimate | 0.605 g | 2.24 g at 1.86 Hz | 4.65 at 1.83 Hz |
-| upper bound | 0.690 g | 3.14 g at 2.57 Hz | 6.01 at 2.56 Hz |
+| lower bound | 0.557 g | 2.02 g at 1.51 Hz | 4.28 at 1.46 Hz |
+| best estimate | 0.627 g | 2.64 g at 2.04 Hz | 4.96 at 1.97 Hz |
+| upper bound | 0.678 g | 3.31 g at 2.88 Hz | 6.96 at 2.83 Hz |
 
 The site frequency moves with the stiffness, and the response does not scale with it: the upper
-bound puts the site frequency (2.56 Hz) on the 2.5 Hz peak of the RG 1.60 input spectrum, and its
-surface spectrum peaks 40 % above the best estimate. Every structure frequency near the site
-frequency sees a different amplification in each case. That is why the ISRS of the soil cases are
+bound moves the site frequency (2.83 Hz) onto the high plateau of the RG 1.60 input spectrum, just
+above its 2.5 Hz peak, and its surface spectrum peaks 25 % above the best estimate. Every structure
+frequency near the site frequency sees a different amplification in each case. That is why the ISRS of the soil cases are
 enveloped and broadened (lesson 07), and why the governing soil case is often a different one for
 different floors and frequency bands.
 
 Read the last line of each iteration table too: the upper-bound case still changes its moduli by
-2.8 % at iteration 8 (best estimate 1.2 %, lower bound 1.0 %). Iterations are cheap; when the last
+4.0 % at iteration 8 (best estimate 2.0 %, lower bound 0.6 %). Iterations are cheap; when the last
 change is not small, increase `<iter>`.
 
 ### Technical basis
 Each case is an independent equivalent-linear analysis, so its strain-compatible profile is not the
-best-estimate profile multiplied by the factor. In the upper bound the sand at 9.5 m strains 0.32 %
-instead of 0.51 % and keeps $V_s = 102\,\text{m/s}$, not $1.225 \times 74 = 90\,\text{m/s}$. Bounds
+best-estimate profile multiplied by the factor. In the upper bound the sand at 28.5 ft strains 0.25 %
+instead of 0.49 % and keeps $V_s = 363\,\text{ft/s}$, not $1.225 \times 242 = 296\,\text{ft/s}$. Bounds
 are therefore applied to the **low-strain** properties (or to the curves) and the site response is
 repeated. [User Guide §4.2](docs/user/USER_GUIDE.md#42-models-in-memory) explains the models in memory
 (`CPMODEL`, `ACTM`, `MDL`).
@@ -541,9 +547,8 @@ envelope in line 24 and `WRITESPEC` writes it to `ex04/surface_envelope.rs`.
 ### Why it matters
 The envelope of the soil cases is the design spectrum at the ground surface for this column; in an SSI
 analysis the same operation is applied to the ISRS of each soil case at each floor, followed by peak
-broadening. Here the lower bound governs from 0.25 to 1.6 Hz, the best estimate from 1.6 to 2.1 Hz and
-the upper bound above 2.1 Hz (with short exchanges between 4 and 6.3 Hz); the envelope peaks at
-3.14 g at 2.57 Hz, from the upper bound.
+broadening. Here the lower bound governs from 0.25 to 1.7 Hz, the best estimate from 1.7 to 2.3 Hz and
+the upper bound above 2.3 Hz; the envelope peaks at 3.31 g at 2.88 Hz, from the upper bound.
 
 ### Technical basis
 `BROADEN` computes, on the union of the frequencies of its sources, the envelope

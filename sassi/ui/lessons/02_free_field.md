@@ -20,41 +20,43 @@ STRATA), with two additions SASSI needs for SSI: the layered soil is discretised
 sublayers so that the same model also gives the soil's response to point loads (the soil springs
 of lesson 3), and the half-space below the layers is simulated with extra sublayers and dashpots.
 
-In this lesson you build the site of example 1 (5 m of sand and 12 m of gravel on weathered rock),
-run SITE, read its listing, and then check the free field against an exact one-dimensional
+In this lesson you build the site of example 1 (16 ft of sand and 39 ft of gravel on weathered
+rock), run SITE, read its listing, and then check the free field against an exact one-dimensional
 (SHAKE-type) solution of the same column computed by the SOIL module.
 
 ## Units and soil layer types
 
 ```sassi
 MDL,ex01,ex01
-TIT,Ex01 site - 5 m of sand and 12 m of gravel on weathered rock
-* SI units: m, kN, t, s; weights are unit weights in kN/m3 and are divided by gravity
-GRAVITY,9.81
+TIT,Ex01 site - 16 ft of sand and 39 ft of gravel on weathered rock
+* US customary units: ft, kip, s; weights are unit weights in kcf (kip/ft3), divided by gravity
+GRAVITY,32.2
 * L,<nm>,<thick>,<weight>,<Vp>,<Vs>,<pdamp>,<sdamp>
-L,1,0.5,19.0,600,300,0.05,0.05
-L,2,1.0,20.0,1000,500,0.04,0.04
-L,3,1.0,21.0,2000,1000,0.02,0.02
+L,1,1.6,0.120,2000,1000,0.05,0.05
+L,2,3.25,0.125,3300,1650,0.04,0.04
+L,3,3.25,0.130,6600,3300,0.02,0.02
 LLIST,1,3
 ```
 
 ```action
-explain: L,1,0.5,19.0,600,300,0.05,0.05
+explain: L,1,1.6,0.120,2000,1000,0.05,0.05
 ```
 
 ### What this does
 `MDL,ex01,ex01` names the model and creates its directory `ex01/`, which becomes the working
-directory. `GRAVITY,9.81` sets the acceleration of gravity and with it the unit system: SASSI works
+directory. `GRAVITY,32.2` sets the acceleration of gravity and with it the unit system: SASSI works
 in any consistent unit set, takes **unit weights** and divides them by gravity to get densities (a
-new model starts with 32.2, the ft-kip-s value, so set it first in SI).
+new model already starts with 32.2 ft/s², the ft-kip-s value; setting it explicitly documents the
+units of the model).
 
 `L` defines a soil layer **type**: `<nm>` its number, `<thick>` the thickness of each sublayer that
 uses it, `<weight>` the unit weight, `<Vp>` and `<Vs>` the compression and shear-wave velocities,
-`<pdamp>` and `<sdamp>` the P- and S-wave damping ratios. Layer 1 is dense sand
-($V_s = 300\,\text{m/s}$, 5 %), layer 2 gravel ($V_s = 500\,\text{m/s}$, 4 %), layer 3 weathered
-rock ($V_s = 1000\,\text{m/s}$, 2 %) that will be the half-space; its thickness is not used. `LLIST`
-prints the derived properties: $G = 174{,}312\,\text{kPa}$, 509,684 kPa and 2,140,670 kPa, densities
-1.94, 2.04 and 2.14 t/m³, $\nu = 1/3$ for all three.
+`<pdamp>` and `<sdamp>` the P- and S-wave damping ratios (thickness in ft, unit weight in kcf =
+kip/ft³, velocities in ft/s). Layer 1 is dense sand ($V_s = 1{,}000\,\text{ft/s}$, 5 %), layer 2
+gravel ($V_s = 1{,}650\,\text{ft/s}$, 4 %), layer 3 weathered rock ($V_s = 3{,}300\,\text{ft/s}$, 2 %)
+that will be the half-space; its thickness is not used. `LLIST` prints the derived properties:
+$G = 3{,}727\,\text{ksf}$, 10,569 ksf and 43,966 ksf, mass densities 0.00373, 0.00388 and
+0.00404 kip·s²/ft⁴, $\nu = 1/3$ for all three.
 
 ### Why it matters
 $V_s$ and damping are the soil properties that control SSI. In a design analysis they are the
@@ -97,10 +99,10 @@ explain: TOPL,1,1,1,1,1,1,1,1,1,1
 ```
 
 ### What this does
-`TOPL` builds the column from the ground surface down: ten 0.5 m sublayers of type 1 (the 5 m of
-sand) and twelve 1 m sublayers of type 2 (the 12 m of gravel), 22 sublayers in all. The
+`TOPL` builds the column from the ground surface down: ten 1.6 ft sublayers of type 1 (the 16 ft
+of sand) and twelve 3.25 ft sublayers of type 2 (the 39 ft of gravel), 22 sublayers in all. The
 **interfaces** are the tops of the sublayers: interface 1 is the ground surface, interface 23 the top
-of the half-space at 17 m depth. The half-space is not part of `TOPL`; SITE adds it below
+of the half-space at 55 ft depth. The half-space is not part of `TOPL`; SITE adds it below
 (next step). The layer plot shows the column and the property table.
 
 ### Why it matters
@@ -122,8 +124,8 @@ h \le \frac{V_s}{5\,f_{\text{cut}}}, \qquad f_{\text{pass}} = \frac{V_s}{5\,h}
 with $h$ the sublayer thickness, $f_{\text{cut}}$ the cut-off frequency and $f_{\text{pass}}$ the
 passing frequency of the sublayer. Here:
 
-* sand: $f_{\text{pass}} = 300/(5 \times 0.5) = 120\,\text{Hz}$;
-* gravel: $f_{\text{pass}} = 500/(5 \times 1.0) = 100\,\text{Hz}$.
+* sand: $f_{\text{pass}} = 1000/(5 \times 1.6) = 125\,\text{Hz}$;
+* gravel: $f_{\text{pass}} = 1650/(5 \times 3.25) = 102\,\text{Hz}$.
 
 Treat $f_{\text{pass}}$ as a limit, not a target: exactly at $h = \lambda/5$ the one-dimensional
 amplification can still be off by up to about 9 % with the mixed mass (17 % with a consistent mass);
@@ -137,12 +139,11 @@ of linear elements with lumped, consistent and mixed mass, VP-05 the Rayleigh-wa
 deep stratum).
 
 ### Check yourself
-A soft clay with a strain-compatible $V_s$ of 150 m/s must pass a 30 Hz cut-off. What is the largest
-sublayer thickness?
+A soft clay with a strain-compatible $V_s$ of 500 ft/s must pass a 30 Hz cut-off. What is the
+largest sublayer thickness?
 
-Answer: $h = 150/(5 \times 30) = 1.0\,\text{m}$. Use the strain-compatible $V_s$, not the low-strain
-value: if
-SOIL softens the clay to 100 m/s, the limit drops to 0.67 m.
+Answer: $h = 500/(5 \times 30) = 3.3\,\text{ft}$. Use the strain-compatible $V_s$, not the
+low-strain value: if SOIL softens the clay to 330 ft/s, the limit drops to 2.2 ft.
 
 ## Frequencies, the wave field and the control point
 
@@ -228,28 +229,31 @@ open-file: ex01/ex01.sit
 
 ### What this does
 `AOPT` selects the modules that `CHECK` checks and `AFWRITE` writes decks for; here only SITE.
-`AFWRITE` writes `ex01.sit`, and `RUNSITE` runs the module in the model directory (0.1 s). It
-writes FILE2 (Mode 1) and FILE1 (Mode 2) and the listing `ex01_SITE.out`, which has four parts:
+`AFWRITE` writes `ex01.sit`, and `RUNSITE` runs the module in the model directory (about a
+second). It writes FILE2 (Mode 1) and FILE1 (Mode 2) and the listing `ex01_SITE.out`, which has
+four parts:
 
 1. **Soil layers**: the 22 sublayers and the half-space with $V_s$, damping, $\nu$ and the passing
-   frequency $f_{\text{pass}}$ (120 and 100 Hz).
-2. **Generated half-space sublayers**: below 17 m SITE adds 20 sublayers of rock whose total
-   depth is 1.5 shear wavelengths of the rock: 15,360 m at 0.098 Hz (768 m each), 1499 m at
-   1.0 Hz, 75 m at 20 Hz (3.75 m each).
+   frequency $f_{\text{pass}}$ (125 and 102 Hz).
+2. **Generated half-space sublayers**: below 55 ft SITE adds 20 sublayers of rock whose total
+   depth is 1.5 shear wavelengths of the rock: 50,688 ft at 0.098 Hz (2,534 ft each), 4,945 ft at
+   1.0 Hz, 248 ft at 20 Hz (12.4 ft each).
 3. **Mode 1**: the propagating Rayleigh and Love modes of the column. At 20 Hz there are 7
    propagating Rayleigh modes (of 86) and 5 Love modes (of 43); the slowest propagating Rayleigh
-   mode has a phase velocity of 403 m/s and a wavelength of 20.1 m.
+   mode has a phase velocity of 1,352 ft/s and a wavelength of 67.6 ft.
 4. **Mode 2**: the free-field amplitude at every interface for unit motion at the surface. At
-   0.098 Hz it is 1.000 down to 17 m. At 20 Hz it is 0.98 at 0.5 m, falls to 0.13 at 3.5-4 m and
-   rises to 0.47 at 17 m. The last line of each frequency is the ratio of the surface motion to the
-   **outcrop** motion at the top of the half-space: 1.00 at 0.1 Hz, **2.18 at 7.0 Hz**, 1.51 at
-   12 Hz, 2.15 at 18 Hz.
+   0.098 Hz it is 1.000 down to 55 ft. At 20 Hz it is 0.98 at 1.6 ft, falls to 0.09 at 12.8 ft,
+   rises again to 0.68 at 29 ft and is 0.37 at 55 ft. The last line of each frequency is the ratio
+   of the surface motion to the **outcrop** motion at the top of the half-space: 1.00 at 0.1 Hz,
+   **2.13 at 7.0 Hz** and 2.11 at 8.0 Hz (the column frequency lies between the two), 1.48 at
+   12 Hz, 2.18 at 18 Hz.
 
 ### Why it matters
 FILE2 (the modes) feeds POINT, which computes the soil springs and dashpots (lesson 3). FILE1 is
 the seismic input of ANALYS. The amplitudes with depth matter for embedded structures: at 20 Hz
-the free field at 4 m depth is almost at rest while the surface moves fully, so a basement that
-spans these depths receives a strongly varying motion (kinematic interaction, lesson 5).
+the free field at about 13 ft depth is almost at rest (0.09) while the surface moves fully, so a
+basement that spans these depths receives a strongly varying motion (kinematic interaction,
+lesson 5).
 
 ### Technical basis
 **Mode 1** solves the thin-layer eigenproblem $(A k^2 + B k + G - \omega^2 M)\,\phi = 0$ for the
@@ -288,7 +292,7 @@ FOREACH,SAND,SPRO,@SAND[#],1,Elastic
 FOREACH,GRAVEL,SPRO,@GRAVEL[#],2,Elastic
 SPRO,23,3
 * SOIL,<nrval>,<grav>,<header>,<outcrop>,<save>,<iter>,<ratio>,<gravmult>,<cof>
-SOIL,4001,9.81,1,0,0,0,0.65,1,0
+SOIL,4001,32.2,1,0,0,0,0.65,1,0
 * SOILX,<indir>,<mult>,<max>,<cl>: horizontal, factor 1, motion given at the top of sublayer 1
 SOILX,0,1,0,1
 THFILE,../data/rg160h_030g.acc
@@ -321,11 +325,11 @@ open-listing: SITE
   motion at the top of sublayer 23 (the half-space), every 0.0977 Hz. `EDUOPT,SOILCUTOFF,25`
   stops SOIL at 25 Hz to keep this short.
 
-The result (`SAF001W_023O.TFU`, computed in under a second): the amplification peaks at
-**2.21 at 7.3 Hz** (the first mode of the column) and 2.22 at 17.3 Hz (the second); the listing's
-quarter-wavelength estimate $4H/V$, with the thickness-weighted average velocity of 441 m/s, is
-0.15 s, i.e. 6.5 Hz. At the 22 SITE frequencies the SOIL curve and the "surface / outcrop" line of
-the SITE listing agree within **0.5 %** (for example 2.191 against 2.181 at 7.0 Hz).
+The result (`SAF001W_023O.TFU`, computed in a few seconds): the amplification peaks at
+**2.16 at 7.4 Hz** (the first mode of the column) and 2.19 at 17.8 Hz (the second); the listing's
+quarter-wavelength estimate $4H/V$, with the thickness-weighted average velocity of 1,461 ft/s, is
+0.15 s, i.e. 6.6 Hz. At the 22 SITE frequencies the SOIL curve and the "surface / outcrop" line of
+the SITE listing agree within **0.5 %** (for example 2.136 against 2.126 at 7.0 Hz).
 
 ### Why it matters
 SITE and your site-response analysis solve the same problem with the same normalisation, so the
@@ -340,9 +344,9 @@ up- and down-going wave amplitudes across interfaces (the SHAKE recursion,
 [Theory §12.1](docs/theory/THEORY_MANUAL.md#12-the-shake-equivalent-linear-method-soil)); SITE
 uses linear thin layers on a simulated half-space. The difference has two sources. The thin-layer
 discretisation error is small here (the sublayers are 70 to 90 times thinner than the shear
-wavelength at 7 Hz): compared on the motion within the column, surface over 17 m depth, which does
-not depend on the half-space model, the two agree within 0.2 %. Most of the 0.5 % comes from the
-half-space simulation, which enters the **outcrop** motion; VP-02b finds 0.20 % for the same
+wavelength at 7 Hz): compared on the motion within the column, surface over 55 ft depth, which
+does not depend on the half-space model, the two agree within 0.12 %. Most of the 0.5 % comes from
+the half-space simulation, which enters the **outcrop** motion; VP-02b finds 0.20 % for the same
 simulation on a uniform layer (VP-02a checks SOIL, VP-02b SITE against closed forms,
 [VP-02a](docs/verification/VERIFICATION_MANUAL.md#vp-02a),
 [Theory §5](docs/theory/THEORY_MANUAL.md#5-half-space-variable-depth-and-viscous-boundary)).
@@ -368,7 +372,7 @@ open-listing: SOIL
 
 ### What this does
 `SSAF` for layer 1 is redefined with `<outcrop2>` = 0; `RUNSOIL` writes `SAF001W_023W.TFU` next to
-the outcrop curve of the previous step. The surface-to-within ratio peaks at **17.1 at 7.2 Hz**,
+the outcrop curve of the previous step. The surface-to-within ratio peaks at **17.1 at 7.3 Hz**,
 almost eight times the outcrop amplification of 2.2 (SOIL listing: "Maximum amplification
 surface / base WITHIN").
 
@@ -378,12 +382,12 @@ Two lessons for design practice:
 1. **Know where and how your design motion is defined.** The outcrop motion at the top of rock is
    twice the incident wave; the within motion at the same depth is incident plus reflected wave,
    and at the column frequency the two nearly cancel. A rock-outcrop motion applied in SASSI as a
-   within motion at 17 m would produce a free field many times too strong near 7 Hz. SASSI's
+   within motion at 55 ft would produce a free field many times too strong near 7 Hz. SASSI's
    control motion is always the within motion at the top of layer `<cl>`; an outcrop design motion
    is first converted with SOIL (input as outcrop, then the computed surface motion is used as the
    control motion at the surface, as example 4 shows).
 2. **A half-space carries energy away; a rigid base does not.** The within ratio is exactly the
-   transfer function of the 17 m column on a rigid base: with no energy leaving through the base,
+   transfer function of the 55 ft column on a rigid base: with no energy leaving through the base,
    only the 4-5 % material damping limits the resonance (17.1). With the half-space, waves radiate
    into the rock and the column resonance is 2.2 times the outcrop motion. SITE therefore
    simulates the half-space (`<nl>` = 10-20 generated sublayers plus dashpots); `<nl>` = 0 is only
@@ -393,8 +397,8 @@ Two lessons for design practice:
 ### Technical basis
 For vertically propagating waves the within motion at the top of the half-space is $E + F$ (incident
 plus reflected amplitude) and the outcrop motion is $2E$; the column above a given depth responds to
-the within motion there, whatever lies below, so $\text{surface}/\text{within}(17\,\text{m})$ is the
-rigid-base transfer function of the 17 m column
+the within motion there, whatever lies below, so $\text{surface}/\text{within}(55\,\text{ft})$ is
+the rigid-base transfer function of the 55 ft column
 ([Theory §5](docs/theory/THEORY_MANUAL.md#5-half-space-variable-depth-and-viscous-boundary), "Within
 and outcrop motions"; [User Guide §7.3](docs/user/USER_GUIDE.md#73-half-space-or-rigid-base) and
 [§7.4](docs/user/USER_GUIDE.md#74-wave-field-and-control-point-site-options)).
@@ -402,17 +406,17 @@ and outcrop motions"; [User Guide §7.3](docs/user/USER_GUIDE.md#73-half-space-o
 ```figure
 soil-column f=7.3
 The column of this lesson solved exactly, per unit motion at the surface. Near 7.3 Hz the surface
-moves 2.2 times the rock outcrop but 17 times the within motion at 17 m, the numbers of the two
+moves 2.2 times the rock outcrop but 17 times the within motion at 55 ft, the numbers of the two
 SOIL runs. Raise the rock velocity towards a rigid base and the outcrop curve climbs towards the
 within curve: less and less energy leaves through the base.
 ```
 
 ### Try this
-Run SITE with a rigid base at 17 m (`<nl>` = 0) in a copy of the model and compare its Mode 2 table
-with the half-space run: the amplitudes at the interfaces are identical (at 7.0 Hz the motion at
-17 m is 0.0667 of the surface motion in both). Only the last line of each frequency changes: on a
-rigid base the outcrop and the within motion at 17 m are the same, so it reads 15.0 at 7.0 Hz
-instead of 2.18. With the control motion given at the surface, the free field in the layers above
+Run SITE with a rigid base at 55 ft (`<nl>` = 0) in a copy of the model and compare its Mode 2
+table with the half-space run: the amplitudes at the interfaces are identical (at 7.0 Hz the motion
+at 55 ft is 0.0836 of the surface motion in both). Only the last line of each frequency changes: on
+a rigid base the outcrop and the within motion at 55 ft are the same, so it reads 12.0 at 7.0 Hz
+instead of 2.13. With the control motion given at the surface, the free field in the layers above
 the base does not depend on what lies below. The base model matters when the motion is defined at
 depth or as an outcrop motion, and for the soil springs and dashpots of lesson 3.
 
@@ -427,10 +431,10 @@ RUNSITE
 ```
 
 ### Check yourself
-The site report gives the design motion as a 0.30 g outcrop motion at the top of the rock at 17 m
+The site report gives the design motion as a 0.30 g outcrop motion at the top of the rock at 55 ft
 depth. What do you give SASSI as control motion, and where?
 
-Answer: not the outcrop record at 17 m as a within motion. Run SOIL with the record as an outcrop
+Answer: not the outcrop record at 55 ft as a within motion. Run SOIL with the record as an outcrop
 motion at the top of the half-space (`<outcrop>` 1, control at sublayer 23, with the
 strain-dependent curves), take the computed surface motion, and use it as the control motion at the
 ground surface (`<cl>` = 1) with the strain-compatible properties in SITE. Lesson 6 does exactly

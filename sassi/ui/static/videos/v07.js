@@ -2,8 +2,8 @@
  * straight up (SV, SH, P), one ANALYS run for the three directions, an off-centre mass that couples them, SRSS and
  * 100-40-40, then the envelope and the widened peaks of the design floor spectrum.
  * Numbers: sassi/ui/lessons/07_three_components.md; curves: d07.js (the lesson's run, python -m sassi.ui.video_data).
- * Geometry of example 5 to scale: 12 m x 12 m basemat 1.5 m thick, stick nodes at 4 m and 8 m, roof mass at
- * (2, 1, 8) on a rigid arm; site 5 m sand, 12 m gravel, rock.  The model moves with the computed transfer
+ * Geometry of example 5 to scale (ft): 40 ft x 40 ft basemat 5 ft thick, stick nodes at 13 ft and 26 ft, roof mass
+ * at (6.5, 3.25, 26) on a rigid arm; site 16 ft sand, 39 ft gravel, rock.  The model moves with the computed transfer
  * functions of the X input at 5.0 Hz (amplitude and phase); the wave fields are the exact pulse of a uniform
  * half-space of the lesson's sand (PH.halfspacePulse); the widening animates PH.broaden of the SRSS and ends on
  * BROADEN's own result (roof_Y_design.rs). */
@@ -28,17 +28,17 @@
   const FREQS = T("X_00030TR_X.TFU").f;                     // the 19 SSI frequencies
   const F5 = FREQS.reduce((a, f) => (Math.abs(f - 5) < Math.abs(a - 5) ? f : a));       // 5.005 Hz
   /** The X input at 5.0 Hz (per unit control motion): roof mass node 30 in X, Y, Z, the stick top's twist
-   *  (node 27, rad per metre), the X motion of nodes 13 (basemat centre), 26 and 27.  The arm is rigid, so the
-   *  stick top moves as u27 = u30 - theta x r, r = (2, 1, 0): in Y, u27y = u30y - 2 theta_z (lesson: 1.22). */
+   *  (node 27, rad per ft), the X motion of nodes 13 (basemat centre), 26 and 27.  The arm is rigid, so the
+   *  stick top moves as u27 = u30 - theta x r, r = (6.5, 3.25, 0): in Y, u27y = u30y - 6.5 theta_z (lesson: 1.15). */
   const H = {x30: tfAt(T("X_00030TR_X.TFU"), F5), y30: tfAt(T("X_00030TR_Y.TFU"), F5), z30: tfAt(T("X_00030TR_Z.TFU"), F5),
     rz27: tfAt(T("X_00027R_ZZ.TFU"), F5), x13: tfAt(T("00013TR_X.TFU"), F5), x26: tfAt(T("00026TR_X.TFU"), F5), x27: tfAt(T("00027TR_X.TFU"), F5)};
-  H.y27 = [H.y30[0] - 2 * H.rz27[0], H.y30[1] - 2 * H.rz27[1]];
+  H.y27 = [H.y30[0] - 6.5 * H.rz27[0], H.y30[1] - 6.5 * H.rz27[1]];
   /** Re(h e^{i phi}). */
   const re = (h, ph) => h[0] * Math.cos(ph) - h[1] * Math.sin(ph);
-  const FDRAW = 0.3;                                         // m drawn per unit of control motion (as the lesson's animation)
+  const FDRAW = 1;                                           // ft drawn per unit of control motion (as the lesson's animation)
   const SLOW = 10;                                           // 5.0 Hz shown slowed down 10 x
 
-  /** Oblique projection (Y recedes up and to the right at half scale): model (x, y, z) m -> screen px. */
+  /** Oblique projection (Y recedes up and to the right at half scale): model (x, y, z) ft -> screen px. */
   const proj = (cx, cy, S) => (x, y, z) => [cx + S * (x + 0.433 * y), cy - S * (z + 0.25 * y)];
   /** Path of a polygon of model points through P. */
   const poly = (P, pts) => "M" + pts.map((q) => P(...q).map((v) => v.toFixed(1)).join(",")).join("L") + "Z";
@@ -55,16 +55,16 @@
     style: {border: `3px solid ${color}`, borderRadius: "16px", background: "rgba(15,26,43,.94)", display: "flex", alignItems: "center",
       justifyContent: "center", flexDirection: "column", fontWeight: "650", lineHeight: "1.25"}}, o || {}), root);
   const note = (g, x, y, str, o) => K.text(g, x, y, str, Object.assign({cls: "t-label", size: 24, color: "var(--muted)", hidden: true}, o));
-  /** The stick of example 5 at rest in P: basemat (12 m, 1.5 m thick), stick to 8 m, masses at 4 m and (2, 1, 8). */
+  /** The stick of example 5 at rest in P: basemat (40 ft, 5 ft thick), stick to 26 ft, masses at 13 ft and (6.5, 3.25, 26). */
   function model(g, P, o) {
     K.defs();
     const m = {g: K.g(g, {hidden: o && o.hidden})};
-    m.mat = box3(m.g, P, [-6, 6, -6, 6, -0.75, 0.75], {fill: "#2b3a4e", side: "#223044", topFill: "#3b4a5e", stroke: C.concrete, "stroke-width": 2});
-    m.stick = K.path(m.g, K.d([P(0, 0, 0.75), P(0, 0, 4), P(0, 0, 8)]), {cls: "struct"});
-    m.m1 = K.circle(m.g, ...P(0, 0, 4), o.r1 || 20, {cls: "mass", fill: "url(#sv-grad-mass)"});
-    m.arm = K.path(m.g, `M${P(0, 0, 8)}L${P(2, 1, 8)}`, {stroke: C.ssi, "stroke-width": o.arm || 7, "stroke-linecap": "round"});
-    m.top = K.circle(m.g, ...P(0, 0, 8), o.rt || 9, {fill: C.steel});
-    m.m2 = K.circle(m.g, ...P(2, 1, 8), o.r2 || 24, {fill: C.ssi, stroke: "#0a111d", "stroke-width": 3});
+    m.mat = box3(m.g, P, [-20, 20, -20, 20, -2.5, 2.5], {fill: "#2b3a4e", side: "#223044", topFill: "#3b4a5e", stroke: C.concrete, "stroke-width": 2});
+    m.stick = K.path(m.g, K.d([P(0, 0, 2.5), P(0, 0, 13), P(0, 0, 26)]), {cls: "struct"});
+    m.m1 = K.circle(m.g, ...P(0, 0, 13), o.r1 || 20, {cls: "mass", fill: "url(#sv-grad-mass)"});
+    m.arm = K.path(m.g, `M${P(0, 0, 26)}L${P(6.5, 3.25, 26)}`, {stroke: C.ssi, "stroke-width": o.arm || 7, "stroke-linecap": "round"});
+    m.top = K.circle(m.g, ...P(0, 0, 26), o.rt || 9, {fill: C.steel});
+    m.m2 = K.circle(m.g, ...P(6.5, 3.25, 26), o.r2 || 24, {fill: C.ssi, stroke: "#0a111d", "stroke-width": 3});
     return m;
   }
 
@@ -76,19 +76,19 @@
     build(s) {
       K.defs();
       const g = K.g(s.svg);
-      // the site of the lesson (5 m sand, 12 m gravel, rock) and example 5 on it, one scale: 22 px per metre
-      const P = proj(580, 360, 22);
-      const lay = [[-0.75, -5.75, "var(--sand)", "sv-pat-sand"], [-5.75, -17.75, "var(--gravel)", "sv-pat-gravel"], [-17.75, -21.75, "var(--rock)", "sv-pat-rock"]];
+      // the site of the lesson (16 ft sand, 39 ft gravel, rock) and example 5 on it, one scale: 6.77 px per ft
+      const P = proj(580, 360, 22 / 3.25);
+      const lay = [[-2.5, -18.5, "var(--sand)", "sv-pat-sand"], [-18.5, -57.5, "var(--gravel)", "sv-pat-gravel"], [-57.5, -70.5, "var(--rock)", "sv-pat-rock"]];
       lay.slice().reverse().forEach(([zt, zb, col, pat], j) => {
         const i = lay.length - 1 - j;                       // rock first, the sand (and the ground surface) last
         const st = {fill: col, "fill-opacity": i === 2 ? 0.5 : 0.78, side: col, stroke: "rgba(255,240,215,.3)", "stroke-width": 2};
-        const b = box3(g, P, [-16, 16, -8, 8, zb, zt], st);
+        const b = box3(g, P, [-52, 52, -26, 26, zb, zt], st);
         if (i) b.top.remove();
         (i ? [b.right, b.front] : [b.right, b.front, b.top]).forEach((e) => K.path(g, e.getAttribute("d"), {fill: `url(#${pat})`}));
       });
-      const fl = P(-16, -8, -0.75), fr = P(16, -8, -0.75), fb = P(16, -8, -17.75);
+      const fl = P(-52, -26, -2.5), fr = P(52, -26, -2.5), fb = P(52, -26, -57.5);
       s.wf = K.wavefronts(g, {x: fl[0] + 10, w: fr[0] - fl[0] - 20, y0: fb[1] - 6, y1: fl[1] + 14, lambda: 80, color: C.wave, width: 4, hidden: true});
-      s.wfn = note(g, fl[0], P(0, -8, -21.75)[1] + 34, "waves rising: schematic · site and building to scale");
+      s.wfn = note(g, fl[0], P(0, -26, -70.5)[1] + 34, "waves rising: schematic · site and building to scale");
       s.mod = model(g, P, {r1: 11, r2: 15, rt: 6, arm: 5});
       const O = [150, 250];
       s.ax = K.arrow(g, O[0], O[1], O[0] + 150, O[1], {color: CX, width: 7, head: 24, hidden: true});
@@ -144,12 +144,12 @@
   });
 
   // ---------------------------------------------------------------- 2. three waves, straight up
-  // a uniform half-space of the lesson's sand (Vs 300 m/s, Vp 600 m/s), a 4 Hz pulse, 40 m shown at 9.5 px/m;
+  // a uniform half-space of the lesson's sand (Vs 1,000 ft/s, Vp 2,000 ft/s), a 4 Hz pulse, 130 ft shown at 2.92 px/ft;
   // particle motion in model axes (X, Y, Z), drawn in the oblique projection of the whole video
   const WAVES = [
-    {name: "X · SV wave", V: 300, d: [1, 0, 0], color: CX},
-    {name: "Y · SH wave", V: 300, d: [0, 1, 0], color: CY},
-    {name: "Z · P wave", V: 600, d: [0, 0, 1], color: CZ},
+    {name: "X · SV wave", V: 1000, d: [1, 0, 0], color: CX},
+    {name: "Y · SH wave", V: 1000, d: [0, 1, 0], color: CY},
+    {name: "Z · P wave", V: 2000, d: [0, 0, 1], color: CZ},
   ];
   const UNIT = 56;                                           // px per unit of surface motion (one factor for the scene)
   const scr = (d) => [d[0] + 0.433 * d[1], -(d[2] + 0.25 * d[1])];   // model direction -> screen direction
@@ -158,7 +158,7 @@
     build(s) {
       const g = K.g(s.svg);
       s.head = K.heading(s.root, "Three waves, rising straight up", {x: 120, y: 70, size: "h2"});
-      const top = 360, pxm = 9.5, Hm = 40, Dm = 12, NX = 6, NZ = 13;
+      const top = 360, pxm = 380 / 130, Hm = 130, Dm = 40, NX = 6, NZ = 13;     // px per ft, depth and width (ft)
       s.cols = WAVES.map((wv, i) => {
         const x0 = 170 + i * 580, w = 400, P = proj(x0, top, pxm);
         const cg = K.g(g, {hidden: true});
@@ -173,14 +173,14 @@
           const x = x0 + (kx + 0.5) * w / NX, y = top + zf * Hm * pxm;
           dots.push({l: K.line(cg, x, y, x, y, {stroke: wv.color, "stroke-width": 3, opacity: 0.55}), c: K.circle(cg, x, y, 7, {fill: wv.color}), x, y, z: zf * Hm});
         }
-        // the 12 m x 12 m basemat, 1.5 m thick, on the surface
+        // the 40 ft x 40 ft basemat, 5 ft thick, on the surface
         const sl = K.g(g, {hidden: true});
         const c0 = w / pxm / 2;
-        box3(sl, P, [c0 - 6, c0 + 6, 0, 12, 0, 1.5], {fill: "var(--concrete-fill)", side: "#5d6b7c", topFill: "#8796a8", stroke: "var(--concrete)", "stroke-width": 2});
+        box3(sl, P, [c0 - 20, c0 + 20, 0, 40, 0, 5], {fill: "var(--concrete-fill)", side: "#5d6b7c", topFill: "#8796a8", stroke: "var(--concrete)", "stroke-width": 2});
         return {g: cg, dots, wv, slab: sl, sd};
       });
-      s.dim = K.dim(g, 110, top, 110, top + Hm * pxm, "40 m", {side: "left", hidden: true});
-      s.note = note(g, 170, top + Hm * pxm + 52, `uniform sand: Vs 300 m/s, Vp 600 m/s · 4 Hz pulse · slowed 20 × · 1 unit of surface motion = ${UNIT} px`);
+      s.dim = K.dim(g, 110, top, 110, top + Hm * pxm, "130 ft", {side: "left", hidden: true});
+      s.note = note(g, 170, top + Hm * pxm + 52, `uniform sand: Vs 1,000 ft/s, Vp 2,000 ft/s · 4 Hz pulse · slowed 20 × · 1 unit of surface motion = ${UNIT} px`);
       s.fast = K.text(g, 1330, top + Hm * pxm + 100, "P: twice as fast here", {cls: "t-label", size: 30, color: "var(--spring)", hidden: true});
       s.unit = K.pill(s.root, "surface motion = 1 unit, in each direction", {x: 170, y: 900, size: 32, color: "var(--ink2)"});
       s.notw = K.pill(s.root, "the whole foundation at once: no twist from the input", {x: 170, y: 900, size: 32, color: "var(--good)"});
@@ -269,7 +269,7 @@
   });
 
   // ---------------------------------------------------------------- 4. an off-centre mass couples the directions
-  const ISO = proj(560, 800, 52);
+  const ISO = proj(560, 800, 16);                            // 16 px per ft
   scenes.push({
     id: "model", title: "An off-centre mass",
     build(s) {
@@ -278,53 +278,53 @@
       s.head = K.heading(s.root, "An off-centre roof mass", {x: 120, y: 70, size: "h2"});
       s.mod = model(g, ISO, {hidden: true});
       s.dims = K.g(g, {hidden: true});
-      const d0 = ISO(-6, -6, -0.75), d1 = ISO(6, -6, -0.75);
-      K.dim(s.dims, d0[0], d0[1] + 44, d1[0], d1[1] + 44, "12 m");
-      const s0 = ISO(-1.6, 0, 0), s1 = ISO(-1.6, 0, 4), s2 = ISO(-1.6, 0, 8);
-      K.dim(s.dims, s0[0], s0[1], s1[0], s1[1], "4 m", {side: "left"});
-      K.dim(s.dims, s1[0], s1[1], s2[0], s2[1], "4 m", {side: "left"});
-      s.mnote = note(g, 140, 196, `steady state, X input at ${F5.toFixed(1)} Hz · drawn for ±${FDRAW} m of ground motion · slowed ${SLOW} ×`);
-      const q = ISO(2, 1, 8);
+      const d0 = ISO(-20, -20, -2.5), d1 = ISO(20, -20, -2.5);
+      K.dim(s.dims, d0[0], d0[1] + 44, d1[0], d1[1] + 44, "40 ft");
+      const s0 = ISO(-5.2, 0, 0), s1 = ISO(-5.2, 0, 13), s2 = ISO(-5.2, 0, 26);
+      K.dim(s.dims, s0[0], s0[1], s1[0], s1[1], "13 ft", {side: "left"});
+      K.dim(s.dims, s1[0], s1[1], s2[0], s2[1], "13 ft", {side: "left"});
+      s.mnote = note(g, 140, 196, `steady state, X input at ${F5.toFixed(1)} Hz · drawn for ±${FDRAW} ft of ground motion · slowed ${SLOW} ×`);
+      const q = ISO(6.5, 3.25, 26);
       s.lab2 = K.g(g, {hidden: true});
       K.text(s.lab2, q[0] + 96, q[1] - 10, "heavy roof mass", {cls: "t-label", size: 32, color: "var(--ssi)", weight: 750});
-      K.text(s.lab2, q[0] + 96, q[1] + 30, "2 m and 1 m off-centre", {cls: "t-label", size: 30, color: "var(--ssi)"});
+      K.text(s.lab2, q[0] + 96, q[1] + 30, "6.5 ft and 3.25 ft off-centre", {cls: "t-label", size: 30, color: "var(--ssi)"});
       s.zArr = K.g(g, {hidden: true});
       K.arrow(s.zArr, q[0] + 60, q[1] - 120, q[0] + 60, q[1] - 40, {color: CZ, width: 5, head: 16, both: true});
       K.text(s.zArr, q[0] + 84, q[1] - 74, "up and down", {cls: "t-label", size: 30, color: CZ, weight: 750});
-      // plan view, same factor: 36 px per metre
+      // plan view: 10.8 px per ft
       s.plan = K.g(g, {hidden: true});
-      const PC = [1440, 400], PS = 36;
+      const PC = [1440, 400], PS = 10.8;
       s.PC = PC; s.PS = PS;
       const PP = (x, y) => [PC[0] + PS * x, PC[1] - PS * y];
       s.PP = PP;
-      K.text(s.plan, PC[0], PC[1] - 6 * PS - 30, "seen from above", {cls: "t-label", size: 30, anchor: "middle"});
-      s.pMat = K.rect(s.plan, PC[0] - 6 * PS, PC[1] - 6 * PS, 12 * PS, 12 * PS, {fill: "rgba(59,74,94,.6)", stroke: C.concrete, "stroke-width": 2});
-      const m0 = PP(2, 1), a0 = PP(0, 0);
-      K.dim(s.plan, a0[0], a0[1] + 70, m0[0], a0[1] + 70, "2 m", {color: C.ink2});
-      K.dim(s.plan, m0[0] + 46, a0[1], m0[0] + 46, m0[1], "1 m", {color: C.ink2});
+      K.text(s.plan, PC[0], PC[1] - 20 * PS - 30, "seen from above", {cls: "t-label", size: 30, anchor: "middle"});
+      s.pMat = K.rect(s.plan, PC[0] - 20 * PS, PC[1] - 20 * PS, 40 * PS, 40 * PS, {fill: "rgba(59,74,94,.6)", stroke: C.concrete, "stroke-width": 2});
+      const m0 = PP(6.5, 3.25), a0 = PP(0, 0);
+      K.dim(s.plan, a0[0], a0[1] + 70, m0[0], a0[1] + 70, "6.5 ft", {color: C.ink2});
+      K.dim(s.plan, m0[0] + 46, a0[1], m0[0] + 46, m0[1], "3.25 ft", {color: C.ink2});
       s.ell = K.path(s.plan, "", {stroke: "rgba(238,243,249,.4)", "stroke-width": 2.5, "stroke-dasharray": "7 7", fill: "none"});
       s.pTop = K.path(s.plan, "", {fill: "rgba(159,176,195,.25)", stroke: C.steel, "stroke-width": 4});
       s.pArm = K.path(s.plan, "", {stroke: C.ssi, "stroke-width": 6});
       s.pMass = K.circle(s.plan, 0, 0, 17, {fill: C.ssi, stroke: "#0a111d", "stroke-width": 3});
       // the ground (control) motion, along X
-      s.gy = PC[1] + 6 * PS + 50;
+      s.gy = PC[1] + 20 * PS + 50;
       K.line(s.plan, PC[0] - FDRAW * PS, s.gy, PC[0] + FDRAW * PS, s.gy, {stroke: "rgba(76,195,255,.45)", "stroke-width": 4, "stroke-linecap": "round"});
       s.gnd = K.circle(s.plan, PC[0], s.gy, 9, {fill: CX});
-      K.text(s.plan, PC[0] - 6 * PS - 16, s.gy + 10, "ground", {cls: "t-label", size: 28, color: "var(--wave)", anchor: "end"});
-      s.yLab = K.text(g, PC[0] - 6 * PS + 18, PC[1] - 6 * PS + 46, "moves in Y too", {cls: "t-label", size: 32, color: CY, weight: 800, hidden: true});
-      s.twist = K.text(g, PC[0] - 6 * PS + 18, PC[1] + 6 * PS - 22, "the stick twists", {cls: "t-label", size: 32, color: "var(--ink)", weight: 800, hidden: true});
+      K.text(s.plan, PC[0] - 20 * PS - 16, s.gy + 10, "ground", {cls: "t-label", size: 28, color: "var(--wave)", anchor: "end"});
+      s.yLab = K.text(g, PC[0] - 20 * PS + 18, PC[1] - 20 * PS + 46, "moves in Y too", {cls: "t-label", size: 32, color: CY, weight: 800, hidden: true});
+      s.twist = K.text(g, PC[0] - 20 * PS + 18, PC[1] + 20 * PS - 22, "the stick twists", {cls: "t-label", size: 32, color: "var(--ink)", weight: 800, hidden: true});
       s.coup = K.card(s.root, {x: 1100, y: 800, w: 700, kind: "check", title: "Coupling", size: 32, body: "real floors: the mass is rarely centred on the stiffness"});
       s.A = 0;
     },
     tick(s, t) {
       const ph = (TAU * F5 * t) / SLOW, k = FDRAW * s.A;
-      // displacements (m) of the X input at 5.0 Hz
+      // displacements (ft) of the X input at 5.0 Hz
       const x13 = k * re(H.x13, ph), x26 = k * re(H.x26, ph), x27 = k * re(H.x27, ph), y27 = k * re(H.y27, ph);
       const x30 = k * re(H.x30, ph), y30 = k * re(H.y30, ph), z30 = k * re(H.z30, ph), th = k * re(H.rz27, ph);
       // isometric view (the basemat drawn translating with node 13; node 26 in X only, the stick top's
       // vertical motion is axial and negligible)
       const m = s.mod;
-      const n0 = ISO(x13, 0, 0.75), n1 = ISO(x26, 0, 4), n2 = ISO(x27, y27, 8), n3 = ISO(2 + x30, 1 + y30, 8 + z30);
+      const n0 = ISO(x13, 0, 2.5), n1 = ISO(x26, 0, 13), n2 = ISO(x27, y27, 26), n3 = ISO(6.5 + x30, 3.25 + y30, 26 + z30);
       m.stick.setAttribute("d", K.d([n0, n1, n2], true));
       m.m1.setAttribute("cx", n1[0]); m.m1.setAttribute("cy", n1[1]);
       m.top.setAttribute("cx", n2[0]); m.top.setAttribute("cy", n2[1]);
@@ -335,24 +335,24 @@
       // plan view
       const PP = s.PP, PS = s.PS;
       s.pMat.setAttribute("transform", `translate(${(PS * x13).toFixed(2)} 0)`);
-      const c = Math.cos(th), sn = Math.sin(th), hw = 0.75;
+      const c = Math.cos(th), sn = Math.sin(th), hw = 2.5;
       const sq = [[-hw, -hw], [hw, -hw], [hw, hw], [-hw, hw]].map(([a, b]) => PP(x27 + a * c - b * sn, y27 + a * sn + b * c));
       s.pTop.setAttribute("d", K.d(sq.concat([sq[0]])) + "Z");
-      const tp = PP(x27, y27), mp = PP(2 + x30, 1 + y30);
+      const tp = PP(x27, y27), mp = PP(6.5 + x30, 3.25 + y30);
       s.pArm.setAttribute("d", `M${tp}L${mp}`);
       s.pMass.setAttribute("cx", mp[0]); s.pMass.setAttribute("cy", mp[1]);
       if (s.ellA !== s.A) {
         s.ellA = s.A;
         const pts = [];
-        for (let i = 0; i <= 48; i++) { const a = TAU * i / 48; pts.push(PP(2 + k * re(H.x30, a), 1 + k * re(H.y30, a))); }
+        for (let i = 0; i <= 48; i++) { const a = TAU * i / 48; pts.push(PP(6.5 + k * re(H.x30, a), 3.25 + k * re(H.y30, a))); }
         s.ell.setAttribute("d", K.d(pts) + "Z");
       }
       s.gnd.setAttribute("cx", PP(k * Math.cos(ph), 0)[0]);
     },
     beats: [
-      {say: "[a]Now the example: a two-storey stick, on a 12 metre square foundation.",
+      {say: "[a]Now the example: a two-storey stick, on a 40-foot square foundation.",
         go(k) { k.show(k.s.head); }, a(k) { k.show([k.s.mod.g, k.s.dims]); }},
-      {say: "[m]But its heavy roof mass sits off-centre: 2 metres one way, 1 metre the other.",
+      {say: "[m]But its heavy roof mass sits off-centre: 6.5 feet one way, 3.25 feet the other.",
         m(k) { k.show([k.s.lab2, k.s.plan]); k.pulse(k.s.mod.m2, {amp: 0.3}); }},
       {say: "[p]Shake only in X, and the roof mass moves in X, [y]but also sideways in Y, [r]as the stick twists.",
         p(k) { k.show(k.s.mnote); k.tween(k.s, {A: 1}, 800); }, y(k) { k.show(k.s.yLab); }, r(k) { k.show(k.s.twist); }},
@@ -383,7 +383,7 @@
     beats: [
       {say: "[s]Here are the floor spectra at the roof mass, for the X shaking alone.",
         go(k) { k.show(k.s.head); }, s(k) { k.show([k.s.p.g, k.s.tag]); }},
-      {say: "[a]4.27 g along X, as expected. [b]But also 1.07 g along Y, [c]and 1.47 g vertically.",
+      {say: "[a]4.21 g along X, as expected. [b]But also 1.07 g along Y, [c]and 1.45 g vertically.",
         a(k) { k.draw(k.s.sx, 900); k.show([k.s.dots[0], k.s.st[0].el], {delay: 300}); },
         b(k) { k.draw(k.s.sy, 900); k.show([k.s.dots[1], k.s.st[1].el], {delay: 300}); },
         c(k) { k.draw(k.s.sz, 900); k.show([k.s.dots[2], k.s.st[2].el], {delay: 300}); }},
@@ -419,13 +419,13 @@
     beats: [
       {say: "[a]Now turn it round: the roof's Y spectrum collects something from each of the three inputs.",
         go(k) { k.show(k.s.head); }, a(k) { k.show(k.s.p.g); }},
-      {say: "[y]4.25 g from the Y shaking, [x]1.07 from X, [z]and 0.34 from the vertical.",
+      {say: "[y]4.07 g from the Y shaking, [x]1.07 from X, [z]and 0.34 from the vertical.",
         y(k) { k.draw(k.s.cy, 900); k.show(k.s.lg[0]); }, x(k) { k.draw(k.s.cx, 900); k.show(k.s.lg[1]); }, z(k) { k.draw(k.s.cz, 900); k.show(k.s.lg[2]); }},
-      {say: "[e]The SRSS rule: square each one, add them up, take the square root. [s]Here, 4.36 g.",
+      {say: "[e]The SRSS rule: square each one, add them up, take the square root. [s]Here, 4.18 g.",
         e(k) { k.show(k.s.eq); }, s(k) { k.draw(k.s.srss, 1000); k.show(k.s.lgS); k.show([k.s.dS, k.s.s1.el], {delay: 400}); }},
       {say: "[l]The 100-40-40 rule: each one in full, plus 40 percent of the other two, and keep the worst.",
         l(k) { k.show(k.s.rule); }},
-      {say: "[m]Here that gives 4.76 g: 9 percent above the SRSS.",
+      {say: "[m]Here that gives 4.57 g: 9 percent above the SRSS.",
         m(k) { k.draw(k.s.lin, 1000); k.show(k.s.lgL); k.show([k.s.dL, k.s.s2.el], {delay: 400}); }},
     ],
   });
@@ -478,7 +478,7 @@
         c(k) { k.show([k.s.e1, k.s.e2]); }},
       {say: "[p]So the peak at 5 hertz becomes a plateau, from 4.26 to 5.76 hertz.",
         p(k) { k.show([k.s.br, k.s.leg]); k.tween(k.s, {b: 0.15}, 1500, {done: () => k.show(k.s.lab)}); }, hold: 600},
-      {say: "[c]Equipment tuned anywhere in that band is designed for the full peak: 4.36 g.",
+      {say: "[c]Equipment tuned anywhere in that band is designed for the full peak: 4.18 g.",
         c(k) { k.show([k.s.band, k.s.pk]); }},
       {say: "[k]In SASSI, one BROADEN line does both: the envelope of its sources, then the widening.",
         k(k) { k.show(k.s.code.el); k.type(k.s.code.lines, {cps: 22}); k.show(k.s.expl, {delay: 400}); k.show(k.s.isrs, {delay: 400}); }},

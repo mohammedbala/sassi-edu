@@ -2,10 +2,10 @@
  * One idea: a faster shortcut (the subtraction method, FI-FSIN) can invent a resonance of the soil trapped in
  * the basement; FI-EVBN fixes it here; always validate a shortcut against the full FV model.  Closes the course.
  * Numbers: sassi/ui/lessons/11_embedded_building.md; curves: d11.js (the lesson's runs of example 8 with the
- * FV, FI-FSIN and FI-EVBN interaction sets; python -m sassi.ui.video_data).
- * Pictures to scale: the 24 m x 24 m building with its 8 m basement (two levels), walls every 6 m, the tower over the
- * four central rooms (storeys of 5 m), true member thicknesses and the ten equipment items where the lesson puts
- * them; the excavated soil as its 9 x 9 x 5 nodes (3 m x 3 m x 2 m) with the interaction sets counted from it.
+ * FV, FI-FSIN and FI-EVBN interaction sets; python -m sassi.ui.video_data).  Units: ft, kip, s.
+ * Pictures to scale: the 80 ft x 80 ft building with its 26 ft basement (two levels), walls every 20 ft, the tower over
+ * the four central rooms (storeys of 16 ft), true member thicknesses and the ten equipment items where the lesson puts
+ * them; the excavated soil as its 9 x 9 x 5 nodes (10 ft x 10 ft x 6.5 ft) with the interaction sets counted from it.
  * Motion: the computed transfer functions (amplitude and phase) of the output nodes at the frequency named, one
  * scale per scene; between the nodes of the excavated soil the lesson's Rayleigh shape (labelled schematic). */
 "use strict";
@@ -19,9 +19,15 @@
   const RS = (dir, node) => D[`${dir}/${String(node).padStart(5, "0")}TR_X01.RS`];
   const FV = "ex08", SM = "ex08_fsin", MSM = "ex08_evbn";
   const COL = {fv: C.ref, sm: C.bad, msm: C.good};     // FV the reference; FI-FSIN the anomaly; FI-EVBN validated
-  // the site of example 8 (lesson 11, step 1): 8 m at 300 m/s, 12 m at 450, 12 m at 650 m/s, rock at 1500 m/s
-  const SITE8 = {g: 9.81, layers: [{h: 8, vs: 300, w: 19.0, beta: 0.04}, {h: 12, vs: 450, w: 20.0, beta: 0.03}, {h: 12, vs: 650, w: 21.0, beta: 0.02}],
-    hs: {vs: 1500, w: 23.0, beta: 0.01}};
+  // the site of example 8 (lesson 11, step 1; ft, ft/s, kcf): 26 ft at 1,000 ft/s, 42 ft at 1,500, 39 ft at 2,100 ft/s,
+  // rock at 5,000 ft/s
+  const SITE8 = {g: 32.2, layers: [{h: 26, vs: 1000, w: 0.120, beta: 0.04}, {h: 42, vs: 1500, w: 0.125, beta: 0.03}, {h: 39, vs: 2100, w: 0.130, beta: 0.02}],
+    hs: {vs: 5000, w: 0.145, beta: 0.01}};
+
+  // ---------------------------------------------------------------- geometry of example 8 (ft)
+  const HB = 40, DE = 26;                                // half the plan size; the embedment depth
+  /** Evenly spaced values from a to b (both included), spacing at most about d. */
+  const span = (a, b, d) => { const n = Math.max(1, Math.round((b - a) / d)); return Array.from({length: n + 1}, (_, i) => a + (b - a) * i / n); };
 
   // ---------------------------------------------------------------- complex motion from the computed transfer functions
   const near = (d, f) => d.f.reduce((b, v, i) => (Math.abs(v - f) < Math.abs(d.f[b] - f) ? i : b), 0);
@@ -29,12 +35,12 @@
   const cAt = (d, f) => { const i = near(d, f); return [d.amp[i] * Math.cos(d.ph[i]), d.amp[i] * Math.sin(d.ph[i])]; };
   const lerpC = (a, b, t) => [a[0] + t * (b[0] - a[0]), a[1] + t * (b[1] - a[1])];
   /** Output nodes of the building (X): basemat 41, basement slab 675, grade slab 757, floor 446, main roof 567, tower roof 605. */
-  const LEVELS = [[-8, 41], [-4, 675], [0, 757], [5, 446], [10, 567], [20, 605]];
+  const LEVELS = [[-26, 41], [-13, 675], [0, 757], [16, 446], [32, 567], [64, 605]];
   /** The horizontal motion of a run at f: uz(z) of the building (linear between the output levels; the slabs carry
    *  the walls) and soil(x, z) of the excavated soil in section y = 0: the walls and basemat on its boundary, the
-   *  computed top-face centre (node 365) and, between them, the Rayleigh shape sin(pi (x + 12)/24) sin(pi (z + 8)/16). */
+   *  computed top-face centre (node 365) and, between them, the Rayleigh shape sin(pi (x + 40)/80) sin(pi (z + 26)/52). */
   function field(dir, f, top) {
-    const lv = LEVELS.filter(([z]) => z <= (top === undefined ? 20 : top)).map(([z, n]) => [z, cAt(TF(dir, n), f)]);
+    const lv = LEVELS.filter(([z]) => z <= (top === undefined ? 64 : top)).map(([z, n]) => [z, cAt(TF(dir, n), f)]);
     const uz = (z) => {
       if (z <= lv[0][0]) return lv[0][1];
       for (let i = 1; i < lv.length; i++) if (z <= lv[i][0]) return lerpC(lv[i - 1][1], lv[i][1], (z - lv[i - 1][0]) / (lv[i][0] - lv[i - 1][0]));
@@ -42,7 +48,7 @@
     };
     const s0 = cAt(TF(dir, 365), f), g0 = uz(0), b = [s0[0] - g0[0], s0[1] - g0[1]];
     const soil = (x, z) => {
-      const w = uz(z), sh = Math.sin(Math.PI * (x + 12) / 24) * Math.sin(Math.PI * (z + 8) / 16);
+      const w = uz(z), sh = Math.sin(Math.PI * (x + HB) / (2 * HB)) * Math.sin(Math.PI * (z + DE) / (2 * DE));
       return [w[0] + b[0] * sh, w[1] + b[1] * sh];
     };
     return {uz, soil, f: TF(dir, 365).f[near(TF(dir, 365), f)]};
@@ -59,12 +65,13 @@
       {cls: "t-label", anchor: o.anchor || "start", color: o.color, size: o.size || 30});
     return g;
   }
-  /** Section of the example 8 building (x across, z up, in m; s px/m; centre cx, grade gy), to scale: shells at their
-   *  mid-surfaces with their true thickness (basemat 2.0 m, outer basement walls 1.0, walls above grade 0.8, interior
-   *  walls 0.6, slabs 0.6 / 0.8 / 0.5 m), the hole of the basement, and the ten equipment items (x, level, mass).
+  /** Section of the example 8 building (x across, z up, in ft; s px/ft; centre cx, grade gy), to scale: shells at their
+   *  mid-surfaces with their true thickness (basemat 6.5 ft, outer basement walls 3.5, outer walls above grade 2.5,
+   *  interior and tower walls 2, basement slab 2, grade slab 2.5, floors and roofs 1.5 ft), the hole of the basement,
+   *  and the ten equipment items (x, level, weight in kips, slab thickness).
    *  Groups: hole, mat, outer, inner, above, tower, eq.  update(u): u(x, z) -> horizontal offset (px). */
-  const EQUIP = [[-9, 0, 150, 0.8], [9, 0, 150, 0.8], [-9, -4, 100, 0.6], [9, -4, 100, 0.6], [-3, 5, 80, 0.5], [3, 5, 80, 0.5],
-    [-9, 10, 25, 0.5], [9, 10, 25, 0.5], [-3, 15, 60, 0.5], [3, 20, 40, 0.5]];
+  const EQUIP = [[-30, 0, 330, 2.5], [30, 0, 330, 2.5], [-30, -13, 220, 2], [30, -13, 220, 2], [-10, 16, 175, 1.5], [10, 16, 175, 1.5],
+    [-30, 32, 55, 1.5], [30, 32, 55, 1.5], [-10, 48, 130, 1.5], [10, 64, 90, 1.5]];
   function building8(p, o) {
     const s = o.s, cx = o.cx, gy = o.gy;
     const X = (x) => cx + x * s, Z = (z) => gy - z * s;
@@ -76,28 +83,28 @@
     const brown = "#b07a4f";
     const mem = (gk, v, a, b, c, th, col) => items.push({el: K.path(grp[gk], "", {stroke: col || C.concrete, "stroke-width": th * s, fill: "none", "stroke-linecap": "butt"}), v, a, b, c});
     // v: x, z1, z2 (vertical); h: z, x1, x2 (horizontal)
-    mem("mat", false, -8, -12.5, 12.5, 2.0, brown);
-    for (const x of [-12, 12]) mem("outer", true, x, -8, 0, 1.0, brown);
-    for (const x of [-6, 0, 6]) mem("inner", true, x, -8, 0, 0.6);
-    mem("inner", false, -4, -11.5, 11.5, 0.6); mem("inner", false, 0, -12.5, 12.5, 0.8);
-    for (const x of [-12, 12]) mem("above", true, x, 0, 10, 0.8);
-    for (const x of [-6, 0, 6]) mem("above", true, x, 0, 10, 0.6);
-    mem("above", false, 5, -12.4, 12.4, 0.5); mem("above", false, 10, -12.4, 12.4, 0.5);
-    for (const x of [-6, 0, 6]) mem("tower", true, x, 10, 20, 0.6);
-    mem("tower", false, 15, -6.3, 6.3, 0.5); mem("tower", false, 20, -6.3, 6.3, 0.5);
-    const eqs = EQUIP.map(([x, z, m, th]) => {
-      const a = 0.35 * Math.cbrt(m);                     // side (m) of a block of the item's mass, for the picture
+    mem("mat", false, -26, -41.75, 41.75, 6.5, brown);
+    for (const x of [-40, 40]) mem("outer", true, x, -26, 0, 3.5, brown);
+    for (const x of [-20, 0, 20]) mem("inner", true, x, -26, 0, 2);
+    mem("inner", false, -13, -38.25, 38.25, 2); mem("inner", false, 0, -41.75, 41.75, 2.5);
+    for (const x of [-40, 40]) mem("above", true, x, 0, 32, 2.5);
+    for (const x of [-20, 0, 20]) mem("above", true, x, 0, 32, 2);
+    mem("above", false, 16, -41.25, 41.25, 1.5); mem("above", false, 32, -41.25, 41.25, 1.5);
+    for (const x of [-20, 0, 20]) mem("tower", true, x, 32, 64, 2);
+    mem("tower", false, 48, -21, 21, 1.5); mem("tower", false, 64, -21, 21, 1.5);
+    const eqs = EQUIP.map(([x, z, w, th]) => {
+      const a = 0.88 * Math.cbrt(w);                     // side (ft) of a block of the item's weight, for the picture
       return {el: K.rect(grp.eq, 0, 0, a * s, a * s, {fill: C.ssi, stroke: "#0a111d", "stroke-width": 2, rx: 2}), x, z, a, th};
     });
     const obj = {g, grp, X, Z};
     obj.update = function (u) {
       u = u || (() => 0);
       const L = [], R = [];
-      for (let z = -8; z <= 0.001; z += 1) { L.push([X(-12) + u(-12, z), Z(z)]); R.push([X(12) + u(12, z), Z(z)]); }
+      for (const z of span(-DE, 0, 3.25)) { L.push([X(-HB) + u(-HB, z), Z(z)]); R.push([X(HB) + u(HB, z), Z(z)]); }
       hole.setAttribute("d", K.d(L) + "L" + R.reverse().map((q) => q.join(",")).join("L") + "Z");
       for (const it of items) {
         const pts = [];
-        if (it.v) for (let z = it.b; z <= it.c + 1e-9; z += 1) pts.push([X(it.a) + u(it.a, z), Z(z)]);
+        if (it.v) for (const z of span(it.b, it.c, 3.25)) pts.push([X(it.a) + u(it.a, z), Z(z)]);
         else { const du = u(0, it.a); pts.push([X(it.b) + du, Z(it.a)], [X(it.c) + du, Z(it.a)]); }
         it.el.setAttribute("d", K.d(pts));
       }
@@ -109,7 +116,7 @@
     obj.update();
     return obj;
   }
-  /** The excavated soil in section y = 0: x = -12..12 every 3 m, z = -8..0 every 2 m (9 x 5 nodes).
+  /** The excavated soil in section y = 0: x = -40..40 every 10 ft, z = -26..0 every 6.5 ft (9 x 5 nodes).
    *  update(u): u(x, z) -> horizontal offset (px). nodes[]: {x, z, i, k, el}. */
   function excav(p, o) {
     const s = o.s, cx = o.cx, gy = o.gy;
@@ -117,26 +124,27 @@
     const g = K.g(p, {hidden: o.hidden});
     const fill = K.path(g, "", {fill: o.fill || "rgba(200,164,107,.34)", stroke: "none"});
     const lines = [];
-    for (let i = 0; i <= 8; i++) lines.push({el: K.path(g, "", {stroke: "rgba(232,210,170,.45)", "stroke-width": 2, fill: "none"}), v: true, x: -12 + 3 * i});
-    for (let k = 0; k <= 4; k++) lines.push({el: K.path(g, "", {stroke: "rgba(232,210,170,.45)", "stroke-width": 2, fill: "none"}), v: false, z: -8 + 2 * k});
+    for (let i = 0; i <= 8; i++) lines.push({el: K.path(g, "", {stroke: "rgba(232,210,170,.45)", "stroke-width": 2, fill: "none"}), v: true, x: -HB + 10 * i});
+    for (let k = 0; k <= 4; k++) lines.push({el: K.path(g, "", {stroke: "rgba(232,210,170,.45)", "stroke-width": 2, fill: "none"}), v: false, z: -DE + 6.5 * k});
     const ng = K.g(g, {});
     const nodes = [];
     for (let k = 0; k <= 4; k++) for (let i = 0; i <= 8; i++) {
-      const x = -12 + 3 * i, z = -8 + 2 * k;
+      const x = -HB + 10 * i, z = -DE + 6.5 * k;
       nodes.push({x, z, i, k, el: K.circle(ng, X(x), Z(z), o.r || 8, {fill: o.node || "#3a4d66", stroke: "#0a111d", "stroke-width": 2.5})});
     }
     const obj = {g, nodes, X, Z, ng};
+    const ZS = span(-DE, 0, 3.25), XS = span(-HB, HB, 5);
     obj.update = function (u) {
       u = u || (() => 0);
       for (const ln of lines) {
         const pts = [];
-        if (ln.v) for (let z = -8; z <= 0.001; z += 1) pts.push([X(ln.x) + u(ln.x, z), Z(z)]);
-        else for (let x = -12; x <= 12.001; x += 1.5) pts.push([X(x) + u(x, ln.z), Z(ln.z)]);
+        if (ln.v) for (const z of ZS) pts.push([X(ln.x) + u(ln.x, z), Z(z)]);
+        else for (const x of XS) pts.push([X(x) + u(x, ln.z), Z(ln.z)]);
         ln.el.setAttribute("d", K.d(pts));
       }
       const L = [], R = [];
-      for (let z = -8; z <= 0.001; z += 1) { L.push([X(-12) + u(-12, z), Z(z)]); R.push([X(12) + u(12, z), Z(z)]); }
-      const T = []; for (let x = -12; x <= 12.001; x += 1.5) T.push([X(x) + u(x, 0), Z(0)]);
+      for (const z of ZS) { L.push([X(-HB) + u(-HB, z), Z(z)]); R.push([X(HB) + u(HB, z), Z(z)]); }
+      const T = XS.map((x) => [X(x) + u(x, 0), Z(0)]);
       fill.setAttribute("d", K.d(L) + "L" + T.map((q) => q.join(",")).join("L") + "L" + R.reverse().map((q) => q.join(",")).join("L") + "Z");
       for (const n of nodes) n.el.setAttribute("cx", X(n.x) + u(n.x, n.z));
     };
@@ -180,11 +188,11 @@
   }
   function heldFaces(pg, B, col, top) {
     const g = K.g(pg, {hidden: true});
-    const off = 0.7 * B.s;
-    hatch(g, B.X(-12) - off - 6, B.Z(0), B.X(-12) - off - 6, B.Z(-8) + off + 14, -1, 0, col);
-    hatch(g, B.X(12) + off + 6, B.Z(0), B.X(12) + off + 6, B.Z(-8) + off + 14, 1, 0, col);
-    hatch(g, B.X(-12) - off - 6, B.Z(-8) + off + 14, B.X(12) + off + 6, B.Z(-8) + off + 14, 0, 1, col);
-    if (top) hatch(g, B.X(-12) - off - 6, B.Z(0) - 12, B.X(12) + off + 6, B.Z(0) - 12, 0, -1, col);
+    const off = 2.3 * B.s;                                // just outside the outer walls and the basemat
+    hatch(g, B.X(-HB) - off - 6, B.Z(0), B.X(-HB) - off - 6, B.Z(-DE) + off + 14, -1, 0, col);
+    hatch(g, B.X(HB) + off + 6, B.Z(0), B.X(HB) + off + 6, B.Z(-DE) + off + 14, 1, 0, col);
+    hatch(g, B.X(-HB) - off - 6, B.Z(-DE) + off + 14, B.X(HB) + off + 6, B.Z(-DE) + off + 14, 0, 1, col);
+    if (top) hatch(g, B.X(-HB) - off - 6, B.Z(0) - 12, B.X(HB) + off + 6, B.Z(0) - 12, 0, -1, col);
     return g;
   }
 
@@ -199,8 +207,9 @@
   scenes.push({
     id: "hook", title: "Can a shortcut invent a resonance?",
     build(s) {
-      const g = K.g(s.svg), S = 20, gy = 560;
-      s.soil = K.soil(g, {x: 110, y: gy, w: 880, layers: [{h: 8 * S, kind: "sand"}, {h: 12 * S, kind: "gravel"}], labels: false});
+      const g = K.g(s.svg), S = 6, gy = 550;                   // 6 px/ft
+      s.S = S;
+      s.soil = K.soil(g, {x: 110, y: gy, w: 880, layers: [{h: 26 * S, kind: "sand"}, {h: 42 * S, kind: "gravel"}], labels: false});
       s.b = building8(g, {s: S, cx: 550, gy, parts: false});
       s.ex = excav(g, {s: S, cx: 550, gy, fill: "rgba(0,0,0,0)", r: 8, hidden: true});
       s.ex.nodes.forEach((n) => n.el.setAttribute("fill", C.ssi));
@@ -214,7 +223,7 @@
     tick(s, t) {
       const w = TAU * t / 2.2, cw = Math.cos(w), sw = Math.sin(w), U = 10 * s.A;
       s.b.update((x, z) => U * re(F65.uz(z), cw, sw));
-      s.soil.shear((d) => U * re(ff(FF65, d / 20), cw, sw));
+      s.soil.shear((d) => U * re(ff(FF65, d / s.S), cw, sw));
     },
     beats: [
       {say: "Real nuclear buildings sit partly buried in the ground, and their SSI models get huge.",
@@ -245,35 +254,38 @@
   scenes.push({
     id: "building", title: "Example 8: the building",
     build(s) {
-      const g = K.g(s.svg), S = 20, cx = 520, gy = 600;
-      s.head = K.heading(s.root, "Example 8: a building 8 m deep", {x: 110, y: 70, size: "h2"});
-      s.soil = K.soil(g, {x: 100, y: gy, w: 840, labels: false, layers: [{h: 8 * S, kind: "sand"}], hs: {h: 230, kind: "gravel"}});
+      const g = K.g(s.svg), S = 6, cx = 520, gy = 600;         // 6 px/ft
+      s.S = S;
+      s.head = K.heading(s.root, "Example 8: a building 26 ft deep", {x: 110, y: 70, size: "h2"});
+      s.soil = K.soil(g, {x: 100, y: gy, w: 840, labels: false, layers: [{h: DE * S, kind: "sand"}], hs: {h: 230, kind: "gravel"}});
       s.soilL = K.g(g, {hidden: true});
-      K.text(s.soilL, 964, gy + 70, "sand and gravel, 8 m", {cls: "t-label", size: 28});
-      K.text(s.soilL, 964, gy + 102, "Vs = 300 m/s", {cls: "t-small", size: 24});
-      K.text(s.soilL, 964, gy + 230, "denser gravels, then rock", {cls: "t-label", size: 28});
-      K.text(s.soilL, 964, gy + 262, "Vs = 450 → 1500 m/s", {cls: "t-small", size: 24});
+      K.text(s.soilL, 990, gy + 70, "sand and gravel, 26 ft", {cls: "t-label", size: 28});
+      K.text(s.soilL, 990, gy + 102, "Vs = 1,000 ft/s", {cls: "t-small", size: 24});
+      K.text(s.soilL, 990, gy + 230, "denser gravels, then rock", {cls: "t-label", size: 28});
+      K.text(s.soilL, 990, gy + 262, "Vs = 1,500 → 5,000 ft/s", {cls: "t-small", size: 24});
       s.b = building8(g, {s: S, cx, gy});
       const X = s.b.X, Z = s.b.Z;
-      s.d24 = K.dim(g, X(-12), Z(20) - 34, X(12), Z(20) - 34, "24 m", {hidden: true});
-      s.d8 = K.dim(g, X(12) + 46, Z(0), X(12) + 46, Z(-8), "8 m: 2 levels", {hidden: true, labelColor: "var(--ink)"});
-      s.d10 = K.dim(g, X(12) + 46, Z(0), X(12) + 46, Z(10), "2 × 5 m", {hidden: true, labelColor: "var(--ink)"});
-      s.dT = K.dim(g, X(6) + 40, Z(10), X(6) + 40, Z(20), "2 × 5 m", {hidden: true, labelColor: "var(--ink)"});
+      s.d24 = K.dim(g, X(-HB), Z(64) - 34, X(HB), Z(64) - 34, "80 ft", {hidden: true});
+      s.d8 = K.dim(g, X(HB) + 46, Z(0), X(HB) + 46, Z(-DE), "26 ft: 2 levels", {hidden: true, labelColor: "var(--ink)"});
+      s.d10 = K.dim(g, X(HB) + 46, Z(0), X(HB) + 46, Z(32), "2 × 16 ft", {hidden: true, labelColor: "var(--ink)"});
+      s.dT = K.dim(g, X(20) + 40, Z(32), X(20) + 40, Z(64), "2 × 16 ft", {hidden: true, labelColor: "var(--ink)"});
       for (const d of [s.d8, s.d10, s.dT]) { const t = d.querySelector("text"); t.style.paintOrder = "stroke"; t.style.stroke = "#0a111d"; t.style.strokeWidth = "6px"; }
-      s.bLab = K.text(g, X(-12) - 26, Z(-4) + 10, "basement", {cls: "t-label", anchor: "end", color: "var(--ink)", hidden: true});
-      s.tow = K.text(g, X(-6) - 22, Z(15) + 10, "tower", {cls: "t-label", anchor: "end", color: "var(--ink)", hidden: true});
-      s.eqL = K.text(g, X(-12) - 26, Z(5) + 10, "equipment: 810 t", {cls: "t-small", anchor: "end", color: "var(--ssi)", size: 24, hidden: true});
-      // plan: 24 m x 24 m, walls every 6 m (16 rooms), the tower over the four central rooms
+      s.bLab = K.text(g, X(-HB) - 26, Z(-13) + 10, "basement", {cls: "t-label", anchor: "end", color: "var(--ink)", hidden: true});
+      s.tow = K.text(g, X(-20) - 22, Z(48) + 10, "tower", {cls: "t-label", anchor: "end", color: "var(--ink)", hidden: true});
+      s.eqL = K.g(g, {hidden: true});
+      K.text(s.eqL, X(-HB) - 26, Z(16) + 2, "equipment:", {cls: "t-small", anchor: "end", color: "var(--ssi)", size: 24});
+      K.text(s.eqL, X(-HB) - 26, Z(16) + 30, "1,780 kips", {cls: "t-small", anchor: "end", color: "var(--ssi)", size: 24});
+      // plan: 80 ft x 80 ft, walls every 20 ft (16 rooms), the tower over the four central rooms
       s.plan = K.g(g, {hidden: true});
-      const ps = 9, px = 1420, py = 520;
-      K.rect(s.plan, px, py, 24 * ps, 24 * ps, {fill: "#2b3a4f", stroke: C.concrete, "stroke-width": 5});
-      K.rect(s.plan, px + 6 * ps, py + 6 * ps, 12 * ps, 12 * ps, {fill: "rgba(255,183,77,.22)", stroke: "none"});
-      for (const t of [6, 12, 18]) {
-        K.line(s.plan, px + t * ps, py, px + t * ps, py + 24 * ps, {stroke: C.concrete, "stroke-width": 3});
-        K.line(s.plan, px, py + t * ps, px + 24 * ps, py + t * ps, {stroke: C.concrete, "stroke-width": 3});
+      const ps = 2.7, px = 1420, py = 520;                     // 2.7 px/ft
+      K.rect(s.plan, px, py, 80 * ps, 80 * ps, {fill: "#2b3a4f", stroke: C.concrete, "stroke-width": 5});
+      K.rect(s.plan, px + 20 * ps, py + 20 * ps, 40 * ps, 40 * ps, {fill: "rgba(255,183,77,.22)", stroke: "none"});
+      for (const t of [20, 40, 60]) {
+        K.line(s.plan, px + t * ps, py, px + t * ps, py + 80 * ps, {stroke: C.concrete, "stroke-width": 3});
+        K.line(s.plan, px, py + t * ps, px + 80 * ps, py + t * ps, {stroke: C.concrete, "stroke-width": 3});
       }
-      K.text(s.plan, px + 12 * ps, py - 18, "plan: 16 rooms", {cls: "t-label", anchor: "middle", size: 26});
-      K.text(s.plan, px + 12 * ps, py + 24 * ps + 38, "tower over the 4 central ones", {cls: "t-small", anchor: "middle", color: "var(--ssi)", size: 24});
+      K.text(s.plan, px + 40 * ps, py - 18, "plan: 16 rooms", {cls: "t-label", anchor: "middle", size: 26});
+      K.text(s.plan, px + 40 * ps, py + 80 * ps + 38, "tower over the 4 central ones", {cls: "t-small", anchor: "middle", color: "var(--ssi)", size: 24});
       s.f65 = K.stat(s.root, {x: 1240, y: 190, w: 560, value: F65.f.toFixed(1), unit: "Hz", label: "where its floors respond most", color: "var(--ssi)", vsize: 110});
       s.note = K.g(g, {hidden: true});
       K.text(s.note, 1520, 432, `computed at ${F65.f.toFixed(1)} Hz (FV) · 1 × ground = 10 px`, {cls: "t-small", anchor: "middle", color: "var(--muted)"});
@@ -283,15 +295,15 @@
     tick(s, t) {
       const w = TAU * t / 2.2, cw = Math.cos(w), sw = Math.sin(w), U = 10 * s.A;
       s.b.update((x, z) => U * re(F65.uz(z), cw, sw));
-      s.soil.shear((d) => U * re(ff(FF65, d / 20), cw, sw));
+      s.soil.shear((d) => U * re(ff(FF65, d / s.S), cw, sw));
     },
     beats: [
-      {say: "Meet example 8: a concrete shear-wall building, [p]24 metres square, [m]with a basement 8 metres deep.",
+      {say: "Meet example 8: a concrete shear-wall building, [p]80 ft square, [m]with a basement 26 ft deep.",
         go(k) { k.show(k.s.head); k.show(k.s.b.grp.above, {delay: 200}); },
         p(k) { k.show(k.s.d24); }, m(k) { k.show([k.s.b.grp.mat, k.s.b.grp.outer, k.s.d8, k.s.bLab]); k.show(k.s.d10, {delay: 300}); }},
-      {say: "[i]Walls every 6 metres make sixteen rooms, [t]and a tower rises from the middle.",
+      {say: "[i]Walls every 20 ft make sixteen rooms, [t]and a tower rises from the middle.",
         i(k) { k.show([k.s.b.grp.inner, k.s.plan]); }, t(k) { k.show([k.s.b.grp.tower, k.s.tow, k.s.dT]); k.show([k.s.b.grp.eq, k.s.eqL], {delay: 300}); }},
-      {say: "[s]It sits in 8 metres of sand and gravel, over denser gravels and rock.",
+      {say: "[s]It sits in 26 ft of sand and gravel, over denser gravels and rock.",
         s(k) { k.show(k.s.soilL); }},
       {say: "[f]Shaken on this soil, its floors respond most strongly at about 6.5 hertz.",
         f(k) { k.tween(k.s, {A: 1}, 1000); k.show(k.s.f65.el, {delay: 300}); k.show(k.s.note, {delay: 400}); }},
@@ -299,14 +311,14 @@
   });
 
   // ---------------------------------------------------------------- 3. the full method and the shortcut
-  // the excavated soil in 3D: 9 x 9 x 5 nodes, 3 m x 3 m in plan, 2 m vertically (24 m x 24 m x 8 m)
-  const P3 = {s: 22, cx: 520, cy: 420, az: 30 * Math.PI / 180, el: 28 * Math.PI / 180};
+  // the excavated soil in 3D: 9 x 9 x 5 nodes, 10 ft x 10 ft in plan, 6.5 ft vertically (80 ft x 80 ft x 26 ft)
+  const P3 = {s: 6.6, cx: 520, cy: 420, az: 30 * Math.PI / 180, el: 28 * Math.PI / 180};     // 6.6 px/ft
   const proj = (x, y, z) => {
     const ca = Math.cos(P3.az), sa = Math.sin(P3.az), x1 = x * ca - y * sa, y1 = x * sa + y * ca;
     return [P3.cx + P3.s * x1, P3.cy - P3.s * (z * Math.cos(P3.el) + y1 * Math.sin(P3.el)), y1];
   };
   const BOXN = [];
-  for (let k = 0; k < 5; k++) for (let j = 0; j < 9; j++) for (let i = 0; i < 9; i++) BOXN.push({i, j, k, x: -12 + 3 * i, y: -12 + 3 * j, z: -8 + 2 * k});
+  for (let k = 0; k < 5; k++) for (let j = 0; j < 9; j++) for (let i = 0; i < 9; i++) BOXN.push({i, j, k, x: -HB + 10 * i, y: -HB + 10 * j, z: -DE + 6.5 * k});
   const COUNT = (m) => BOXN.filter((n) => inSet(m, n.i, n.j, n.k)).length;
   scenes.push({
     id: "methods", title: "The full method and the shortcut",
@@ -317,9 +329,9 @@
       const face = (pts, op) => K.path(s.box, K.d(pts.map((q) => proj(...q))) + "Z", {fill: `rgba(200,164,107,${op})`, stroke: "rgba(232,210,170,.55)", "stroke-width": 2});
       const c = (x, y, z) => [x, y, z];
       // back faces and the bottom, then the nodes (far first), then the front faces and the top
-      face([c(-12, 12, -8), c(12, 12, -8), c(12, 12, 0), c(-12, 12, 0)], 0.10);
-      face([c(12, -12, -8), c(12, 12, -8), c(12, 12, 0), c(12, -12, 0)], 0.10);
-      face([c(-12, -12, -8), c(12, -12, -8), c(12, 12, -8), c(-12, 12, -8)], 0.16);
+      face([c(-HB, HB, -DE), c(HB, HB, -DE), c(HB, HB, 0), c(-HB, HB, 0)], 0.10);
+      face([c(HB, -HB, -DE), c(HB, HB, -DE), c(HB, HB, 0), c(HB, -HB, 0)], 0.10);
+      face([c(-HB, -HB, -DE), c(HB, -HB, -DE), c(HB, HB, -DE), c(-HB, HB, -DE)], 0.16);
       const order = BOXN.map((n) => Object.assign({p: proj(n.x, n.y, n.z)}, n)).sort((a, b) => b.p[2] - a.p[2] || a.k - b.k);
       s.nodes = order.map((n) => {
         const onFace = n.i === 0 || n.j === 0 || n.i === 8 || n.j === 8 || n.k === 0 || n.k === 4;
@@ -327,14 +339,14 @@
         n.el = K.circle(s.box, n.p[0], n.p[1], n.r, {fill: "#5a6d86", stroke: "#0a111d", "stroke-width": 1.5});
         return n;
       });
-      face([c(-12, -12, -8), c(-12, 12, -8), c(-12, 12, 0), c(-12, -12, 0)], 0.06);
-      face([c(-12, -12, -8), c(12, -12, -8), c(12, -12, 0), c(-12, -12, 0)], 0.06);
-      face([c(-12, -12, 0), c(12, -12, 0), c(12, 12, 0), c(-12, 12, 0)], 0.05);
+      face([c(-HB, -HB, -DE), c(-HB, HB, -DE), c(-HB, HB, 0), c(-HB, -HB, 0)], 0.06);
+      face([c(-HB, -HB, -DE), c(HB, -HB, -DE), c(HB, -HB, 0), c(-HB, -HB, 0)], 0.06);
+      face([c(-HB, -HB, 0), c(HB, -HB, 0), c(HB, HB, 0), c(-HB, HB, 0)], 0.05);
       const lab = (q, t, dx, dy, anchor) => { const p = proj(...q); K.text(s.box, p[0] + dx, p[1] + dy, t, {cls: "t-small", anchor: anchor || "middle", size: 24, color: "var(--ink2)"}); };
-      lab([0, -12, -8], "24 m", 0, 46);
-      lab([-12, 0, -8], "24 m", -30, 40, "end");
-      lab([-12, 12, -4], "8 m", -18, 8, "end");
-      K.text(s.box, P3.cx, 850, "the excavated soil: 9 × 9 × 5 nodes, 3 m × 3 m × 2 m", {cls: "t-label", anchor: "middle", size: 28});
+      lab([0, -HB, -DE], "80 ft", 0, 46);
+      lab([-HB, 0, -DE], "80 ft", -30, 40, "end");
+      lab([-HB, HB, -13], "26 ft", -18, 8, "end");
+      K.text(s.box, P3.cx, 850, "the excavated soil: 9 × 9 × 5 nodes, 10 ft × 10 ft × 6.5 ft", {cls: "t-label", anchor: "middle", size: 28});
       s.minus = K.text(g, P3.cx, 205, "− the block of soil the basement replaces", {cls: "t-label", anchor: "middle", color: "var(--ssi)", size: 32, hidden: true});
       s.n405 = K.stat(s.root, {x: 1080, y: 190, w: 340, value: String(COUNT("fv")), label: "points held:<br>FV, the full method", color: "var(--ssi)", vsize: 110});
       s.n209 = K.stat(s.root, {x: 1460, y: 190, w: 360, value: String(COUNT("fsin")), label: "points held:<br>FI-FSIN, the shortcut", color: "var(--bad)", vsize: 110});
@@ -375,13 +387,13 @@
         xlabel: "frequency (Hz)", ylabel: "tower roof amplification", ylabelOffset: 60});
       const dF = TF(FV, 605), dS = TF(SM, 605);
       s.ok = K.rect(s.p.g, s.p.X(0), s.p.box.y, s.p.X(10) - s.p.X(0), s.p.box.h, {fill: "rgba(99,230,164,.08)", hidden: true});
-      s.okL = s.p.text(5, 0.3, "agree within 2.4 %", {cls: "t-label", anchor: "middle", color: "var(--good)", hidden: true});
+      s.okL = s.p.text(5, 0.3, "agree within 2.2 %", {cls: "t-label", anchor: "middle", color: "var(--good)", hidden: true});
       s.band = K.rect(s.p.g, s.p.X(15.5), s.p.box.y, s.p.X(16) - s.p.X(15.5), s.p.box.h, {fill: "rgba(255,107,107,.22)", hidden: true});
       s.lF = s.p.line(dF.f, dF.amp, {color: COL.fv, width: 12, draw: true, opacity: 0.75});
       s.lS = s.p.line(dS.f, dS.amp, {color: COL.sm, width: 4, draw: true});
       // the shortcut's largest computed value of the 15-17 Hz band (its spurious resonance), against FV there
       const iS = dS.f.reduce((b, f, i) => (f >= 15 && f <= 17 && !(dS.f[b] >= 15 && dS.amp[b] >= dS.amp[i]) ? i : b), 0);
-      s.k = ring(s.p, dS.f[iS], dS.amp[iS], `${dS.amp[iS].toFixed(2)} against ${dF.amp[iS].toFixed(2)}`, {color: "var(--bad)", dx: -32, dy: -26, anchor: "end", r: 20});
+      s.k = ring(s.p, dS.f[iS], dS.amp[iS], `${dS.amp[iS].toFixed(3)} against ${dF.amp[iS].toFixed(3)}`, {color: "var(--bad)", dx: -32, dy: -26, anchor: "end", r: 20});
       s.leg = s.p.legend([{label: "FV, the full method", color: COL.fv}, {label: "FI-FSIN, the shortcut", color: COL.sm}], {x: 860, y: 236, hidden: true, size: 28, dy: 46});
       s.s1 = K.stat(s.root, {x: 1340, y: 200, w: 480, value: F65.f.toFixed(1), unit: "Hz", label: "main peak: both agree", color: "var(--good)", vsize: 100});
       s.s2 = K.stat(s.root, {x: 1340, y: 430, w: 480, value: "15.5–16", unit: "Hz", label: "an extra peak, shortcut only", color: "var(--bad)", vsize: 84});
@@ -392,7 +404,7 @@
       {say: "So we run the building both ways, [r]and compare how much the tower roof amplifies the shaking.",
         go(k) { k.show(k.s.head); k.show(k.s.p.g, {delay: 200}); },
         r(k) { k.draw(k.s.lF, 1000); k.draw(k.s.lS, 1000, {to: 0.5, delay: 300}); k.show(k.s.leg, {delay: 400}); }},
-      {say: "[a]Up to 10 hertz, main peak included, the two agree within 2.4 percent.",
+      {say: "[a]Up to 10 hertz, main peak included, the two agree within 2.2 percent.",
         a(k) { k.show([k.s.ok, k.s.okL]); k.show(k.s.s1.el, {delay: 300}); }},
       {say: "[b]Then, between 15.5 and 16 hertz, the shortcut shows a resonance that FV doesn't have.",
         b(k) { k.draw(k.s.lS, 1000, {from: 0.5}); k.show(k.s.band, {delay: 300}); k.show([k.s.k, k.s.s2.el], {delay: 400}); }},
@@ -402,50 +414,50 @@
   });
 
   // ---------------------------------------------------------------- 5. why: the soil trapped in the basement
-  // the computed motion at 15.5 Hz, FI-FSIN above and FV below, one scale: 1 x the ground = 4 px
-  const F155 = {sm: field(SM, 15.5, 0), fv: field(FV, 15.5, 0), msm: field(MSM, 15.5, 0)};
-  const U155 = 5, PER155 = 1.6, SLOW155 = Math.round(F155.sm.f * PER155);
+  // the computed motion at 16 Hz, FI-FSIN above and FV below, one scale: 1 x the ground = 4 px
+  const F16 = {sm: field(SM, 16, 0), fv: field(FV, 16, 0), msm: field(MSM, 16, 0)};
+  const U16 = 4, PER16 = 1.6, SLOW16 = Math.round(F16.sm.f * PER16);
   scenes.push({
     id: "why", title: "Why: the soil trapped in the basement",
     build(s) {
-      const g = K.g(s.svg), S = 18, cx = 470, gA = 290, gB = 630, xl = cx + 12 * S + 44;
+      const g = K.g(s.svg), S = 5.4, cx = 470, gA = 290, gB = 630, xl = cx + HB * S + 44;     // 5.4 px/ft
       s.head = K.heading(s.root, "Why: the soil trapped inside", {x: 110, y: 70, size: "h2"});
       s.A = basement(g, {s: S, cx, gy: gA, hidden: true});
       s.B = basement(g, {s: S, cx, gy: gB, hidden: true});
       s.A.ex.nodes.forEach((n) => { if (inSet("fsin", n.i, 4, n.k)) { n.el.setAttribute("fill", C.bad); n.el.setAttribute("r", 9); } });
       s.B.ex.nodes.forEach((n) => { n.el.setAttribute("fill", C.ssi); n.el.setAttribute("r", 9); });
-      s.tA = K.text(g, cx - 12 * S, gA - 26, "FI-FSIN, the shortcut", {cls: "t-label", size: 30, color: "var(--bad)", hidden: true});
+      s.tA = K.text(g, cx - HB * S, gA - 26, "FI-FSIN, the shortcut", {cls: "t-label", size: 30, color: "var(--bad)", hidden: true});
       s.tB = K.g(g, {hidden: true});
-      K.text(s.tB, cx - 12 * S, gB - 26, "FV, the full method", {cls: "t-label", size: 30, color: "var(--ink)"});
+      K.text(s.tB, cx - HB * S, gB - 26, "FV, the full method", {cls: "t-label", size: 30, color: "var(--ink)"});
       K.text(s.tB, xl, gB + 80, "every node held", {cls: "t-label", size: 28, color: "var(--ssi)"});
       s.held = heldFaces(g, s.A, C.ssi, false);
       s.heldL = K.text(g, xl, gA + 130, "held: sides and bottom", {cls: "t-label", size: 28, color: "var(--ssi)", hidden: true});
       s.free = K.text(g, xl, gA + 30, "free: inside and top", {cls: "t-label", size: 28, color: "var(--bad)", hidden: true});
-      s.own = K.text(g, cx, gA + 8 * S + 78, "its own frequency ≈ 16.8 Hz (Rayleigh estimate)", {cls: "t-small", anchor: "middle", size: 24, color: "var(--ink2)", hidden: true});
+      s.own = K.text(g, cx, gA + DE * S + 78, "its own frequency ≈ 15.6 Hz (eigenvalue analysis)", {cls: "t-small", anchor: "middle", size: 24, color: "var(--ink2)", hidden: true});
       s.note = K.g(g, {hidden: true});
-      K.text(s.note, 110, 862, `computed at ${F155.sm.f.toFixed(1)} Hz: basemat, slabs, soil centre · 1 × ground = ${U155} px · slowed down ${SLOW155} ×`,
+      K.text(s.note, 110, 862, `computed at ${F16.sm.f.toFixed(1)} Hz: basemat, slabs, soil centre · 1 × ground = ${U16} px · slowed down ${SLOW16} ×`,
         {cls: "t-small", size: 22, color: "var(--muted)"});
       K.text(s.note, 110, 890, "the soil between those nodes: schematic shape", {cls: "t-small", size: 22, color: "var(--muted)"});
-      s.p = K.plot(s.svg, {x: 1240, y: 200, w: 570, h: 380, xr: [0, 20], yr: [0, 14], xticks: [0, 4, 8, 12, 16, 20], yticks: [0, 4, 8, 12],
+      s.p = K.plot(s.svg, {x: 1240, y: 200, w: 570, h: 380, xr: [0, 20], yr: [0, 20], xticks: [0, 4, 8, 12, 16, 20], yticks: [0, 5, 10, 15, 20],
         xlabel: "frequency (Hz)", ylabel: "soil inside: amplification", ylabelOffset: 60});
-      const sF = TF(FV, 365), sS = TF(SM, 365), i5 = near(sS, 15.5);
+      const sF = TF(FV, 365), sS = TF(SM, 365), i16 = near(sS, 16);
       s.lF = s.p.line(sF.f, sF.amp, {color: COL.fv, width: 6, draw: true});
       s.lS = s.p.line(sS.f, sS.amp, {color: COL.sm, width: 5, draw: true});
-      s.k = ring(s.p, sS.f[i5], sS.amp[i5], `${sS.amp[i5].toFixed(1)} ×`, {color: "var(--bad)", dx: -32, dy: 12, anchor: "end", r: 20, size: 38});
-      s.kF = ring(s.p, sF.f[i5], sF.amp[i5], "", {color: "var(--ink)", r: 16});
-      K.line(s.kF, s.p.X(14.7), s.p.Y(6.4), s.p.X(sF.f[i5]) - 8, s.p.Y(sF.amp[i5]) - 14, {stroke: C.ink, "stroke-width": 2, "stroke-dasharray": "6 5"});
-      K.text(s.kF, s.p.X(14.7), s.p.Y(7), `FV: ${sF.amp[i5].toFixed(1)} ×`, {cls: "t-label", anchor: "end", size: 30, color: "var(--ink)"});
+      s.k = ring(s.p, sS.f[i16], sS.amp[i16], `${sS.amp[i16].toFixed(1)} ×`, {color: "var(--bad)", dx: -32, dy: 12, anchor: "end", r: 20, size: 38});
+      s.kF = ring(s.p, sF.f[i16], sF.amp[i16], "", {color: "var(--ink)", r: 16});
+      K.line(s.kF, s.p.X(13.6), s.p.Y(5.4), s.p.X(sF.f[i16]) - 8, s.p.Y(sF.amp[i16]) - 14, {stroke: C.ink, "stroke-width": 2, "stroke-dasharray": "6 5"});
+      K.text(s.kF, s.p.X(13.6), s.p.Y(6.2), `FV: ${sF.amp[i16].toFixed(1)} ×`, {cls: "t-label", anchor: "end", size: 30, color: "var(--ink)"});
       s.leg = s.p.legend([{label: "FV", color: COL.fv}, {label: "FI-FSIN", color: COL.sm}], {x: 1280, y: 236, hidden: true, size: 28, dy: 46});
-      const b41 = (d) => cAt(TF(d, 41), 15.5);
-      s.drag = K.text(g, cx, gA + 8 * S + 110, `basemat ${Math.hypot(...b41(SM)).toFixed(2)} × ground, against ${Math.hypot(...b41(FV)).toFixed(2)} with FV`,
+      const b41 = (d) => cAt(TF(d, 41), 16);
+      s.drag = K.text(g, cx, gA + DE * S + 110, `basemat ${Math.hypot(...b41(SM)).toFixed(2)} × ground, against ${Math.hypot(...b41(FV)).toFixed(2)} with FV`,
         {cls: "t-small", anchor: "middle", size: 24, color: "var(--ink2)", hidden: true});
       s.name = K.heading(s.root, "A spurious resonance: made by the method", {x: 110, y: 910, w: 1700, size: "h2", color: "var(--bad)"});
       s.M = 0; s.MB = 0;
     },
     tick(s, t) {
-      const w = TAU * t / PER155, cw = Math.cos(w), sw = Math.sin(w);
-      s.A.move(F155.sm, cw, sw, U155 * s.M);
-      s.B.move(F155.fv, cw, sw, U155 * s.MB);
+      const w = TAU * t / PER16, cw = Math.cos(w), sw = Math.sin(w);
+      s.A.move(F16.sm, cw, sw, U16 * s.M);
+      s.B.move(F16.fv, cw, sw, U16 * s.MB);
     },
     beats: [
       {say: "Where does it come from? [l]Look at the soil inside the basement.",
@@ -454,10 +466,10 @@
         s(k) { k.show([k.s.held, k.s.heldL]); }, t(k) { k.show(k.s.free); }},
       {say: "[j]Like jelly in a bowl, it can wobble on its own, at its own natural frequency.",
         j(k) { k.show(k.s.own); k.show(k.s.note, {delay: 200}); k.tween(k.s, {M: 1}, 1000); }},
-      {say: "[m]Near 15.5 hertz, it sways about 12 times as much as the ground, [d]and drags the building along.",
+      {say: "[m]Near 16 hertz, it sways about 18 times as much as the ground, [d]and drags the building along.",
         m(k) { k.show(k.s.p.g); k.draw(k.s.lF, 1000); k.draw(k.s.lS, 1000, {delay: 300}); k.show(k.s.leg, {delay: 300}); k.show(k.s.k, {delay: 400}); },
         d(k) { k.show(k.s.drag); k.pulse(k.s.A.b.g, {amp: 0.03}); }},
-      {say: "[f]With the full method, the same soil moves only about 1.6 times the ground.",
+      {say: "[f]With the full method, the same soil moves only about 1.8 times the ground.",
         f(k) { k.show([k.s.B.ex.g, k.s.B.b.g, k.s.tB]); k.tween(k.s, {MB: 1}, 600); k.show(k.s.kF, {delay: 200}); k.pulse(k.s.lF); }},
       {say: "[n]Engineers call this a spurious resonance: it comes from the method, not from the building.",
         n(k) { k.show(k.s.name); }},
@@ -472,9 +484,11 @@
       s.p = K.plot(s.svg, {x: 230, y: 190, w: 1000, h: 470, xr: [0, 25], yr: [0, 1.2], xticks: [0, 5, 10, 15, 20, 25],
         yticks: [0, 0.4, 0.8, 1.2], yfmt: (v) => v.toFixed(1), xlabel: "equipment frequency (Hz)", ylabel: "slab at ground level, 5 % (g)", ylabelOffset: 70});
       const rF = RS(FV, 757), rS = RS(SM, 757);
-      const i5 = near(rF, 15.5), f5 = rF.f[i5], up = 100 * (rS.sa[i5] / rF.sa[i5] - 1);
+      // the shortcut's largest excess over FV near the spurious resonance (14.5-17 Hz)
+      const i5 = rF.f.reduce((b, f, i) => (f >= 14.5 && f <= 17 && !(rF.f[b] >= 14.5 && rS.sa[b] / rF.sa[b] >= rS.sa[i] / rF.sa[i]) ? i : b), 0);
+      const f5 = rF.f[i5], up = 100 * (rS.sa[i5] / rF.sa[i5] - 1);
       s.v155 = s.p.vline(f5, {color: C.bad, hidden: true});
-      // the shortcut's excess over FV around the spurious resonance
+      // the area between the two spectra around the spurious resonance and the dip below it
       const band = (d) => d.f.map((f, i) => [f, d.sa[i]]).filter(([f]) => f >= 13.5 && f <= 18);
       const top = band(rS), bot = band(rF).reverse();
       s.ex = K.path(s.p.g, K.d(s.p.pts(top.map((q) => q[0]), top.map((q) => q[1]))) + "L" +
@@ -487,8 +501,8 @@
       K.arrow(s.pt, s.p.X(f5) + 70, s.p.Y(rS.sa[i5]) - 70, s.p.X(f5) + 10, s.p.Y(rS.sa[i5]) - 10, {color: C.bad, width: 4, head: 14});
       K.text(s.pt, s.p.X(f5) + 76, s.p.Y(rS.sa[i5]) - 78, `${rS.sa[i5].toFixed(2)} g against ${rF.sa[i5].toFixed(2)} g`, {cls: "t-label", size: 26, color: "var(--bad)"});
       s.s1 = K.stat(s.root, {x: 1320, y: 190, w: 500, value: `+${up.toFixed(0)} %`, label: `slab at ground level, ${f5.toFixed(1)} Hz`, color: "var(--bad)", vsize: 96});
-      s.s2 = K.stat(s.root, {x: 1320, y: 400, w: 500, value: "+31 %", label: "vertical, under a 150 t item", color: "var(--bad)", vsize: 96});
-      s.s3 = K.stat(s.root, {x: 1320, y: 610, w: 500, value: "≈ 1 %", label: "basement wall forces", color: "var(--good)", vsize: 96});
+      s.s2 = K.stat(s.root, {x: 1320, y: 400, w: 500, value: "+16 / −10 %", label: "worst of the 11 spectra", color: "var(--bad)", vsize: 80});
+      s.s3 = K.stat(s.root, {x: 1320, y: 610, w: 500, value: "≈ 1.5 %", label: "basement wall forces", color: "var(--good)", vsize: 96});
       s.q = K.pill(s.root, "designed for a demand that doesn't exist", {x: 260, y: 760, color: "var(--bad)", style: {fontSize: "30px"}});
       s.tf = K.card(s.root, {x: 230, y: 840, w: 1590, kind: "check", title: "So", size: 32,
         body: "Forces can't validate a shortcut. Compare the transfer functions themselves."});
@@ -496,11 +510,11 @@
     beats: [
       {say: "Does it matter for design? [p]Here is the floor spectrum of the slab at ground level.",
         go(k) { k.show(k.s.head); }, p(k) { k.show(k.s.p.g); k.draw(k.s.lF, 1000); k.draw(k.s.lS, 1000, {delay: 300}); k.show(k.s.leg, {delay: 400}); }},
-      {say: "[g]At 15.5 hertz, the shortcut's spectrum is 23 percent too high. [t]Vertically, under a 150 tonne item, 31 percent.",
+      {say: "[g]Near 15 hertz, the shortcut's spectrum is 12 percent too high. [t]Elsewhere, up to 16 percent, and 10 percent too low just below.",
         g(k) { k.show([k.s.v155, k.s.k, k.s.ex, k.s.pt]); k.show(k.s.s1.el, {delay: 300}); }, t(k) { k.show(k.s.s2.el); }},
       {say: "[q]Equipment tuned near 15.5 hertz would be designed for a demand that doesn't exist.",
         q(k) { k.show(k.s.q); }},
-      {say: "[w]Yet the basement wall forces barely change: about 1 percent. They come from the 6.5 hertz sway.",
+      {say: "[w]Yet the basement wall forces barely change: about 1.5 percent. They come from the 6.5 hertz sway.",
         w(k) { k.show(k.s.s3.el); }},
       {say: "[v]So forces can't validate a shortcut. Compare the transfer functions themselves.",
         v(k) { k.show(k.s.tf); }},
@@ -511,15 +525,15 @@
   scenes.push({
     id: "evbn", title: "The fix, and the rule",
     build(s) {
-      const g = K.g(s.svg), S = 20, cx = 500, gy = 290;
+      const g = K.g(s.svg), S = 6, cx = 500, gy = 290;         // 6 px/ft
       s.head = K.heading(s.root, "The fix: put a lid on it", {x: 110, y: 70, size: "h2"});
       s.B = basement(g, {s: S, cx, gy});
       s.B.ex.nodes.forEach((n) => { if (inSet("fsin", n.i, 4, n.k)) { n.el.setAttribute("fill", C.bad); n.el.setAttribute("r", 9); } });
       s.held = heldFaces(g, s.B, C.ssi, false); s.held.classList.remove("sv-in", "sv-fade");
       s.lid = K.g(g, {hidden: true});
-      hatch(s.lid, s.B.X(-12) - 18, s.B.Z(0) - 14, s.B.X(12) + 18, s.B.Z(0) - 14, 0, -1, C.good);
+      hatch(s.lid, s.B.X(-HB) - 18, s.B.Z(0) - 14, s.B.X(HB) + 18, s.B.Z(0) - 14, 0, -1, C.good);
       s.lidL = K.text(g, cx, s.B.Z(0) - 52, `top held too: ${COUNT("evbn") - COUNT("fsin")} more points`, {cls: "t-label", anchor: "middle", color: "var(--good)", size: 32, hidden: true});
-      s.note = K.text(g, 130, s.B.Z(-8) + 76, `computed at ${F155.sm.f.toFixed(1)} Hz, the same scale as before: FI-FSIN, then FI-EVBN`,
+      s.note = K.text(g, 130, s.B.Z(-DE) + 76, `computed at ${F16.sm.f.toFixed(1)} Hz, the same scale as before: FI-FSIN, then FI-EVBN`,
         {cls: "t-small", size: 22, color: "var(--muted)"});
       s.n258 = K.stat(s.root, {x: 220, y: 560, w: 500, value: String(COUNT("evbn")), label: "points: FI-EVBN, the modified method", color: "var(--good)", vsize: 96});
       s.p = K.plot(s.svg, {x: 1100, y: 190, w: 700, h: 360, xr: [0, 20], yr: [0, 3], xticks: [0, 4, 8, 12, 16, 20], yticks: [0, 1, 2, 3],
@@ -529,16 +543,16 @@
       s.lF = s.p.line(dF.f, dF.amp, {color: COL.fv, width: 11, opacity: 0.8});
       s.lE = s.p.line(dE.f, dE.amp, {color: COL.msm, width: 4, draw: true});
       s.leg = s.p.legend([{label: "FV", color: COL.fv}, {label: "FI-EVBN", color: COL.msm}, {label: "FI-FSIN", color: COL.sm}], {x: 1560, y: 226, size: 26, dy: 40});
-      s.cut = K.pill(s.root, "its own frequency: ≈ 23 Hz, above the 20 Hz cut-off", {x: 130, y: 715, color: "var(--good)", style: {fontSize: "28px"}});
-      s.s37 = K.stat(s.root, {x: 1200, y: 655, w: 520, value: "3.7 %", label: "worst difference from FV", color: "var(--good)", vsize: 84});
+      s.cut = K.pill(s.root, "its own frequency: 22.7 Hz, above the 20 Hz cut-off", {x: 130, y: 715, color: "var(--good)", style: {fontSize: "28px"}});
+      s.s37 = K.stat(s.root, {x: 1200, y: 655, w: 520, value: "5.1 %", label: "worst difference from FV", color: "var(--good)", vsize: 84});
       s.warn = K.card(s.root, {x: 110, y: 810, w: 820, kind: "warn", title: "Not a cure", size: 30, body: "Softer soil or a deeper basement brings the wobble back."});
       s.rule = K.card(s.root, {x: 980, y: 810, w: 840, kind: "check", title: "The rule", size: 30, body: "Validate every shortcut against FV, on the softest soil."});
       s.T = 0;
     },
     tick(s, t) {
-      const w = TAU * t / PER155, cw = Math.cos(w), sw = Math.sin(w), m = s.T;
-      const F = {uz: (z) => lerpC(F155.sm.uz(z), F155.msm.uz(z), m), soil: (x, z) => lerpC(F155.sm.soil(x, z), F155.msm.soil(x, z), m)};
-      s.B.move(F, cw, sw, U155);
+      const w = TAU * t / PER16, cw = Math.cos(w), sw = Math.sin(w), m = s.T;
+      const F = {uz: (z) => lerpC(F16.sm.uz(z), F16.msm.uz(z), m), soil: (x, z) => lerpC(F16.sm.soil(x, z), F16.msm.soil(x, z), m)};
+      s.B.move(F, cw, sw, U16);
     },
     beats: [
       {say: "The fix is surprisingly cheap: [l]hold the top face of the soil block as well.",
@@ -547,7 +561,7 @@
         e(k) { k.show(k.s.lidL); k.show(k.s.n258.el, {delay: 300}); }},
       {say: "[m]With its lid on, the jelly is stiffer: its wobble moves above the 20 hertz cut-off.",
         m(k) { k.show(k.s.cut); }},
-      {say: "[r]Now the shortcut follows FV within 3.7 percent, at every frequency and every output.",
+      {say: "[r]Now the shortcut follows FV within 5.1 percent, at every frequency and every output.",
         r(k) { k.show(k.s.p.g); k.draw(k.s.lE, 1000, {delay: 300}); k.show(k.s.s37.el, {delay: 400}); }},
       {say: "[w]But it's not a cure: softer soil or a deeper basement brings the wobble back into range.",
         w(k) { k.show(k.s.warn); k.show(k.s.rule, {delay: 400}); }},
@@ -562,14 +576,14 @@
       s.head = K.heading(s.root, "Recap", {x: 120, y: 80, size: "h2"});
       s.list = K.bullets(s.root, [
         {t: "A shortcut can invent a resonance", sub: "the soil trapped in the basement resonates"},
-        {t: "Floor spectra up to 31 % too high", sub: "with no error, and wall forces unchanged"},
+        {t: "Floor spectra up to 16 % too high", sub: "with no error, and wall forces unchanged"},
         {t: "Hold the top too, and validate", sub: "against FV, on the softest soil"},
       ], {x: 120, y: 200, w: 980, num: true, size: 40});
       s.list.items.forEach((li) => { li.style.marginBottom = "40px"; });
       s.q = K.card(s.root, {x: 1150, y: 190, w: 680, kind: "check", title: "Check yourself", size: 32,
-        body: "The shortcut's wall forces are within about 1 % of FV. Can you use it for design?"});
+        body: "The shortcut's wall forces are within about 1&nbsp;% of FV. Can you use it for design?"});
       s.a = K.card(s.root, {x: 1150, y: 470, w: 680, title: "Answer", size: 32,
-        body: "<b>No.</b> Near 15.5 Hz its transfer functions are 2 to 4 times off."});
+        body: "<b>No.</b> Near 16&nbsp;Hz its transfer functions are 2.6&nbsp;to&nbsp;5&nbsp;times off."});
       // the course: eleven lessons, lit one after the other
       s.path = K.g(g, {hidden: true});
       const x0 = 200, dx = 152, y = 790;
@@ -599,13 +613,13 @@
     beats: [
       {say: "[a]A shortcut that holds the basement soil at fewer points can invent a resonance.",
         go(k) { k.show(k.s.head); }, a(k) { k.show(k.s.list.items[0]); }},
-      {say: "[b]Here it pushed floor spectra up to 31 percent too high, with no error.",
+      {say: "[b]Here it pushed floor spectra up to 16 percent too high, with no error.",
         b(k) { k.show(k.s.list.items[1]); }},
       {say: "[c]Hold the top face too, and always validate against FV, on the softest soil.",
         c(k) { k.show(k.s.list.items[2]); }},
       {say: "[q]Check yourself. The shortcut's wall forces are within about 1 percent of FV. Can you use it for design?",
         q(k) { k.show(k.s.q); }, gap: 1500},
-      {say: "[a]No. Near 15.5 hertz its transfer functions are 2 to 4 times off, and its floor spectra too high.",
+      {say: "[a]No. Near 16 hertz its transfer functions are 2.6 to 5 times off, and its floor spectra too high.",
         a(k) { k.show(k.s.a); }},
       {say: "[f]Compute it, check it, and know its limits. Thanks for watching, and good luck with your own SSI models.",
         go(k) { k.show(k.s.path); k.tween(k.s, {L: 10}, 1000, {ease: "linear", delay: 200}); }, f(k) { k.show(k.s.motto, {delay: 300}); }},

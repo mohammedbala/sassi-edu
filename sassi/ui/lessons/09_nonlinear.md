@@ -27,33 +27,33 @@ Each repetition is a cheap **New Structure restart**: the soil impedance of the 
 
 The lesson runs example 6 (a loose backfill block behind an abutment wall, about 5 s) and then builds
 and runs example 7 (a two-storey shear-wall building with eight cracking wall panels at 0.6 g, about
-15-60 s depending on the computer). The iterations need the ANALYS restart files, about 55 MB for
+15-60 s depending on the computer). The iterations need the ANALYS restart files, about 65 MB for
 example 7; the last step deletes them once the iterations are over, and the workspace keeps about
 50 MB.
 
 ## Primary nonlinearity: the free-field column (SOIL)
 
-Example 6 sits in 10 m of medium-dense sand ($V_s = 250\,\text{m/s}$ at low strain) on rock. SOIL runs
+Example 6 sits in 32.5 ft of medium-dense sand ($V_s = 800\,\text{ft/s}$ at low strain) on rock. SOIL runs
 the equivalent-linear site response with the RG 1.60 record scaled to a 0.30 g rock outcrop.
 
 ```sassi
 MDL,ex06,ex06
 TIT,Ex06 - loose backfill behind an embedded wall (equivalent-linear SSI iterations)
-* low-strain sand (sublayers of 1, 1, 2, 2, 2, 2 m) on rock
-L,1,1.0,19.0,500,250,0.02,0.02
-L,2,1.0,19.0,500,250,0.02,0.02
-L,3,2.0,19.0,500,250,0.02,0.02
-L,7,1.0,21.0,1600,800,0.01,0.01
+* low-strain sand (sublayers of 3.25, 3.25, 6.5, 6.5, 6.5, 6.5 ft) on rock
+L,1,3.25,0.120,1600,800,0.02,0.02
+L,2,3.25,0.120,1600,800,0.02,0.02
+L,3,6.5,0.120,1600,800,0.02,0.02
+L,7,3.25,0.130,5200,2600,0.01,0.01
 SITE,0,1,0,20,7,1,0,1,4096,1,0,0.005,8192,1
 WAVE,2,1,1,1,0
-HOUSE,9.81,0,0,2,0,0,0,0,0
+HOUSE,32.2,0,0,2,0,0,0,0,0
 INP,../sassi/data/dynp_library.pre
 SPRO,1,1,Sand
 SPRO,2,2,Sand
 VAR,SANDL,3,4,5,6
 FOREACH,SANDL,SPRO,@SANDL[#],3,Sand
 SPRO,7,7
-SOIL,4000,9.81,1,1,1,8,0.65,1,0
+SOIL,4000,32.2,1,1,1,8,0.65,1,0
 * SOILX,<indir>,<mult>,<max>,<cl>,<file>: rock outcrop scaled to 0.30 g at the top of sublayer 7
 SOILX,0,0,0.3,7,../data/rg160h_030g.acc
 EDUOPT,SOILCUTOFF,15
@@ -76,8 +76,8 @@ outcrop motion at the top of the rock, `EDUOPT,SOILCUTOFF,15` removes Fourier co
 
 ### Why it matters
 The 0.30 g rock outcrop becomes **0.58 g** at the surface. The strain-compatible sand softens with
-depth, from $V_s = 245\,\text{m/s}$ ($G/G_{\max} = 0.96$, 1.4 % damping) at 0.5 m to 148 m/s
-($G/G_{\max} = 0.35$, 10.3 %) at 9 m; the 5 % surface spectrum peaks at 2.20 g at 3.98 Hz. These
+depth, from $V_s = 781\,\text{ft/s}$ ($G/G_{\max} = 0.95$, 1.5 % damping) at 1.6 ft to 467 ft/s
+($G/G_{\max} = 0.34$, 10.7 %) at 29 ft; the 5 % surface spectrum peaks at 2.23 g at 3.31 Hz. These
 properties are the free field of the SSI model of the next step, and `ACC001.TH` is its control
 motion. This is the primary nonlinearity: it is in every SSI analysis whose soil properties come from
 SOIL.
@@ -103,37 +103,37 @@ plot-history: ex06/ACC001.TH
 ## The SSI model: strain-compatible layers and the excavated soil
 
 The SSI site takes the strain-compatible properties of SOIL (FILE88, rounded) as L layers 11-16.
-The wall's excavation is a 4 m × 4 m × 2 m block behind the wall, meshed with 2 × 2 × 2 SOLID
+The wall's excavation is a 13 ft × 13 ft × 6.5 ft block behind the wall, meshed with 2 × 2 × 2 SOLID
 elements; every node of it is an interaction node (flexible volume).
 
 ```sassi
 * strain-compatible site from FILE88 (each embedment layer its own L number)
-L,11,1.0,19.0,489,245,0.014,0.014
-L,12,1.0,19.0,459,230,0.029,0.029
-L,13,2.0,19.0,410,205,0.048,0.048
-L,14,2.0,19.0,361,181,0.072,0.072
-L,15,2.0,19.0,324,162,0.089,0.089
-L,16,2.0,19.0,297,148,0.103,0.103
+L,11,3.25,0.120,1562,781,0.015,0.015
+L,12,3.25,0.120,1459,730,0.030,0.030
+L,13,6.5,0.120,1301,650,0.049,0.049
+L,14,6.5,0.120,1138,569,0.074,0.074
+L,15,6.5,0.120,1015,508,0.092,0.092
+L,16,6.5,0.120,934,467,0.107,0.107
 TOPL,11,12,13,14,15,16
 FREQ,1,4,20,41,61,82,102,123,143,164,184
 FREQ,1,205,225,246,266,287,307,328,369,410,451
 FREQ,1,492,533,573,614
-* nodes at x = 0, 2, 4; y = -2, 0, 2; z = -2, -1, 0, numbered bottom-up
-N,1,0,-2,-2
-N,3,4,-2,-2
+* nodes at x = 0, 6.5, 13; y = -6.5, 0, 6.5; z = -6.5, -3.25, 0 ft, numbered bottom-up
+N,1,0,-6.5,-6.5
+N,3,13,-6.5,-6.5
 FILL,1,3
-NGEN,2,3,1,3,1,0,2,0
-NGEN,2,9,1,9,1,0,0,1
+NGEN,2,3,1,3,1,0,6.5,0
+NGEN,2,9,1,9,1,0,0,3.25
 * excavated soil, one group per embedment layer (MACT = its L number)
 GROUP,1,SOLID
-GTIT,1,excavated soil 0 to -1 m
+GTIT,1,excavated soil 0 to -3.25 ft
 MACT,11
 E,1,10,11,14,13,19,20,23,22
 EGEN,1,1,1
 EGEN,1,3,1,2
 ETYPE,1,4,1,2
 GROUP,2,SOLID
-GTIT,2,excavated soil -1 to -2 m
+GTIT,2,excavated soil -3.25 to -6.5 ft
 MACT,12
 E,1,1,2,5,4,10,11,14,13
 EGEN,1,1,1
@@ -143,8 +143,8 @@ INT,1,27,1,1
 ```
 
 ### What this does
-* L 11-16 are the SOIL results rounded (for example L 11: $V_s = 245\,\text{m/s}$, 1.4 % damping;
-  L 16: 148 m/s, 10.3 %). Each embedment layer has its own L number, and each excavated group uses the L
+* L 11-16 are the SOIL results rounded (for example L 11: $V_s = 781\,\text{ft/s}$, 1.5 % damping;
+  L 16: 467 ft/s, 10.7 %). Each embedment layer has its own L number, and each excavated group uses the L
   number of its layer (`MACT,11`, `MACT,12`).
 * `ETYPE,1,4,1,2` marks elements 1-4 of the active group as **excavated soil** (type 2): they are the
   soil that the flexible-volume method removes; their properties must equal the free field.
@@ -171,14 +171,14 @@ plot-layers
 
 ## The backfill as a nonlinear soil group, and the wall
 
-The loose backfill ($V_s = 160\,\text{m/s}$ at low strain) occupies the same volume as the excavated
+The loose backfill ($V_s = 500\,\text{ft/s}$ at low strain) occupies the same volume as the excavated
 native soil. It is modelled as SOLID elements of the **structure** (type 1) at the same nodes: group
-3, whose shear modulus and damping HOUSE will iterate. The wall is a 0.6 m SHELL in the plane $x = 0$
-carrying 150 t of a bridge deck at its top.
+3, whose shear modulus and damping HOUSE will iterate. The wall is a 2 ft SHELL in the plane $x = 0$
+carrying 330 kips of a bridge deck at its top.
 
 ```sassi
-* the backfill: LOW-STRAIN properties (G_max of the curve): Vp 320, Vs 160 m/s, 2 % damping
-M,2,320,160,18.5,0.02,0.02,3
+* the backfill: LOW-STRAIN properties (G_max of the curve): Vp 1000, Vs 500 ft/s, 2 % damping
+M,2,1000,500,0.120,0.02,0.02,3
 GROUP,3,SOLID
 GTIT,3,backfill (non-linear soil)
 MACT,2
@@ -187,20 +187,20 @@ EGEN,1,1,1
 EGEN,1,3,1,2
 EGEN,1,9,1,4
 ETYPE,1,8,1,1
-* the wall (concrete, 0.6 m) in the plane x = 0
-M,1,3.0E7,0.2,24.0,0.05,0.05,1
+* the wall (concrete, 2 ft) in the plane x = 0
+M,1,576000,0.2,0.150,0.05,0.05,1
 GROUP,4,SHELL
 GTIT,4,wall
 MACT,1
 E,1,1,4,13,10
 EGEN,1,3,1
 EGEN,1,9,1,2
-THICK,1,4,1,0.6
+THICK,1,4,1,2.0
 D,1,25,3,1,ROTX
-* 150 t of the deck on the three top nodes of the wall
-MT,19,490,490,490
-MT,22,490,490,490
-MT,25,490,490,490
+* 330 kips of the deck on the three top nodes of the wall
+MT,19,110,110,110
+MT,22,110,110,110
+MT,25,110,110,110
 * the non-linear soil input (.pin): ESF 0.65; group 3, octahedral strain, start at 0.4 G_ff, curve Sand
 PIN,0.65
 PINGRP,3,1,0.4,1.0,Sand
@@ -209,9 +209,10 @@ PINLIST
 ```
 
 ### What this does
-* `M,2,320,160,18.5,0.02,0.02,3` (type 3: $V_p$, $V_s$) holds the **low-strain** backfill:
-  $G_{\max} = \rho V_s^2 = 48\,\text{MPa}$ is the reference of the $G/G_{\max}$ curve. Never enter
-  strain-compatible values here: the curve would soften them a second time.
+* `M,2,1000,500,0.120,0.02,0.02,3` (type 3: $V_p$, $V_s$) holds the **low-strain** backfill:
+  $G_{\max} = \rho V_s^2 = (0.120/32.2) \times 500^2 = 932\,\text{ksf}$ is the reference of the
+  $G/G_{\max}$ curve. Never enter strain-compatible values here: the curve would soften them a second
+  time.
 * `PIN,0.65` sets the effective-strain factor; `PINGRP,3,1,0.4,1.0,Sand` declares group 3 nonlinear
   with the octahedral shear strain (ISTR 1), starting at $\mathrm{GFAC} = 0.4$ times the free-field
   $G$ at the element and $\mathrm{DFAC} = 1$ times its damping, iterated on the Sand curve.
@@ -265,7 +266,7 @@ files. STRESS then computes the effective strain of every backfill element for e
 and `COMBXYZSTRAIN` combines them.
 
 ```sassi
-POINT,0,2,1.8
+POINT,0,2,5.85
 THFILE,ACC001.TH
 THTIT,SOIL surface motion (rock outcrop 0.30 g)
 MOTION,0,0,0,20,0,0.1,100,301,1,0,1,5000,0,0,0,1,0,0,1
@@ -311,8 +312,8 @@ FOREACH,NLCOMB,@NLCOMB[#]
 
 ### What this does
 * The control motion is the SOIL surface motion `ACC001.TH` (8192 values; records 1-5000, the 20 s
-  motion plus 5 s, leave a quiet zone). `POINT,0,2,1.8`: two embedded layers, central-zone radius
-  $0.9 \times 2\,\text{m}$.
+  motion plus 5 s, leave a quiet zone). `POINT,0,2,5.85`: two embedded layers, central-zone radius
+  $0.9 \times 6.5\,\text{ft}$.
 * Three SITE runs (SV, SH, P), `ANALYS ... <save>` 1 (restart files `COOXqqq` with the soil
   impedance) and `<simul>` 1; `NLSSIRESET` starts a new nonlinear analysis (`ex06.liq` = 0), so this
   HOUSE run uses the `.pin` starting properties.
@@ -328,7 +329,7 @@ COMB_XYZ_STRAIN.
 
 Read the warnings of this step (lesson 10), three of them, and decide:
 
-* SITE, G-05: the deepest sand sublayer (2 m, $V_s = 148\,\text{m/s}$) passes 14.8 Hz, just below the
+* SITE, G-05: the deepest sand sublayer (6.5 ft, $V_s = 467\,\text{ft/s}$) passes 14.4 Hz, just below the
   15.0 Hz cut-off; SITE also notes that the manual recommends more than 20 soil layers for accurate
   Rayleigh and Love modes (here 6). Both are shortcuts that keep the example small; a design model
   would split the sublayers.
@@ -371,13 +372,16 @@ NLSSIITER,NLRUN+NLX+NLY+NLZ+NLCOMB,8
 (absolute). Its history is in `NLSOIL_CONVERGENCE.TXT` and in the HOUSE listing.
 
 ### Why it matters
-The iterations converge in **6 passes** (`NLSOIL_CONVERGENCE.TXT`): $\max\lvert\Delta G/G\rvert$ = 66,
-22, 14, 9.4, 4.0, 2.9 and 1.5 % (iterations 0-6), and the damping changes by 4.7, 1.8, 1.3, 0.8, 0.4,
-0.3 and 0.1 points. The first change is the largest because $\mathrm{GFAC} = 0.4$ started the backfill
-near its own low-strain modulus. The converged backfill (FILE74) has effective octahedral strains of
-0.041-0.053 %, $G/G_{\max} = 0.51\text{–}0.57$ ($G = 25\text{–}27\,\text{MPa}$, a fifth to a quarter
-of the 102-116 MPa of the native soil at the same depth) and 6.4-7.3 % damping. The four elements next
-to the wall ($x = 0$ to 2 m, odd numbers) strain and soften more than the four at the back.
+The iterations converge in **4 passes** (`NLSOIL_CONVERGENCE.TXT`): $\max\lvert\Delta G/G\rvert$ = 74,
+26, 27, 9.8 and 0.7 % (iterations 0-4), and the damping changes by 5.0, 2.0, 2.3, 0.9 and 0.1 points.
+The first change is the largest because $\mathrm{GFAC} = 0.4$ started the backfill near its own
+low-strain modulus. Iteration 2 overshoots: it softens the backfill a little too much, and iteration 3
+stiffens it back (the sign of $\Delta G/G$ in the history turns from negative to positive) before the
+last change of 0.7 %. The converged backfill (FILE74) has effective octahedral strains of
+0.049-0.059 %, $G/G_{\max} = 0.49\text{–}0.53$ ($G = 457\text{–}496\,\text{ksf}$, a fifth to a
+quarter of the 1,990-2,270 ksf of the native soil at the same depth) and 7.0-7.7 % damping. The four
+elements next to the wall ($x = 0$ to 6.5 ft, odd numbers) strain and soften more than the four at the
+back: clearly in the lower level (0.059 against 0.049 %), barely in the upper one.
 
 ### Technical basis
 Row $k$ of `NLSOIL_CONVERGENCE.TXT` compares the properties used in iteration $k$ (FILE78) with the
@@ -398,9 +402,9 @@ sequence pass it before it reaches the strain-compatible state, and how would yo
 
 Answer: when each iteration changes the properties only a little but always in the same direction, the
 change per iteration can fall below 2 % while the sum of the remaining changes is larger. Check the
-trend of the history (monotone and shrinking fast, as here, or slow), and compare the last properties
-with the curve at the last effective strain (FILE74 gives $\gamma_\text{eff}$, $G$ and $\beta$ per
-element).
+trend of the history (shrinking fast, as here after the overshoot of iteration 2, or slow and always of
+the same sign), and compare the last properties with the curve at the last effective strain (FILE74
+gives $\gamma_\text{eff}$, $G$ and $\beta$ per element).
 
 ```action
 open-file: ex06/NLSOIL_CONVERGENCE.TXT
@@ -427,11 +431,11 @@ The X-direction transfer functions of the last iteration (FILE8X) convolved with
 5 % spectra (`DAMP,0.05` of step 1) of nodes 22 and 24.
 
 ### Why it matters
-With the converged backfill the wall top (node 22, carrying the deck) reaches **0.75 g**, while the
+With the converged backfill the wall top (node 22, carrying the deck) reaches **0.77 g**, while the
 back of the backfill (node 24) stays at the free-field 0.58 g. The 5 % spectrum of the wall top peaks
-at 2.67 g at 4.27 Hz, against 2.29 g at 3.98 Hz at node 24 and 2.20 g at 3.98 Hz in the free field.
+at 2.66 g at 3.98 Hz, against 2.30 g at 3.31 Hz at node 24 and 2.23 g at 3.31 Hz in the free field.
 Designing the deck bearing for the free-field motion would underestimate its peak acceleration by
-23 %.
+24 %.
 
 **When do you need near-field iterations?** When the soil next to the structure is clearly different
 from the free field (backfill, an excavation refilled with engineered fill, soft pockets) or strains
@@ -452,16 +456,16 @@ open-listing: MOTION
 
 ## Option NON, part 1: a two-storey shear-wall building
 
-Example 7: a 12 m × 12 m box, two storeys of 4 m, 0.3 m reinforced-concrete walls meshed 3 m × 2 m, on
-a 1.5 m stiff surface mat, on 10 m of stiff soil ($V_s = 400\,\text{m/s}$) over rock. A second model
-in memory (model 1) keeps it apart from example 6.
+Example 7: a 40 ft × 40 ft box, two storeys of 13 ft, 1 ft reinforced-concrete walls meshed 10 ft ×
+6.5 ft, on a 5 ft stiff surface mat, on 32.5 ft of stiff soil ($V_s = 1300\,\text{ft/s}$) over rock.
+A second model in memory (model 1) keeps it apart from example 6.
 
 ```sassi
 ACTM,1
 MDL,ex07,../ex07
 TIT,Ex07 - Option NON: two-storey RC shear-wall building, nonlinear wall panels
-L,1,0.4,19.6,800,400,0.05,0.05
-L,2,1.0,22.0,2400,1200,0.02,0.02
+L,1,1.3,0.125,2600,1300,0.05,0.05
+L,2,3.25,0.140,8000,4000,0.02,0.02
 TOPL,1,1,1,1,1,1,1,1,1,1
 TOPL,1,1,1,1,1,1,1,1,1,1
 TOPL,1,1,1,1,1
@@ -469,12 +473,12 @@ TOPL,1,1,1,1,1
 FREQ,1,4,20,41,61,82,102,123,143,164,184
 FREQ,1,205,225,246,266,287,307,328,348,369,389
 FREQ,1,410,451,492,532,573,655,737,819
-* node(i, j, k) = 25 k + 5 j + i + 1 at x = 3i - 6, y = 3j - 6, z = 2k
-N,1,-6,-6,0
-N,5,6,-6,0
+* node(i, j, k) = 25 k + 5 j + i + 1 at x = 10i - 20, y = 10j - 20, z = 6.5k (ft)
+N,1,-20,-20,0
+N,5,20,-20,0
 FILL,1,5
-NGEN,4,5,1,5,1,0,3,0
-NGEN,4,25,1,25,1,0,0,2
+NGEN,4,5,1,5,1,0,10,0
+NGEN,4,25,1,25,1,0,0,6.5
 * interior nodes of the mid-storey levels are not used
 NDEL,32,34
 NDEL,37,39
@@ -483,17 +487,17 @@ NDEL,82,84
 NDEL,87,89
 NDEL,92,94
 * mat (10 x concrete), slab concrete, and one material per wall panel (M,11 ... M,18): 4 % damping
-M,1,3.0E8,0.2,24.0,0.04,0.04,1
-M,2,3.0E7,0.2,24.0,0.04,0.04,1
+M,1,5760000,0.2,0.150,0.04,0.04,1
+M,2,576000,0.2,0.150,0.04,0.04,1
 VAR,PM,11,12,13,14,15,16,17,18
-FOREACH,PM,M,@PM[#],3.0E7,0.2,24.0,0.04,0.04,1
+FOREACH,PM,M,@PM[#],576000,0.2,0.150,0.04,0.04,1
 GROUP,1,SHELL
 GTIT,1,foundation mat
 MACT,1
 E,1,1,2,7,6
 EGEN,3,1,1
 EGEN,3,5,1,4
-THICK,1,16,1,1.5
+THICK,1,16,1,5.0
 * storey-1 walls: groups 2-5 (South, East, North, West), 4 x 2 shells each
 GROUP,2,SHELL
 GTIT,2,panel 1: storey 1 south wall
@@ -501,60 +505,61 @@ MACT,11
 E,1,1,2,27,26
 EGEN,3,1,1
 EGEN,1,25,1,4
-THICK,1,8,1,0.3
+THICK,1,8,1,1.0
 GROUP,3,SHELL
 GTIT,3,panel 2: storey 1 east wall
 MACT,12
 E,1,5,10,35,30
 EGEN,3,5,1
 EGEN,1,25,1,4
-THICK,1,8,1,0.3
+THICK,1,8,1,1.0
 GROUP,4,SHELL
 GTIT,4,panel 3: storey 1 north wall
 MACT,13
 E,1,21,22,47,46
 EGEN,3,1,1
 EGEN,1,25,1,4
-THICK,1,8,1,0.3
+THICK,1,8,1,1.0
 GROUP,5,SHELL
 GTIT,5,panel 4: storey 1 west wall
 MACT,14
 E,1,1,6,31,26
 EGEN,3,5,1
 EGEN,1,25,1,4
-THICK,1,8,1,0.3
+THICK,1,8,1,1.0
 ```
 
 ### What this does
 The commands come in four groups.
 
 * **Site and frequencies.** `ACTM,1` and `MDL,ex07,../ex07` start a second model in its own
-  directory. The soil is 25 sublayers of 0.4 m ($V_s = 400\,\text{m/s}$, 5 % damping) on rock
-  ($V_s = 1200\,\text{m/s}$); the frequency set has 28 frequencies up to 20 Hz.
-* **Nodes.** `N,1` and `N,5` with `FILL` make the five nodes of the line $y = -6$ at $z = 0$ (3 m
-  apart); `NGEN,4,5,1,5,1,0,3,0` copies them four times 3 m apart in $y$ (the 25 nodes of the mat,
-  numbered with step 5); `NGEN,4,25,1,25,1,0,0,2` copies that level four times 2 m apart in $z$
-  (levels $z$ = 2, 4, 6 and 8 m, nodes 26-125, numbered with step 25). The six `NDEL` remove the nine
-  interior nodes of each mid-storey level, $z = 2\,\text{m}$ (32-34, 37-39, 42-44) and
-  $z = 6\,\text{m}$ (82-84, 87-89, 92-94): only the walls use those levels (CHECK later lists the 18
-  missing numbers as gaps, Warning 1, and AFWRITE writes them with all DOFs fixed: harmless). The
-  floor ($z = 4\,\text{m}$) and roof ($z = 8\,\text{m}$) levels keep all 25 nodes for the slabs.
+  directory. The soil is 25 sublayers of 1.3 ft ($V_s = 1300\,\text{ft/s}$, 5 % damping) on rock
+  ($V_s = 4000\,\text{ft/s}$); the frequency set has 28 frequencies up to 20 Hz.
+* **Nodes.** `N,1` and `N,5` with `FILL` make the five nodes of the line $y = -20$ ft at $z = 0$
+  (10 ft apart); `NGEN,4,5,1,5,1,0,10,0` copies them four times 10 ft apart in $y$ (the 25 nodes of the
+  mat, numbered with step 5); `NGEN,4,25,1,25,1,0,0,6.5` copies that level four times 6.5 ft apart in
+  $z$ (levels $z$ = 6.5, 13, 19.5 and 26 ft, nodes 26-125, numbered with step 25). The six `NDEL` remove
+  the nine interior nodes of each mid-storey level, $z = 6.5\,\text{ft}$ (32-34, 37-39, 42-44) and
+  $z = 19.5\,\text{ft}$ (82-84, 87-89, 92-94): only the walls use those levels (CHECK later lists the
+  18 missing numbers as gaps, Warning 1, and AFWRITE writes them with all DOFs fixed: harmless). The
+  floor ($z = 13\,\text{ft}$) and roof ($z = 26\,\text{ft}$) levels keep all 25 nodes for the slabs.
 * **Materials.** `FOREACH,PM,M,@PM[#],...` defines materials 11 to 18 in one line: identical concrete
-  ($E = 30\,\text{GPa}$, $\nu = 0.2$, 4 % damping), but **one material per wall panel**, because
+  ($E = 576\,000\,\text{ksf} = 4000\,\text{ksi}$, $\nu = 0.2$, 4 % damping), but **one material per
+  wall panel**, because
   Option NON changes $E$ panel by panel. Material 1 (the mat) is ten times stiffer, material 2 is the
   slab concrete.
 * **Elements.** Each wall is one SHELL group with its own material, built the same way: `E` defines
-  the first 3 m × 2 m shell by its four corner nodes, `EGEN,3,1,1` (or `EGEN,3,5,1` for the walls
+  the first 10 ft × 6.5 ft shell by its four corner nodes, `EGEN,3,1,1` (or `EGEN,3,5,1` for the walls
   along y) copies it three times along the wall, and `EGEN,1,25,1,4` copies those four elements
-  one level (node increment 25) up. Storey 1: group 2 (south, $y = -6$), 3 (east), 4 (north),
-  5 (west); `THICK,1,8,1,0.3` gives the 8 elements of the group a thickness of 0.3 m. The mat
+  one level (node increment 25) up. Storey 1: group 2 (south, $y = -20$ ft), 3 (east), 4 (north),
+  5 (west); `THICK,1,8,1,1.0` gives the 8 elements of the group a thickness of 1 ft. The mat
   (group 1) is meshed like the mat of lesson 07.
 
 ### Why it matters
 The panel is the unit of nonlinearity: one wall (or wall segment) of one storey, deforming mostly in
 shear, with one backbone curve and one equivalent-linear modulus. The mesh and the groups must be
 prepared for it: each panel a group of coplanar shells in a vertical plane, with a material of its
-own. Low-rise walls ($\text{height}/\text{length} = 4/12$ here) are shear governed, the case the
+own. Low-rise walls ($\text{height}/\text{length} = 13/40$ here) are shear governed, the case the
 Cheng-Mertz shear model is made for.
 
 ### Technical basis
@@ -576,7 +581,7 @@ plot-model
 
 ## Option NON, part 2: storey 2, slabs, masses and the panel data
 
-The storey-2 walls (groups 6-9), the floor and roof slabs (group 10) with 400 t of equipment each,
+The storey-2 walls (groups 6-9), the floor and roof slabs (group 10) with 875 kips of equipment each,
 then the Option NON data: panels, capacities, backbone curves and the equivalent-linear options.
 
 ```sassi
@@ -586,28 +591,28 @@ MACT,15
 E,1,51,52,77,76
 EGEN,3,1,1
 EGEN,1,25,1,4
-THICK,1,8,1,0.3
+THICK,1,8,1,1.0
 GROUP,7,SHELL
 GTIT,7,panel 6: storey 2 east wall
 MACT,16
 E,1,55,60,85,80
 EGEN,3,5,1
 EGEN,1,25,1,4
-THICK,1,8,1,0.3
+THICK,1,8,1,1.0
 GROUP,8,SHELL
 GTIT,8,panel 7: storey 2 north wall
 MACT,17
 E,1,71,72,97,96
 EGEN,3,1,1
 EGEN,1,25,1,4
-THICK,1,8,1,0.3
+THICK,1,8,1,1.0
 GROUP,9,SHELL
 GTIT,9,panel 8: storey 2 west wall
 MACT,18
 E,1,51,56,81,76
 EGEN,3,5,1
 EGEN,1,25,1,4
-THICK,1,8,1,0.3
+THICK,1,8,1,1.0
 GROUP,10,SHELL
 GTIT,10,floor and roof slabs
 MACT,2
@@ -615,22 +620,22 @@ E,1,51,52,57,56
 EGEN,3,1,1
 EGEN,3,5,1,4
 EGEN,1,50,1,16
-THICK,1,32,1,0.4
+THICK,1,32,1,1.25
 FIXROT
-* 400 t on each slab: 16 t (157 kN) at each of its 25 nodes
-MT,51,157,157,157
+* 875 kips on each slab: 35 kips at each of its 25 nodes
+MT,51,35,35,35
 MTGEN,24,1,51
 MTGEN,1,50,51,75
 INT,1,25,1,1
-POINT,0,0,2.7
-HOUSE,9.81,0,0,2,0,0,0,0,0
+POINT,0,0,9.0
+HOUSE,32.2,0,0,2,0,0,0,0,0
 * ---- Option NON data
 PNLGEN
 PLIST
-* SHEAR,<panel>,<fc>,<fy>,<rho>,<Nu>: f'c 30 MPa, fy 420 MPa, 0.5 % web steel, no axial force
-SHEAR,0,30000,420000,0.005,0
+* SHEAR,<panel>,<fc>,<fy>,<rho>,<Nu>: f'c 4 ksi, fy 60 ksi, 0.5 % web steel, no axial force
+SHEAR,0,4,60,0.005,0
 * BBCGEN,<Panel>,<ShearModel>,<fc>,<fy>,<Pn>,<Nu>,<bre>,<bys>,<CrackingForceLevel>
-BBCGEN,0,1,30000,420000,0.005,0,0,0,0.3
+BBCGEN,0,1,4,60,0.005,0,0,0,0.3
 * EQL,<disp>,<NonLinOpts>,<dampCutoff %>,<dampScale>,<ElasicD>
 EQL,0.8,1,0,0,1
 NONLINMOTDISP
@@ -638,18 +643,19 @@ NONLINMOTDISP
 
 ### What this does
 * **The rest of the structure.** Groups 6-9 are the storey-2 walls, built like those of storey 1 one
-  level higher. Group 10 holds the floor ($z = 4\,\text{m}$) and roof ($z = 8\,\text{m}$) slabs: the 3
-  × 3 m floor mesh is made like the mat, and `EGEN,1,50,1,16` copies its 16 elements 50 node numbers
-  up to the roof (32 elements, 0.4 m thick). `FIXROT` fixes the drilling rotation where only coplanar
-  shells meet (51 nodes inside the mat, the slabs and the walls), since a flat shell has no drilling
-  stiffness. `MT,51,...` with the two `MTGEN` puts 157 kN (16 t) on each of the 25 floor nodes and
+  level higher. Group 10 holds the floor ($z = 13\,\text{ft}$) and roof ($z = 26\,\text{ft}$) slabs:
+  the 10 × 10 ft floor mesh is made like the mat, and `EGEN,1,50,1,16` copies its 16 elements 50 node
+  numbers up to the roof (32 elements, 1.25 ft thick). `FIXROT` fixes the drilling rotation where only
+  coplanar shells meet (51 nodes inside the mat, the slabs and the walls), since a flat shell has no
+  drilling stiffness. `MT,51,...` with the two `MTGEN` puts 35 kips on each of the 25 floor nodes and
   copies them to the 25 roof nodes; the concrete's own weight comes from the materials. `INT`, `POINT`
   and `HOUSE` are those of a surface mat (lesson 07).
 * `PNLGEN` makes one panel per vertical shell group (panels 1-8 = groups 2-9; displacement option 1
   = shear strain from the corners, force option 1 = Cheng-Mertz shear hysteresis); `PLIST` lists
   them with their corners, $L$, $H$, $t$ and material.
-* `SHEAR,0,30000,420000,0.005,0` prints the shear capacity of every panel by ACI 318-08, Wood 1990,
-  Barda 1977 and Gulec-Whittaker 2009 (kN/m², kN).
+* `SHEAR,0,4,60,0.005,0` prints the shear capacity of every panel by ACI 318-08, Wood 1990,
+  Barda 1977 and Gulec-Whittaker 2009 (strengths in ksi, forces in kips: with the gravity 32.2 the
+  model is in British units).
 * `BBCGEN,0,1,...,0.3` builds a 22-point backbone curve for every panel from the ACI 318-08 capacity
   $V_u$: cracking at $0.3\,V_u$ (point 1, on the elastic slope $G A_W$), a smooth rise to $V_u$ at
   0.4 % shear strain, failure at 2 %.
@@ -658,14 +664,15 @@ NONLINMOTDISP
   panel corners to the MOTION and RELDISP requests.
 
 ### Why it matters
-`SHEAR` prints, for each of the identical walls ($h_W = 4\,\text{m}$, $l_W = 12\,\text{m}$,
-$t_W = 0.3\,\text{m}$): ACI 318-08 **12 472 kN**; Wood 1990 1890 kN from its formula, raised to its
-lower bound $6\sqrt{f'_c}\,A_W =$ **9824 kN**; Barda 1977 **11 576 kN**; Gulec-Whittaker 2009
-**7527 kN**. The capacities differ by a factor of 1.7: the choice of the shear-strength model weighs
-as much as the analysis. `BBCGEN` uses ACI: $V_u = 12\,472\,\text{kN}$, cracking at
-$V_\text{cr} = 3742\,\text{kN}$ and $\gamma_\text{cr} = 8.31 \times 10^{-5}$ (on the elastic slope
-$G A_W = 4.5 \times 10^{7}\,\text{kN}$), yield at $\gamma = 0.4\,\%$, failure at
-$(0.02,\ 12\,721\,\text{kN})$. `NONLINMOTDISP` adds the 12 corner nodes (36 MOTION
+`SHEAR` prints, for each of the identical walls ($h_W = 13\,\text{ft}$, $l_W = 40\,\text{ft}$,
+$t_W = 1\,\text{ft}$): ACI 318-08 **2821 kips**; Wood 1990 432 kips from its formula, raised to its
+lower bound $6\sqrt{f'_c}\,A_W =$ **2186 kips** ($f'_c$ in psi, $A_W$ in in²); Barda 1977
+**2608 kips**; Gulec-Whittaker 2009 **1716 kips**. The capacities differ by a factor of 1.6: the
+choice of the shear-strength model weighs as much as the analysis. `BBCGEN` uses ACI:
+$V_u = 2821\,\text{kips}$, cracking at $V_\text{cr} = 846\,\text{kips}$ and
+$\gamma_\text{cr} = 8.82 \times 10^{-5}$ (on the elastic slope
+$G A_W = 9.6 \times 10^{6}\,\text{kips}$), yield at $\gamma = 0.4\,\%$, failure at
+$(0.02,\ 2877\,\text{kips})$. `NONLINMOTDISP` adds the 12 corner nodes (36 MOTION
 requests, 12 RELDISP nodes).
 
 ### Technical basis
@@ -699,7 +706,7 @@ of part 4.
 
 ```action
 plot-model
-explain: BBCGEN,0,1,30000,420000,0.005,0,0,0,0.3
+explain: BBCGEN,0,1,4,60,0.005,0,0,0,0.3
 open-doc: docs/user/OPTION_NON.md#5-shear-capacities-and-backbone-generation-shear-bbcgen
 ```
 
@@ -786,14 +793,14 @@ NONLINMOTDISP
 * The last block runs MOTION once more on the elastic X case for the mat, floor and roof centres
   (nodes 13, 63, 113), keeps the spectra as `EL_*`, and restores the corner requests with `NOUT,0`
   and `NONLINMOTDISP`. `HARMFRAME,FILE8X,8.0,HARM_EL` keeps the steady-state motion of the uncracked
-  building at 8.008 Hz, the computed peak of its roof transfer function (6.35), for the comparison in
+  building at 8.008 Hz, the computed peak of its roof transfer function (6.25), for the comparison in
   part 4: FILE8X is replaced by the iterations.
 
 ### Why it matters
-In the uncracked building the storey-1 walls reach a peak shear strain of 1.51e-4, 1.8 times their
-cracking strain ($\mu = 1.81$ in `Panel_elastic.fmu`); the storey-2 walls stay below it
-($\mu = 0.94$). The elastic run therefore proposes, for the storey-1 walls, $E/E_\text{el} = 0.72$ and
-11.4 % damping (4 % elastic + 7.4 % hysteretic) for the next analysis, while the storey-2 walls keep
+In the uncracked building the storey-1 walls reach a peak shear strain of 1.54e-4, 1.7 times their
+cracking strain ($\mu = 1.75$ in `Panel_elastic.fmu`); the storey-2 walls stay below it
+($\mu = 0.89$). The elastic run therefore proposes, for the storey-1 walls, $E/E_\text{el} = 0.74$ and
+10.9 % damping (4 % elastic + 6.9 % hysteretic) for the next analysis, while the storey-2 walls keep
 their elastic properties. A linear SSI analysis would stop here, with walls that its own results show
 to be cracked.
 
@@ -830,8 +837,8 @@ NOUT,1,1,1,0,0,1,1,13,63,113
 AOPT,0,0,0,0,0,0,0,0,0,0,1,0,0,0
 AFWRITE
 RUNMOTION
-* the steady-state motion of the cracked building at its computed peak (7.0 Hz), as HARM_EL in part 3
-HARMFRAME,FILE8X,7.0,HARM_CR
+* the steady-state motion of the cracked building at its computed peak (7.5 Hz), as HARM_EL in part 3
+HARMFRAME,FILE8X,7.5,HARM_CR
 * done: one more New Structure run (the same FILE8) that deletes the restart files (ANALYSX <delrst>)
 ANALYSX,0,1
 AOPT,0,0,0,0,0,0,0,0,1,0,0,0,0,0
@@ -848,14 +855,14 @@ ANALYSX,0,0
   ANALYS, MOTION + RELDISP × 3, COMBXYZTHD, NONLINEAR; at most 10 passes. (`FCOPY` warns in every pass
   that it replaces `ex07.hou`: that is the intended step.)
 * The next block computes the 5 % spectra of the converged building for the X input, and
-  `HARMFRAME,FILE8X,7.0,HARM_CR` its steady-state motion at 7.007 Hz, the computed peak of its roof
-  transfer function (5.08). Play it after the uncracked building of part 3 (same scale; each
+  `HARMFRAME,FILE8X,7.5,HARM_CR` its steady-state motion at 7.495 Hz, the computed peak of its roof
+  transfer function (5.11). Play it after the uncracked building of part 3 (same scale; each
   animation spans one period of its own frequency). Cracked, the first storey takes the larger share of
   the deformation: per unit control motion the storey drift in X (the difference of the complex
-  amplitudes of the slab centres above and below the storey, nodes 13, 63 and 113) is 2.26 in storey 1
-  against 1.31 in storey 2, where the uncracked building has 2.15 against 1.86.
+  amplitudes of the slab centres above and below the storey, nodes 13, 63 and 113) is 2.47 in storey 1
+  against 1.48 in storey 2, where the uncracked building has 2.10 against 1.79.
 * The last block is housekeeping. The restart files hold the soil impedance (`COOXqqq`) and the
-  factorised system (`COOTKqqq`) of every SSI frequency: 54 MB here, and, for a model with 2,000
+  factorised system (`COOTKqqq`) of every SSI frequency: 66 MB here, and, for a model with 2,000
   interaction nodes, more than 500 MB per frequency for the impedance alone (lesson 10). Once the
   iterations are over they are not needed. `ANALYSX,0,1` sets *Delete Restart Files* (`<delrst>`), a
   New Structure run without `<save>` reproduces the converged FILE8 and then deletes them, and
@@ -863,19 +870,19 @@ ANALYSX,0,0
 
 ### Why it matters
 The iterations converge after **7 passes** (`NONLINEAR_CONVERGENCE.TXT`): $\max\lvert\Delta E/E\rvert$
-= 28.0, 22.9, 17.1, 11.5, 6.6, 4.2, 2.4 and 1.3 % (analyses 0-7), while the damping changes fall
-faster (7.4 to 0.01 points). The converged state (`Panel_EQL_Matl_Prop.txt`, `Panel.fmu`):
+= 25.5, 20.9, 16.1, 11.1, 7.4, 4.0, 2.6 and 1.7 % (analyses 0-7), while the damping changes fall
+faster (6.9 to 0.01 points). The converged state (`Panel_EQL_Matl_Prop.txt`, `Panel.fmu`):
 
-* storey-1 walls: **$E/E_\text{el} = 0.35$**, damping **16.7 %** (4 % + 12.7 % hysteretic), peak
-  shear strain $3.69 \times 10^{-4} = 4.4\,\gamma_\text{cr}$ ($\mu = 4.43$), far below the 0.4 % yield
-  strain; $F_\mu = 3.34$ (the initial stiffness at that strain would give 16 584 kN, the backbone gives
-  4962 kN, 40 % of $V_u$);
-* storey-2 walls: $\mu = 0.84$, elastic ($E/E_\text{el} = 1$, 4 %).
+* storey-1 walls: **$E/E_\text{el} = 0.37$**, damping **16.5 %** (4 % + 12.5 % hysteretic), peak
+  shear strain $3.64 \times 10^{-4} = 4.1\,\gamma_\text{cr}$ ($\mu = 4.13$), far below the 0.4 % yield
+  strain; $F_\mu = 3.14$ (the initial stiffness at that strain would give 3493 kips, the backbone gives
+  1114 kips, 39 % of $V_u$);
+* storey-2 walls: $\mu = 0.82$, elastic ($E/E_\text{el} = 1$, 4 %).
 
-Cracking softens the building: the X spectrum of the floor centre peaks at 5.17 g at 6.76 Hz instead
-of 5.39 g at 7.94 Hz uncracked, the roof centre at 6.68 g at 6.76 Hz instead of 7.39 g at 7.94 Hz.
-Peak accelerations of the converged model: 0.64 g (mat centre), 0.85 g (floor) and 1.12 g (roof). The
-16.7 % damping is above the 7 % that ASCE 4 accepts for cracked concrete (OPTION_NON.md §11): a design
+Cracking softens the building: the X spectrum of the floor centre peaks at 5.04 g at 6.76 Hz instead
+of 5.35 g at 7.94 Hz uncracked, the roof centre at 6.47 g at 6.92 Hz instead of 7.28 g at 7.94 Hz.
+Peak accelerations of the converged model: 0.65 g (mat centre), 0.86 g (floor) and 1.14 g (roof). The
+16.5 % damping is above the 7 % that ASCE 4 accepts for cracked concrete (OPTION_NON.md §11): a design
 analysis would cap it with `<dampCutoff>`.
 
 **When is Option NON warranted?** When the walls are expected to crack under the design motion (high
@@ -920,6 +927,6 @@ open-file: ex07/Panel.fmu
 plot-spectrum: ex07/EL_00063TR_X01.RS, ex07/00063TR_X01.RS, ex07/EL_00113TR_X01.RS, ex07/00113TR_X01.RS | log
 plot-history: ex07/Panel0001.thd, ex07/Panel0001_elastic.thd
 animate: ex07/HARM_EL | deformed 0.3 front | Uncracked at 8.0 Hz
-animate: ex07/HARM_CR | deformed 0.3 front | Cracked at 7.0 Hz
+animate: ex07/HARM_CR | deformed 0.3 front | Cracked at 7.5 Hz
 open-doc: docs/user/OPTION_NON.md#11-tutorial-example-7
 ```

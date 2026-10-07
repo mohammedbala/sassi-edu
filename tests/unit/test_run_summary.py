@@ -1,8 +1,8 @@
 """The run summary window (sassi/ui/runsummary.py, static/summary.js; requirements 7.20, D-W6-12).
 
 After a run the GUI shows the key inputs (from the decks the modules read), the key outputs (from the result files
-they wrote) and their graphs.  Checked on a real run of example 1 (a 4-mass stick on a surface mat): the SSI
-resonance of its transfer functions is 3.49 Hz at the top of the stick (lesson 1, examples/README.md)."""
+they wrote) and their graphs.  Checked on a real run of example 1 (a 4-mass stick on a surface mat, ft, kip, s):
+the SSI resonance of its transfer functions is 3.47 Hz at the top of the stick (lesson 1, examples/README.md)."""
 from __future__ import annotations
 
 import shutil
@@ -47,23 +47,23 @@ def _rows(sections, title_part):
 
 def test_summary_of_example_1(ex01):
     s = RS.summary(ex01.interp, "ex01")
-    assert s["model"]["name"] == "ex01" and s["units"] == "m" and not s["note"]
+    assert s["model"]["name"] == "ex01" and s["units"] == "ft" and not s["note"]
     assert [m["module"] for m in s["modules"]] == ["SITE", "POINT", "HOUSE", "ANALYS", "MOTION", "STRESS", "RELDISP"]
     assert all(m["ok"] and m["errors"] == 0 for m in s["modules"])
     # key inputs, from the decks
     model = _rows(s["inputs"], "Model")
     assert model["Nodes / elements"].startswith("90 / 76") and "81 (243 DOFs); surface foundation" == model["Interaction nodes"]
-    assert model["Structure mass X Y Z"].startswith("5468")
+    assert model["Structure mass X Y Z"].startswith("368.7")          # 11,872 kips / 32.2
     soil = _rows(s["inputs"], "Soil profile")
-    assert soil["Layers"] == "22 to depth 17 m" and soil["Half-space"].startswith("Vs 1000 m/s")
+    assert soil["Layers"] == "22 to depth 55 ft" and soil["Half-space"].startswith("Vs 3300 ft/s")
     motion = _rows(s["inputs"], "input motion")
     assert motion["Input motion"].startswith("rg160h_030g.acc") and motion["Peak, duration"].startswith("0.3239 g, 20 s")
     assert motion["Spectrum damping"] == "2 %, 5 %"
     # key outputs, from the result files: the SSI resonance at the top of the stick
     tf = _rows(s["outputs"], "Transfer functions")
-    assert tf["Largest amplitude"].startswith("13.08 at 3.491 Hz (node 85 X)")
+    assert tf["Largest amplitude"].startswith("13.11 at 3.467 Hz (node 85 X)")
     acc = _rows(s["outputs"], "Peak accelerations")
-    assert acc["Input motion (peak)"] == "0.3239 g" and acc["node 85 X"].startswith("1.288 g")
+    assert acc["Input motion (peak)"] == "0.3239 g" and acc["node 85 X"].startswith("1.278 g")
     rs = next(x for x in s["outputs"] if x["title"].startswith("In-structure response spectra"))
     assert "(5 % damping)" in rs["title"] and rs["rows"][0][0] == "node 85 X"            # the design damping
     rel = _rows(s["outputs"], "Relative displacements")

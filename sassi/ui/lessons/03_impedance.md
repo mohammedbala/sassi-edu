@@ -16,22 +16,23 @@ the **impedance** of the soil at the foundation, numerically for any layering an
 shape, as a full frequency-dependent complex matrix: the real part is the spring, the imaginary part
 the dashpot.
 
-In this lesson you compute it for a case where the closed forms apply: a rigid, massless 12 m × 12 m
-mat (half-width $B = 6\,\text{m}$) on a uniform half-space with $V_s = 200\,\text{m/s}$,
-$\nu = 1/3$, $\rho = 2.0\,\text{t/m}^3$ ($G = 80{,}000\,\text{kPa}$) and 2 % material damping. You
-load the mat with unit forces and moments (a foundation-vibration analysis, as for a machine
-foundation), let ANALYS condense the soil impedance to the six rigid-body degrees of freedom,
-compare the static values with Pais and Kausel, look at how springs and dashpots change with
-frequency, and refine the mesh of interaction nodes.
+In this lesson you compute it for a case where the closed forms apply: a rigid, massless
+39 ft × 39 ft mat (half-width $B = 19.5\,\text{ft}$) on a uniform half-space with
+$V_s = 650\,\text{ft/s}$, $\nu = 1/3$, unit weight $\gamma = 0.125\,\text{kcf}$
+($G = \gamma V_s^2/g = 1{,}640\,\text{ksf}$) and 2 % material damping. You load the mat with unit
+forces and moments (a foundation-vibration analysis, as for a machine foundation), let ANALYS
+condense the soil impedance to the six rigid-body degrees of freedom, compare the static values
+with Pais and Kausel, look at how springs and dashpots change with frequency, and refine the mesh
+of interaction nodes.
 
 ## A uniform half-space as thin layers
 
 ```sassi
 MDL,ex03,ex03
 TIT,Ex03 - rigid square surface foundation, forced vibration and global impedance
-* 24 sublayers of 1 m (4 B deep) of the same soil as the half-space (L 2)
-L,1,1.0,19.62,400,200,0.02,0.02
-L,2,1.0,19.62,400,200,0.02,0.02
+* 24 sublayers of 3.25 ft (4 B deep) of the same soil as the half-space (L 2)
+L,1,3.25,0.125,1300,650,0.02,0.02
+L,2,3.25,0.125,1300,650,0.02,0.02
 TOPL,1,1,1,1,1,1,1,1,1,1
 TOPL,1,1,1,1,1,1,1,1,1,1
 TOPL,1,1,1,1
@@ -48,15 +49,15 @@ explain: SITE,0,1,0,20,2,0,0,1,2048,1,0,0.005,4096,1
 ```
 
 ### What this does
-The uniform half-space is modelled as 24 m of 1 m sublayers (four half-widths deep) of the same soil
-as the half-space (layer type 2), with 20 generated half-space sublayers below. The sublayers pass
-$V_s/(5h) = 40\,\text{Hz}$. The 16 frequencies run from 0.195 to 20.0 Hz. `SITE` runs **Mode 1
-only** (`<mode2>` = 0): a vibration analysis needs the eigen-solutions of the layered soil for the
-point-load problem, but no seismic free field.
+The uniform half-space is modelled as 78 ft of 3.25 ft sublayers (four half-widths deep) of the
+same soil as the half-space (layer type 2), with 20 generated half-space sublayers below. The
+sublayers pass $V_s/(5h) = 40\,\text{Hz}$. The 16 frequencies run from 0.195 to 20.0 Hz. `SITE`
+runs **Mode 1 only** (`<mode2>` = 0): a vibration analysis needs the eigen-solutions of the layered
+soil for the point-load problem, but no seismic free field.
 
 ### Why it matters
 Impedance functions are usually plotted against the dimensionless frequency $a_0 = \omega B/V_s$.
-Here $a_0 = 2\pi f \times 6/200 = 0.188\,f$, so the frequency set covers $a_0 = 0.04$ to 3.8
+Here $a_0 = 2\pi f \times 19.5/650 = 0.188\,f$, so the frequency set covers $a_0 = 0.04$ to 3.8
 ($a_0 = 1$ at 5.3 Hz). The same mat on a stiffer soil would reach the same $a_0$ only at a higher
 frequency: what
 matters is the ratio of the foundation size to the wavelength.
@@ -71,17 +72,17 @@ energy carried away by waves into an unbounded medium, which a rigid base would 
 ## The foundation: interaction nodes and a rigid mat
 
 ```sassi
-* 7 x 7 interaction nodes at 2 m, numbered row by row; node 25 is the centre
-N,1,-6,-6,0
-N,7,6,-6,0
+* 7 x 7 interaction nodes at 6.5 ft, numbered row by row; node 25 is the centre
+N,1,-19.5,-19.5,0
+N,7,19.5,-19.5,0
 FILL,1,7
-NGEN,6,7,1,7,1,0,2,0
+NGEN,6,7,1,7,1,0,6.5,0
 INT,1,49,1,1
 * K node of the links, above the centre
-N,50,0,0,5
-* rigid links: E = 1E5 x G of the soil, massless, 2 m x 2 m section
-M,1,8.0E9,0.25,0.0,0.0,0.0,1
-R,1,4.0,3.333,3.333,2.25,1.333,1.333
+N,50,0,0,16
+* rigid links: E = 1E5 x G of the soil (ksf), massless, 6.5 ft x 6.5 ft section (ft2, ft4)
+M,1,1.64E8,0.25,0.0,0.0,0.0,1
+R,1,42.25,35.21,35.21,251.0,148.8,148.8
 GROUP,1,BEAMS
 GTIT,1,rigid links
 MACT,1
@@ -98,11 +99,11 @@ explain: INT,1,49,1,1
 ```
 
 ### What this does
-`N`, `FILL` and `NGEN` make a 7 × 7 grid of nodes at 2 m spacing on the ground surface ($z = 0$).
+`N`, `FILL` and `NGEN` make a 7 × 7 grid of nodes at 6.5 ft spacing on the ground surface ($z = 0$).
 `INT,<n1>,<n2>,<inc>,<set>` sets the **interaction** flag on nodes 1 to 49. `FOREACH` creates one
 BEAMS element from the centre node 25 to each of the other 48 nodes (the variable `RIM` lists them,
-`#` is the element number); with $E = 8 \times 10^9\,\text{kPa}$, $10^5$ times the soil modulus, and
-zero weight, the mat is rigid and massless, and a load at node 25 moves the whole mat.
+`#` is the element number); with $E = 1.64 \times 10^8\,\text{ksf}$, $10^5$ times the soil modulus,
+and zero weight, the mat is rigid and massless, and a load at node 25 moves the whole mat.
 
 ### Why it matters
 **Interaction nodes are where the soil acts on the structure.** Only their translations couple to
@@ -127,9 +128,9 @@ all nodes with each other.
 ## Point-load solutions: POINT and the central zone
 
 ```sassi
-* POINT,<opmode>,<layer>,<rad>: surface foundation, central-zone radius R0 = 0.9 x 2 m
-POINT,0,0,1.8
-HOUSE,9.81,0,0,2,0,0,0,0,0
+* POINT,<opmode>,<layer>,<rad>: surface foundation, central-zone radius R0 = 0.9 x 6.5 ft
+POINT,0,0,5.85
+HOUSE,32.2,0,0,2,0,0,0,0,0
 FORCE,0
 * SITE, POINT, HOUSE
 AOPT,0,0,0,1,1,1,0,0,0,0,0,0,0,0
@@ -142,18 +143,18 @@ RUNHOUSE
 
 ```action
 open-listing: POINT
-explain: POINT,0,0,1.8
+explain: POINT,0,0,5.85
 open-doc: docs/user/USER_GUIDE.md#84-the-central-zone-radius
 ```
 
 ### What this does
 `POINT,<opmode>,<layer>,<rad>`: `<layer>` = 0 embedded layers (loads only at the ground surface),
-`<rad>` = 1.8 m central-zone radius. `HOUSE,9.81,...` sets gravity (SI units), the ground elevation
-0 and a 3D analysis. `FORCE,0` only initialises the FORCE options. The three modules run in a
-fraction of a second. The POINT listing prints the self-flexibility on the load axis: at 0.195 Hz
-a unit horizontal load moves its own point $4.57 \times 10^{-6}\,\text{m/kN}$, a vertical load
-$3.76 \times 10^{-6}\,\text{m/kN}$; the
-imaginary parts grow with frequency (energy carried away by waves).
+`<rad>` = 5.85 ft central-zone radius. `HOUSE,32.2,...` sets gravity (32.2 ft/s², kip-ft units),
+the ground elevation 0 and a 3D analysis. `FORCE,0` only initialises the FORCE options. The three
+modules run in a fraction of a second. The POINT listing prints the self-flexibility on the load
+axis: at 0.195 Hz a unit horizontal load moves its own point $6.85 \times 10^{-5}\,\text{ft/kip}$, a
+vertical load $5.65 \times 10^{-5}\,\text{ft/kip}$; the imaginary parts grow with frequency (energy
+carried away by waves).
 
 ### Why it matters
 POINT is where the soil springs are born. It solves the layered soil once per load depth for a unit
@@ -335,19 +336,19 @@ open-listing: ANALYS
 ```
 
 ### What this does
-`LLIST` confirms $G = 80{,}000\,\text{kPa}$ ($\rho = 2.0\,\text{t/m}^3$). The first row of FOUNSTIF
-(0.195 Hz, $a_0 = 0.04$) is practically the static stiffness. Compared with Pais and Kausel (1988)
-for a square, $\nu = 1/3$ ($GB = 4.8 \times 10^5\,\text{kN/m}$,
-$GB^3 = 1.728 \times 10^7\,\text{kN\,m}$):
+`LLIST` confirms $G = 1{,}640\,\text{ksf}$ (derived with $g = 32.2\,\text{ft/s}^2$ from
+$\gamma = 0.125\,\text{kcf}$). The first row of FOUNSTIF (0.195 Hz, $a_0 = 0.04$) is practically the
+static stiffness. Compared with Pais and Kausel (1988) for a square, $\nu = 1/3$
+($GB = 3.20 \times 10^4\,\text{kip/ft}$, $GB^3 = 1.216 \times 10^7\,\text{kip\,ft}$):
 
-| | SASSI, 2 m mesh | Pais & Kausel | difference | welded BEM (VP-14) | difference |
+| | SASSI, 6.5 ft mesh | Pais & Kausel | difference | welded BEM (VP-14) | difference |
 |---|---|---|---|---|---|
-| $K_x = K_y$ (kN/m) | $2.82 \times 10^6$ | $5.52\,GB = 2.65 \times 10^6$ | +6.3 % | $5.586\,GB$ | +5.0 % |
-| $K_z$ (kN/m) | $3.58 \times 10^6$ | $7.05\,GB = 3.38 \times 10^6$ | +5.8 % | $7.057\,GB$ | +5.7 % |
-| $K_{xx} = K_{yy}$ (kN m/rad) | $1.24 \times 10^8$ | $6.00\,GB^3 = 1.04 \times 10^8$ | +19.8 % | $6.457\,GB^3$ | +11.4 % |
-| $K_{zz}$ (kN m/rad) | $1.70 \times 10^8$ | $8.31\,GB^3 = 1.44 \times 10^8$ | +18.1 % | $8.588\,GB^3$ | +14.2 % |
+| $K_x = K_y$ (kip/ft) | $1.88 \times 10^5$ | $5.52\,GB = 1.77 \times 10^5$ | +6.3 % | $5.586\,GB$ | +5.0 % |
+| $K_z$ (kip/ft) | $2.39 \times 10^5$ | $7.05\,GB = 2.25 \times 10^5$ | +5.8 % | $7.057\,GB$ | +5.7 % |
+| $K_{xx} = K_{yy}$ (kip·ft/rad) | $8.75 \times 10^7$ | $6.00\,GB^3 = 7.30 \times 10^7$ | +19.8 % | $6.457\,GB^3$ | +11.4 % |
+| $K_{zz}$ (kip·ft/rad) | $1.19 \times 10^8$ | $8.31\,GB^3 = 1.01 \times 10^8$ | +18.1 % | $8.588\,GB^3$ | +14.2 % |
 
-The matrix also has an off-diagonal term $K_{x,yy} = -1.44 \times 10^6\,\text{kN}$: a horizontal
+The matrix also has an off-diagonal term $K_{x,yy} = -3.11 \times 10^5\,\text{kip}$: a horizontal
 force at the mat centre also rocks the mat.
 
 ### Why it matters
@@ -390,8 +391,8 @@ vertical pulse and watch it in the time domain, then read the springs and dashpo
 * MOTION on the vertical load case (FILE8003), response = displacement
 EDUOPT,TFFILE,FILE8003
 MOTIONX,0,0
-MOTION,0,0,0,5,0,0.1,100,301,1000,0,1,0,0,0,0,1,0,0,1
-* the load history: a 5 Hz Ricker wavelet, peak 1 at t = 0.5 s, times the factor 1000 (kN)
+MOTION,0,0,0,5,0,0.1,100,301,225,0,1,0,0,0,0,1,0,0,1
+* the load history: a 5 Hz Ricker wavelet, peak 1 at t = 0.5 s, times the factor 225 (kips)
 THFILE,../data/ricker_5hz.th
 THTIT,Ricker wavelet 5 Hz, peak 1 at t = 0.5 s
 NOUT,3,1,1,0,0,0,1,25
@@ -409,12 +410,12 @@ open-listing: MOTION
 
 ### What this does
 `EDUOPT,TFFILE,FILE8003` makes MOTION read the vertical load case; `MOTIONX,0,0` asks for
-displacements; `MOTION` takes the load history from `THFILE` with the factor `<mult>` = 1000, so the
-mat receives a 1000 kN vertical Ricker pulse; `NOUT` requests the Z history of node 25 (the file is
-called `.ACC` whatever the response type). The load acts upwards (+Z) and so does the mat: it
-moves **0.205 mm** at 0.525 s, just after the load peak at 0.5 s, and stops almost at once: from
-$t = 1\,\text{s}$ on the motion stays below 0.03 % of the peak. The static displacement under
-1000 kN would be $1000/K_z = 0.279\,\text{mm}$.
+displacements; `MOTION` takes the load history from `THFILE` with the factor `<mult>` = 225, so the
+mat receives a 225 kip vertical Ricker pulse; `NOUT` requests the Z history of node 25 (the file is
+called `.ACC` whatever the response type, and the displacement is in ft). The load acts upwards (+Z)
+and so does the mat: it moves **0.00069 ft (0.0083 in)** at 0.525 s, just after the load peak at
+0.5 s, and stops almost at once: from $t = 1\,\text{s}$ on the motion stays below 0.03 % of the
+peak. The static displacement under 225 kips would be $225/K_z = 0.00094\,\text{ft}$ (0.0113 in).
 
 The springs and dashpots across the frequency range (from FOUNSTIF, FOUNDAMP):
 
@@ -430,12 +431,13 @@ The springs and dashpots across the frequency range (from FOUNSTIF, FOUNDAMP):
   which 2 % is the soil's material damping). This is why the pulse dies out at once, and why a
   rocking-dominated building gets much less damping from the soil than a sliding one.
 * The dashpot coefficients (FOUNDASH) become nearly constant above about 4 Hz:
-  $5.95\text{--}6.32 \times 10^4\,\text{kN\,s/m}$ in X against the plane-wave value
-  $\rho V_s A = 5.76 \times 10^4$, $1.05\text{--}1.24 \times 10^5$ in Z against
-  $\rho V_p A = 1.15 \times 10^5$. These are the dashpots of the classical lumped models.
+  $3.97\text{--}4.21 \times 10^3\,\text{kip\,s/ft}$ in X against the plane-wave value
+  $\rho V_s A = 3.84 \times 10^3$, $6.99\text{--}8.27 \times 10^3$ in Z against
+  $\rho V_p A = 7.68 \times 10^3$ ($\rho = \gamma/g$, $A = 39 \times 39\,\text{ft}^2$). These are the
+  dashpots of the classical lumped models.
 * The springs soften with frequency (rocking by 29 % at 8 Hz). A single constant spring is a
   compromise; SASSI uses the correct value at each frequency.
-* The dynamic peak (0.205 mm) is below the static value (0.279 mm): the pulse has its energy around
+* The dynamic peak (0.0083 in) is below the static value (0.0113 in): the pulse has its energy around
   5 Hz, where $\lvert K\rvert$ is larger than the static stiffness because of the damping term.
 
 On a layered site (lesson 4) the picture changes: a soft layer over much stiffer soil traps waves.
@@ -479,7 +481,7 @@ higher $a_0$ (30 % at 8 Hz here).
 
 ## The mesh of interaction nodes
 
-The 2 m mesh was too stiff. Halve the spacing and compute the impedance again; only the soil
+The 6.5 ft mesh was too stiff. Halve the spacing and compute the impedance again; only the soil
 impedance is needed, so a seismic run with the global impedance option is enough.
 
 ```sassi
@@ -487,16 +489,16 @@ impedance is needed, so a seismic run with the global impedance option is enough
 CPMODEL,2
 ACTM,2
 MDL,ex03f,../ex03_fine
-TIT,Ex03 - 12 m x 12 m mat, 1 m mesh of interaction nodes
+TIT,Ex03 - 39 ft x 39 ft mat, 3.25 ft mesh of interaction nodes
 GDEL,1
 NDEL,1,50
 FDEL,25
 MMDEL,25
-* 13 x 13 interaction nodes at 1 m, a stiff massless SHELL mat (the structure only closes the model)
-N,1,-6,-6,0
-N,13,6,-6,0
+* 13 x 13 interaction nodes at 3.25 ft, a stiff massless SHELL mat (it only closes the model)
+N,1,-19.5,-19.5,0
+N,13,19.5,-19.5,0
 FILL,1,13
-NGEN,12,13,1,13,1,0,1,0
+NGEN,12,13,1,13,1,0,3.25,0
 INT,1,169,1,1
 GROUP,1,SHELL
 GTIT,1,rigid mat
@@ -504,10 +506,10 @@ MACT,1
 E,1,1,2,15,14
 EGEN,11,1,1
 EGEN,11,13,1,12
-THICK,1,144,1,2.0
+THICK,1,144,1,6.5
 FIXROT
-* R0 = 0.9 x 1 m; a free field (Mode 2, vertical SV) so that ANALYS can run a seismic case
-POINT,0,0,0.9
+* R0 = 0.9 x 3.25 ft; a free field (Mode 2, vertical SV) so that ANALYS can run a seismic case
+POINT,0,0,2.925
 SITE,0,1,0,20,2,1,0,1,2048,1,0,0.005,4096,1
 WAVE,2,1,1,1,0
 ANALYS,0,0,0,0,1,0,0,0,0,0,2
@@ -531,11 +533,11 @@ The 32 commands form five groups:
 
 1. **Copy and clear** (`CPMODEL` ... `MMDEL`): copy the model to a new directory; `GDEL` deletes
    the links (group and elements), `NDEL` the 50 nodes, `FDEL`/`MMDEL` the last load.
-2. **New interaction nodes** (`N`, `FILL`, `NGEN`, `INT`): a 13 × 13 grid at 1 m replaces the
+2. **New interaction nodes** (`N`, `FILL`, `NGEN`, `INT`): a 13 × 13 grid at 3.25 ft replaces the
    7 × 7 grid.
-3. **A mat to close the model** (`GROUP` ... `FIXROT`): 144 stiff, massless SHELL elements 2 m
+3. **A mat to close the model** (`GROUP` ... `FIXROT`): 144 stiff, massless SHELL elements 6.5 ft
    thick (material 1, `E`/`EGEN` as in lesson 4), with `FIXROT` for the drilling rotations.
-4. **Module options**: $R_0$ becomes 0.9 m (`POINT`). Because the global impedance depends only on
+4. **Module options**: $R_0$ becomes 2.925 ft (`POINT`). Because the global impedance depends only on
    the soil at the interaction nodes, a seismic run (SITE Mode 2 plus a vertical SV wave) with
    `<impe>` = 2 gives it without load cases.
 5. **Run** SITE, POINT, HOUSE and ANALYS: 169 interaction nodes (507 interaction DOFs) take
@@ -543,18 +545,18 @@ The 32 commands form five groups:
 
 The static stiffnesses (first row of `ex03_fine/FOUNSTIF`), compared with the welded BEM of VP-14:
 
-| | 2 m mesh | 1 m mesh | welded BEM |
+| | 6.5 ft mesh | 3.25 ft mesh | welded BEM |
 |---|---|---|---|
-| $K_x$ | +5.0 % | +4.6 % | $2.68 \times 10^6\,\text{kN/m}$ |
-| $K_z$ | +5.7 % | +5.1 % | $3.39 \times 10^6\,\text{kN/m}$ |
-| $K_{xx}$ | +11.4 % | +7.1 % | $1.12 \times 10^8\,\text{kN\,m/rad}$ |
-| $K_{zz}$ | +14.2 % | +10.1 % | $1.48 \times 10^8\,\text{kN\,m/rad}$ |
+| $K_x$ | +5.0 % | +4.6 % | $1.79 \times 10^5\,\text{kip/ft}$ |
+| $K_z$ | +5.7 % | +5.1 % | $2.26 \times 10^5\,\text{kip/ft}$ |
+| $K_{xx}$ | +11.4 % | +7.1 % | $7.85 \times 10^7\,\text{kip\,ft/rad}$ |
+| $K_{zz}$ | +14.2 % | +10.1 % | $1.04 \times 10^8\,\text{kip\,ft/rad}$ |
 
 ### Why it matters
 Halving the interaction-node spacing reduces the rocking and torsion errors by a third; the
 translations, already close, change less. What remains comes from the vertical discretisation
-(1 m soil sublayers) as well: see Try this. In a real model the interaction-node spacing is set by
-the basemat or excavation mesh, so check it the way you check any FE mesh: by refinement, on the
+(3.25 ft soil sublayers) as well: see Try this. In a real model the interaction-node spacing is set
+by the basemat or excavation mesh, so check it the way you check any FE mesh: by refinement, on the
 quantities that matter (here the rocking stiffness, which governs the SSI frequency of a tall
 building).
 
@@ -565,13 +567,13 @@ uses 16 to 32 cells per side and extrapolates
 ([VP-14](docs/verification/VERIFICATION_MANUAL.md#vp-14)).
 
 ### Try this
-Also halve the soil sublayers (48 sublayers of 0.5 m to the same 24 m depth) and rerun SITE, POINT,
-HOUSE and ANALYS in this model: the errors against the welded BEM drop to +2.6 % ($K_x$), +3.8 %
-($K_z$), +4.1 % ($K_{xx}$) and +5.8 % ($K_{zz}$). Both the horizontal (interaction nodes) and the
-vertical (sublayers) discretisation stiffen the soil.
+Also halve the soil sublayers (48 sublayers of 1.625 ft to the same 78 ft depth) and rerun SITE,
+POINT, HOUSE and ANALYS in this model: the errors against the welded BEM drop to +2.6 % ($K_x$),
++3.8 % ($K_z$), +4.1 % ($K_{xx}$) and +5.8 % ($K_{zz}$). Both the horizontal (interaction nodes) and
+the vertical (sublayers) discretisation stiffen the soil.
 
 ```sassi-show
-L,1,0.5,19.62,400,200,0.02,0.02
+L,1,1.625,0.125,1300,650,0.02,0.02
 TOPL,0
 VAR,HALF,1,2,3,4,5,6,7,8
 FOREACH,HALF,TOPL,1,1,1,1,1,1

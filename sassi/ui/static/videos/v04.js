@@ -3,8 +3,8 @@
  * SASSI chain turns it into floor spectra, displacements and forces; the frequency drops from 5 to 3.5 Hz mostly
  * because the mat rocks on the soil, and the peak stays high because rocking radiates almost no energy here.
  * Numbers: sassi/ui/lessons/04_surface_ssi.md; curves: d04.js (the lesson's run, python -m sassi.ui.video_data).
- * Pictures to scale (20 m mat, 5 m storeys, 5 m sand on 12 m gravel); every moving picture is the computed
- * steady state for 1 mm of ground motion, all displacements x 400, slowed down 7 times. */
+ * Units: ft, kip, s.  Pictures to scale (64 ft mat, 16 ft storeys, 16 ft sand on 39 ft gravel); every moving
+ * picture is the computed steady state for 0.04 in of ground motion, all displacements x 400, slowed down 7 times. */
 "use strict";
 
 (function () {
@@ -23,50 +23,51 @@
     return [o.amp[i] * Math.cos(o.ph[i]), o.amp[i] * Math.sin(o.ph[i])];
   }
   /** Steady state at 3.49 Hz per unit control motion (MOTION output of the run): mat centre X (node 41), floors X
-   *  (82..85), and the rocking theta = uz(37) / 10 m (node 37 is the mat edge at x = -10 m). */
+   *  (82..85), and the rocking theta = uz(37) / 32 ft (node 37 is the mat edge at x = -32 ft). */
   const HM = {
     mat: tfAt("00041TR_X.TFU", 3.49),
     fl: ["00082TR_X.TFU", "00083TR_X.TFU", "00084TR_X.TFU", "00085TR_X.TFU"].map((n) => tfAt(n, 3.49)),
-    th: Cx.scale(tfAt("00037TR_Z.TFU", 3.49), 1 / 10),
+    th: Cx.scale(tfAt("00037TR_Z.TFU", 3.49), 1 / 32),
   };
-  /** The same stick clamped to rigid ground (lesson 4: E = 3e7 kPa, I = 200 m4, shear area 10 m2, 5 m storeys,
-   *  1000 t per floor, 5 % hysteretic damping): floor motion relative to the base per unit base motion at
-   *  5.05 Hz, its first mode (roof 13.4, as lesson 1's fixed-base run). */
+  /** The same stick clamped to rigid ground (lesson 4: E = 576,000 ksf, I = 23,000 ft4, shear area 108 ft2,
+   *  16 ft storeys, 2,200 kips per floor, 5 % hysteretic damping; kip, ft, s): floor motion relative to the base
+   *  per unit base motion at 4.97 Hz, its first mode (4.99 Hz elastic; roof 13.4, as lesson 1's fixed-base run). */
   const HFB = (function () {
-    const E = 3.0e7, I = 200, GAs = (3.0e7 / 2.4) * 10, z = [5, 10, 15, 20], m = 1000, w = TAU * 5.05;
+    const E = 576000, I = 23000, GAs = (576000 / 2.4) * 108, z = [16, 32, 48, 64], m = 2200 / 32.2, w = TAU * 4.97;
     const flex = z.map((zi) => z.map((zj) => { const a = Math.min(zi, zj), b = Math.max(zi, zj); return a * a * (3 * b - a) / (6 * E * I) + a / GAs; }));
     const cols = z.map((_, j) => PH.csolve(flex.map((r) => r.map((v) => [v, 0])), z.map((_, i) => [i === j ? 1 : 0, 0])).x);
     const cf = PH.cfac(0.05);
     const A = z.map((_, i) => z.map((_, j) => Cx.sub(Cx.scale(cf, cols[j][i][0]), [i === j ? w * w * m : 0, 0])));
     return PH.csolve(A, z.map(() => [w * w * m, 0])).x;
   })();
-  /** The free field of the site (lesson 2's column) at 3.49 Hz: displacement at depth z (m) per unit surface motion. */
+  /** The free field of the site (lesson 2's column) at 3.49 Hz: displacement at depth z (ft) per unit surface motion. */
   const WV = PH.columnWaves(PH.COLUMN, 3.49);
   const colU = (z) => PH.columnU(WV, PH.COLUMN, z);
   // foundation impedance of the run (FOUNSTIF, FOUNDAMP): sliding X and rocking about Y
   const imp = {f: F("FOUNDAMP").cols[0], dx: F("FOUNDAMP").cols[1], dyy: F("FOUNDAMP").cols[29],
     kx: F("FOUNSTIF").cols[1], kyy: F("FOUNSTIF").cols[29]};
   const iF = (f) => { let i = 0; imp.f.forEach((v, j) => { if (Math.abs(v - f) < Math.abs(imp.f[i] - f)) i = j; }); return i; };
-  // soil flexibility for a push at the roof (h = 20 m), mm per MN: 1/Kx = 0.068 and h^2/Kyy = 0.235 (lesson 4)
+  // soil flexibility for a push at the roof (h = 64 ft), in per 1,000 kips: 1/Kx = 0.0119 and h^2/Kyy = 0.0416 (lesson 4)
   const i349 = iF(3.49);
-  const FLEX = {slide: 1e6 / imp.kx[i349], rock: 4e8 / imp.kyy[i349]};
+  const FLEX = {slide: 12e3 / imp.kx[i349], rock: 12e3 * 64 * 64 / imp.kyy[i349]};
 
   // ---------------------------------------------------------------- the stick on its mat, to scale
   const XD = 400;                                   // displacement exaggeration of every moving picture
+  const UG = 0.04 / 12;                             // ground motion of every moving picture: 0.04 in, in ft
   const TV = 2.0;                                   // visual period at 3.49 Hz (s): slowed down 7 times
-  const CAP = "computed at 3.49 Hz: ground motion 1 mm, displacements × 400, slowed down 7 ×";
-  const CAPFB = "computed at 5.05 Hz: ground motion 1 mm, displacements × 400, slowed down 7 ×";
+  const CAP = "computed at 3.49 Hz: ground motion 0.04 in, displacements × 400, slowed down 7 ×";
+  const CAPFB = "computed at 4.97 Hz: ground motion 0.04 in, displacements × 400, slowed down 7 ×";
   /** The stick of example 1 on its mat over the site, with sliding and rocking springs (r.springs) and dashpots
-   *  (r.dashes), both hidden.  o: x (centre), y (top of the mat), s (px per metre), soilW, soilHidden, hsH (px of
-   *  half-space shown).  Displacements: o.A = px per mm of ground motion (XD x s / 1000). */
+   *  (r.dashes), both hidden.  o: x (centre), y (top of the mat), s (px per foot), soilW, soilHidden, hsH (px of
+   *  half-space shown).  Displacements: o.A = px for 0.04 in of ground motion (XD x s x UG). */
   function rig(g, o) {
     const r = {o};
-    o.A = XD * o.s / 1000;
-    const half = 10 * o.s, matH = 1.5 * o.s, ys = o.y + matH, yb = ys + (o.springL || 118);
+    o.A = XD * o.s * UG;
+    const half = 32 * o.s, matH = 5 * o.s, ys = o.y + matH, yb = ys + (o.springL || 118);
     r.half = half; r.ys = ys; r.yb = yb;
     r.soil = K.soil(g, {x: o.x - o.soilW / 2, y: ys, w: o.soilW, labels: "inside", labelSize: 24, hidden: o.soilHidden,
-      layers: [{h: 5 * o.s, kind: "sand", name: "sand · 5 m"}, {h: 12 * o.s, kind: "gravel", name: "gravel · 12 m"}],
-      hs: {h: o.hsH || 5 * o.s, kind: "rock", name: "rock"}});
+      layers: [{h: 16 * o.s, kind: "sand", name: "sand · 16 ft"}, {h: 39 * o.s, kind: "gravel", name: "gravel · 39 ft"}],
+      hs: {h: o.hsH || 16 * o.s, kind: "rock", name: "rock"}});
     r.springs = K.g(g, {hidden: true});
     r.dashes = K.g(g, {hidden: true});
     r.vx = [-(half - 30), half - 30]; r.dx = [-(half - 82), half - 82];
@@ -80,18 +81,18 @@
     r.hsp = K.spring(r.springs, r.wx, r.hy[0], o.x - half, r.hy[0], {coils: 5, amp: 9});
     r.hdp = K.dashpot(r.dashes, o.x - half, r.hy[1], r.wx, r.hy[1], {w: 18, cyl: 50});
     r.wall = K.line(r.springs, r.wx, o.y - 30, r.wx, ys + 30, {stroke: "var(--muted)", "stroke-width": 5});
-    r.stick = K.stick(g, {x: o.x, y: o.y, z: [1, 2, 3, 4].map((i) => i * 5 * o.s), matW: 2 * half, matH, r: o.r || 20, slabW: o.slabW || 7 * o.s});
+    r.stick = K.stick(g, {x: o.x, y: o.y, z: [1, 2, 3, 4].map((i) => i * 16 * o.s), matW: 2 * half, matH, r: o.r || 20, slabW: o.slabW || 22 * o.s});
     return r;
   }
   /** Pose the rig at time t: the computed steady state at 3.49 Hz split into its parts, weighted by w = {slide,
-   *  rock, bend, ground} (1 = as computed), plus w.fixed x the clamped stick at 5.05 Hz (hook). */
+   *  rock, bend, ground} (1 = as computed), plus w.fixed x the clamped stick at 4.97 Hz (hook). */
   function pose(r, t, w) {
     const o = r.o, A = o.A, ph = TAU * t / TV, c = Math.cos(ph), sn = Math.sin(ph);
     const re = (z) => z[0] * c - z[1] * sn;
-    const pf = TAU * t / (TV * 3.49 / 5.05), cf = Math.cos(pf), sf = Math.sin(pf), wf = w.fixed || 0;
+    const pf = TAU * t / (TV * 3.49 / 4.97), cf = Math.cos(pf), sf = Math.sin(pf), wf = w.fixed || 0;
     const ug = A * ((w.ground || 0) * c + wf * cf);                       // the ground surface (free field)
     const sway = A * (w.slide * re(HM.mat) + wf * cf), rock = A * w.rock * re(HM.th) / o.s;
-    const bend = HM.fl.map((H, i) => A * w.bend * re(Cx.sub(Cx.sub(H, HM.mat), Cx.scale(HM.th, 5 * (i + 1))))
+    const bend = HM.fl.map((H, i) => A * w.bend * re(Cx.sub(Cx.sub(H, HM.mat), Cx.scale(HM.th, 16 * (i + 1))))
       + A * wf * (HFB[i][0] * cf - HFB[i][1] * sf));
     r.stick.set({sway, rock, bend});
     const sr = Math.sin(rock);
@@ -132,19 +133,19 @@
     build(s) {
       const g = K.g(s.svg);
       s.pic = K.g(g, {hidden: true});
-      s.r = rig(s.pic, {x: 540, y: 520, s: 18, soilW: 760, soilHidden: true, hsH: 80});
+      s.r = rig(s.pic, {x: 540, y: 520, s: 5.625, soilW: 760, soilHidden: true, hsH: 80});
       s.hatch = K.ground(s.pic, 540 - 260, s.r.ys, 520, {color: "var(--ref)"});
-      K.dim(s.pic, 790, 520, 790, 160, "20 m");
+      K.dim(s.pic, 790, 520, 790, 520 - 64 * 5.625, "64 ft");
       s.capF = K.text(g, 540, 975, CAPFB, {cls: "t-small", anchor: "middle", hidden: true});
       s.capS = K.text(g, 540, 975, CAP, {cls: "t-small", anchor: "middle", hidden: true});
-      s.fb = K.stat(s.root, {x: 1080, y: 210, w: 680, value: "5.05", unit: "Hz", label: "clamped to rigid ground", color: "var(--ref)", vsize: 120});
+      s.fb = K.stat(s.root, {x: 1080, y: 210, w: 680, value: "4.97", unit: "Hz", label: "clamped to rigid ground", color: "var(--ref)", vsize: 120});
       s.ssi = K.stat(s.root, {x: 1080, y: 470, w: 680, value: "3.49", unit: "Hz", label: "on real soil", color: "var(--ssi)", vsize: 120});
       s.q = K.heading(s.root, '<span style="color:var(--ssi)">What slows it down?</span>', {x: 1080, y: 770, w: 680, align: "center", size: "h1"});
       s.w = {slide: 0, rock: 0, bend: 0, ground: 0, fixed: 0};
     },
     tick(s, t) {
       pose(s.r, t, s.w);
-      s.hatch.setAttribute("transform", `translate(${s.r.o.A * s.w.fixed * Math.cos(TAU * t / (TV * 3.49 / 5.05))} 0)`);
+      s.hatch.setAttribute("transform", `translate(${s.r.o.A * s.w.fixed * Math.cos(TAU * t / (TV * 3.49 / 4.97))} 0)`);
     },
     beats: [
       {say: "You've built this model before: a four-storey stick on a concrete mat, with heavy floors.",
@@ -182,47 +183,47 @@
       K.defs();
       const g = K.g(s.svg);
       s.head = K.heading(s.root, "Build it like an ANSYS model", {x: 120, y: 70, size: "h2"});
-      const CX = 600, CY = 580, S = 19;
+      const CX = 600, CY = 580, S = 5.9375;           // px per foot
       const P = (x, y, z) => [CX + (x - y) * S * 0.82, CY + (x + y) * S * 0.36 - (z || 0) * S];
       const quad = (gg, pts, a) => K.path(gg, K.d(pts) + "Z", a);
-      // the site of lesson 2 to scale: 5 m of sand on 12 m of gravel (cut, fading out below 9.5 m)
+      // the site of lesson 2 to scale: 16 ft of sand on 39 ft of gravel (cut, fading out below 30 ft)
       s.soil = K.g(g, {hidden: true});
-      const E = 13;
+      const E = 42;
       quad(s.soil, [P(-E, -E, 0), P(E, -E, 0), P(E, E, 0), P(-E, E, 0)], {fill: C.sand, "fill-opacity": 0.32, stroke: "rgba(255,240,215,.35)", "stroke-width": 2});
-      const strips = [[0, -5, C.sand, "sv-pat-sand", 1]].concat([0, 1, 2, 3, 4, 5, 6, 7, 8].map((i) => [-5 - 0.5 * i, -5.5 - 0.5 * i, C.gravel, "sv-pat-gravel", 1 - i / 9]));
+      const strips = [[0, -16, C.sand, "sv-pat-sand", 1]].concat([0, 1, 2, 3, 4, 5, 6, 7, 8].map((i) => [-16 - 1.6 * i, -17.6 - 1.6 * i, C.gravel, "sv-pat-gravel", 1 - i / 9]));
       strips.forEach(([z1, z2, col, pat, op]) => {
         const fr = [P(E, -E, z1), P(E, E, z1), P(E, E, z2), P(E, -E, z2)], fl = [P(-E, E, z1), P(E, E, z1), P(E, E, z2), P(-E, E, z2)];
         quad(s.soil, fr, {fill: col, "fill-opacity": 0.8 * op}); quad(s.soil, fr, {fill: `url(#${pat})`, opacity: op});
         quad(s.soil, fl, {fill: col, "fill-opacity": 0.62 * op}); quad(s.soil, fl, {fill: `url(#${pat})`, opacity: op});
       });
-      K.text(s.soil, P(0, E, -2.5)[0], P(0, E, -2.5)[1] + 10, "sand · 5 m", {cls: "t-label", anchor: "middle", size: 26});
-      K.text(s.soil, P(0, E, -7)[0], P(0, E, -7)[1] + 10, "gravel · 12 m", {cls: "t-label", anchor: "middle", size: 26});
-      // the mat: 20 m x 20 m, 1.5 m thick
-      const M = 10, T = 1.5;
+      K.text(s.soil, P(0, E, -8)[0], P(0, E, -8)[1] + 10, "sand · 16 ft", {cls: "t-label", anchor: "middle", size: 26});
+      K.text(s.soil, P(0, E, -22)[0], P(0, E, -22)[1] + 10, "gravel · 39 ft", {cls: "t-label", anchor: "middle", size: 26});
+      // the mat: 64 ft x 64 ft, 5 ft thick
+      const M = 32, T = 5;
       s.mat = K.g(g, {hidden: true});
       quad(s.mat, [P(M, -M, 0), P(M, M, 0), P(M, M, -T), P(M, -M, -T)], {fill: "#56677d", stroke: C.concrete, "stroke-width": 2});
       quad(s.mat, [P(-M, M, 0), P(M, M, 0), P(M, M, -T), P(-M, M, -T)], {fill: "#435267", stroke: C.concrete, "stroke-width": 2});
       quad(s.mat, [P(-M, -M, 0), P(M, -M, 0), P(M, M, 0), P(-M, M, 0)], {fill: "var(--concrete-fill)", stroke: C.concrete, "stroke-width": 3});
       s.grid = K.g(g, {hidden: true});
       for (let i = 1; i < 8; i++) {
-        const v = -M + 2.5 * i;
+        const v = -M + 8 * i;
         K.path(s.grid, K.d([P(v, -M), P(v, M)]), {stroke: "rgba(223,230,238,.42)", "stroke-width": 2});
         K.path(s.grid, K.d([P(-M, v), P(M, v)]), {stroke: "rgba(223,230,238,.42)", "stroke-width": 2});
       }
-      const rowPts = (j) => K.linspace(-M, M, 9).map((x) => P(x, -M + 2.5 * j));
+      const rowPts = (j) => K.linspace(-M, M, 9).map((x) => P(x, -M + 8 * j));
       s.nodes = K.nodes(g, [].concat(...K.linspace(0, 8, 9).map(rowPts)), {r: 6, color: "var(--ink2)", hidden: true});
       s.irows = K.linspace(0, 8, 9).map((j) => K.nodes(g, rowPts(j), {r: 9, color: C.wave, hidden: true}));
-      // the stick (4 storeys of 5 m) and the floor masses
+      // the stick (4 storeys of 16 ft) and the floor masses
       s.stick = K.g(g, {hidden: true});
-      K.path(s.stick, K.d([P(0, 0, 0), P(0, 0, 20)]), {cls: "struct"});
-      s.masses = [5, 10, 15, 20].map((z) => { const q = P(0, 0, z); return K.circle(g, q[0], q[1], 20, {cls: "mass", fill: "url(#sv-grad-mass)", hidden: true, in: "pop"}); });
+      K.path(s.stick, K.d([P(0, 0, 0), P(0, 0, 64)]), {cls: "struct"});
+      s.masses = [16, 32, 48, 64].map((z) => { const q = P(0, 0, z); return K.circle(g, q[0], q[1], 20, {cls: "mass", fill: "url(#sv-grad-mass)", hidden: true, in: "pop"}); });
       s.labs = K.g(g, {});
       s.labMat = K.text(s.labs, P(M, -M)[0] + 28, P(M, -M)[1] - 8, "shell mat", {cls: "t-label", hidden: true});
-      s.labMat2 = K.text(s.labs, P(M, -M)[0] + 28, P(M, -M)[1] + 26, "20 m × 20 m", {cls: "t-small", hidden: true});
-      s.labMat3 = K.text(s.labs, P(M, -M)[0] + 28, P(M, -M)[1] + 56, "nodes every 2.5 m", {cls: "t-small", hidden: true});
-      s.labStick = K.text(s.labs, CX - 40, P(0, 0, 12.5)[1], "beam stick", {cls: "t-label", anchor: "end", hidden: true});
-      s.labStick2 = K.text(s.labs, CX - 40, P(0, 0, 12.5)[1] + 32, "4 storeys × 5 m", {cls: "t-small", anchor: "end", hidden: true});
-      s.labMass = K.text(s.labs, CX + 40, P(0, 0, 20)[1] + 10, "1000 t per floor", {cls: "t-label", hidden: true});
+      s.labMat2 = K.text(s.labs, P(M, -M)[0] + 28, P(M, -M)[1] + 26, "64 ft × 64 ft", {cls: "t-small", hidden: true});
+      s.labMat3 = K.text(s.labs, P(M, -M)[0] + 28, P(M, -M)[1] + 56, "nodes every 8 ft", {cls: "t-small", hidden: true});
+      s.labStick = K.text(s.labs, CX - 40, P(0, 0, 40)[1], "beam stick", {cls: "t-label", anchor: "end", hidden: true});
+      s.labStick2 = K.text(s.labs, CX - 40, P(0, 0, 40)[1] + 32, "4 storeys × 16 ft", {cls: "t-small", anchor: "end", hidden: true});
+      s.labMass = K.text(s.labs, CX + 40, P(0, 0, 64)[1] + 10, "2,200 kips per floor", {cls: "t-label", hidden: true});
       // right column
       s.ansys = K.card(s.root, {x: 1150, y: 190, w: 650, kind: "ansys", title: "In ANSYS terms", size: 32,
         body: "The same model: shells, beams and point masses."});
@@ -233,11 +234,11 @@
       s.hands = K.label(s.root, "where building and soil meet", {x: 1154, y: 790, size: 32, color: "var(--ink2)", in: "fade"});
     },
     beats: [
-      {say: "[m]Start with the mat: a {20 m|20-metre} square concrete slab, [s]made of shell elements.",
+      {say: "[m]Start with the mat: a {64 ft|64-foot} square concrete slab, [s]made of shell elements.",
         go(k) { k.show(k.s.head); },
         m(k) { k.show(k.s.mat); },
         s(k) { k.show(k.s.grid); k.show(k.s.nodes.g, {delay: 300}); k.show([k.s.labMat, k.s.labMat2, k.s.labMat3], {delay: 200, stagger: 120}); }},
-      {say: "[b]Then the building: a stick of beam elements, [m]with 1000 tonnes at each floor.",
+      {say: "[b]Then the building: a stick of beam elements, [m]with 2,200 kips at each floor.",
         b(k) { k.show([k.s.stick, k.s.labStick, k.s.labStick2]); },
         m(k) { k.show(k.s.masses, {stagger: 140}); k.show(k.s.labMass, {delay: 400}); }},
       {say: "[a]So far, it's exactly the model you'd build in ANSYS.",
@@ -377,26 +378,26 @@
     build(s) {
       const g = K.g(s.svg);
       s.head = K.heading(s.root, "Read the results", {x: 120, y: 70, size: "h2"});
-      // the stick to scale (24 px per metre: 20 m mat, 5 m storeys, 1.5 m mat)
-      const SX = 400, SY = 830, SC = 24;
+      // the stick to scale (7.5 px per foot: 64 ft mat, 16 ft storeys, 5 ft mat)
+      const SX = 400, SY = 830, SC = 7.5;
       s.pic = K.g(g, {hidden: true});
-      K.soil(s.pic, {x: 130, y: SY + 1.5 * SC, w: 540, layers: [{h: 5 * SC, kind: "sand"}], labels: false});
-      s.axis = K.line(s.pic, SX, SY, SX, SY - 20 * SC - 20, {stroke: "rgba(147,161,179,.55)", "stroke-width": 3, "stroke-dasharray": "10 8"});
-      s.stick = K.stick(s.pic, {x: SX, y: SY, z: [5, 10, 15, 20].map((z) => z * SC), matW: 20 * SC, matH: 1.5 * SC, r: 22, slabW: 5 * SC});
-      const yR = SY - 20 * SC;
+      K.soil(s.pic, {x: 130, y: SY + 5 * SC, w: 540, layers: [{h: 16 * SC, kind: "sand"}], labels: false});
+      s.axis = K.line(s.pic, SX, SY, SX, SY - 64 * SC - 20, {stroke: "rgba(147,161,179,.55)", "stroke-width": 3, "stroke-dasharray": "10 8"});
+      s.stick = K.stick(s.pic, {x: SX, y: SY, z: [16, 32, 48, 64].map((z) => z * SC), matW: 64 * SC, matH: 5 * SC, r: 22, slabW: 16 * SC});
+      const yR = SY - 64 * SC;
       s.equip = K.g(g, {hidden: true, in: "pop"});
       K.rect(s.equip, SX + 64, yR - 48, 58, 40, {rx: 6, fill: C.ssi, stroke: "#0a111d", "stroke-width": 3});
       K.text(s.equip, SX + 136, yR - 18, "equipment", {cls: "t-label", color: "var(--ssi)"});
-      // RELDISP: X displacement relative to the mat centre, all floors at their maximum together (t = 1.86 s)
-      const dmm = [4.7, 10.6, 16.9, 23.2], XR = 200, PXMM = XR * SC / 1000;
-      s.dmm = dmm; s.PXMM = PXMM; s.def = 0;
+      // RELDISP: X displacement relative to the mat centre (ft), all floors at their maximum together (t = 1.86 s)
+      const dft = [0.0155, 0.0349, 0.0559, 0.0766], XR = 200, PXFT = XR * SC;
+      s.dft = dft; s.PXFT = PXFT; s.def = 0;
       s.dLab = K.g(g, {hidden: true});
-      K.text(s.dLab, SX + 23.2 * PXMM + 5 * SC / 2 + 18, yR + 10, "23 mm", {cls: "t-label", color: "var(--ssi)", size: 34});
+      K.text(s.dLab, SX + dft[3] * PXFT + 16 * SC / 2 + 18, yR + 10, `${(12 * dft[3]).toFixed(2)} in`, {cls: "t-label", color: "var(--ssi)", size: 34});
       K.text(s.dLab, SX, 190, `relative to the mat, t = 1.86 s, displacements × ${XR}`, {cls: "t-small", anchor: "middle"});
-      // STRESS: the shear at the base of the stick
+      // STRESS: the shear at the base of the stick (6,764 kips, lesson 4)
       s.force = K.g(g, {hidden: true, in: "left"});
       K.arrow(s.force, SX - 220, SY - 50, SX - 26, SY - 50, {color: C.dash, width: 7, head: 24});
-      K.text(s.force, SX - 220, SY - 74, "30 MN", {cls: "t-label", color: "var(--dash)", size: 34});
+      K.text(s.force, SX - 220, SY - 74, "6,800 kips", {cls: "t-label", color: "var(--dash)", size: 34});
       // one plot at a time (right), annotated at the data's own maxima
       const PX = 930, PY = 250, PW = 850, PH = 400;
       s.ta = K.label(s.root, "<span style='font-family:var(--mono)'>MOTION</span> · floor spectra", {x: PX - 30, y: 160, size: 36, color: "var(--ssi)", in: "fade"});
@@ -410,31 +411,31 @@
       K.circle(s.rsPk, s.pa.X(rs.f[ir]), s.pa.Y(rs.sa[ir]), 11, {fill: C.ssi, stroke: "#0a111d", "stroke-width": 3});
       K.text(s.rsPk, s.pa.X(rs.f[ir]) + 26, s.pa.Y(rs.sa[ir]) + 12, `${rs.sa[ir].toFixed(1)} g at ${rs.f[ir].toFixed(1)} Hz`, {cls: "t-label", color: "var(--ssi)", size: 32});
       const thd = F("00085TR_X.THD"), id = argmax(thd.v);
-      s.pb = K.plot(s.svg, {x: PX, y: PY, w: PW, h: PH, xr: [0, 24], yr: [-25, 25], xticks: [0, 6, 12, 18, 24], yticks: [-20, 0, 20],
-        xlabel: "time (s)", ylabel: "roof vs mat (mm)", ylabelOffset: 70});
-      s.thd = s.pb.line(thd.t, thd.v.map((v) => 1000 * v), {color: C.ssi, width: 3, draw: true});
-      s.thdPk = s.pb.dot(thd.t[id], 1000 * thd.v[id], {color: C.ssi, hidden: true, r: 11});
+      s.pb = K.plot(s.svg, {x: PX, y: PY, w: PW, h: PH, xr: [0, 24], yr: [-1, 1], xticks: [0, 6, 12, 18, 24], yticks: [-1, -0.5, 0, 0.5, 1],
+        xlabel: "time (s)", ylabel: "roof vs mat (in)", ylabelOffset: 70});
+      s.thd = s.pb.line(thd.t, thd.v.map((v) => 12 * v), {color: C.ssi, width: 3, draw: true});
+      s.thdPk = s.pb.dot(thd.t[id], 12 * thd.v[id], {color: C.ssi, hidden: true, r: 11});
       const fyi = F("BEAMS_002_00001_FYI.THS"), iy = argmax(fyi.v);
-      s.pc = K.plot(s.svg, {x: PX, y: PY, w: PW, h: PH, xr: [0, 24], yr: [-32, 32], xticks: [0, 6, 12, 18, 24], yticks: [-30, 0, 30],
-        xlabel: "time (s)", ylabel: "base shear (MN)", ylabelOffset: 70});
-      s.fyi = s.pc.line(fyi.t, fyi.v.map((v) => v / 1000), {color: C.dash, width: 3, draw: true});
-      s.fyiPk = s.pc.dot(fyi.t[iy], fyi.v[iy] / 1000, {color: C.dash, hidden: true, r: 11});
+      s.pc = K.plot(s.svg, {x: PX, y: PY, w: PW, h: PH, xr: [0, 24], yr: [-7200, 7200], xticks: [0, 6, 12, 18, 24], yticks: [-6000, 0, 6000],
+        xlabel: "time (s)", ylabel: "base shear (kips)", ylabelOffset: 112});
+      s.fyi = s.pc.line(fyi.t, fyi.v, {color: C.dash, width: 3, draw: true});
+      s.fyiPk = s.pc.dot(fyi.t[iy], fyi.v[iy], {color: C.dash, hidden: true, r: 11});
     },
-    tick(s) { s.stick.set({bend: s.dmm.map((d) => d * s.PXMM * s.def)}); },
+    tick(s) { s.stick.set({bend: s.dft.map((d) => d * s.PXFT * s.def)}); },
     beats: [
       {say: "[m]MOTION gives the floor spectra: how hard equipment on each floor gets shaken.",
         go(k) { k.show([k.s.head, k.s.pic]); },
         m(k) { k.show([k.s.ta, k.s.pa.g]); k.draw(k.s.rs, 1000, {delay: 200}); k.show(k.s.equip, {delay: 400}); }},
-      {say: "[r]At the roof, the spectrum peaks at 8.2 g, [f]right at the new frequency, 3.5 Hz.",
+      {say: "[r]At the roof, the spectrum peaks at 8 g, [f]right at the new frequency, 3.5 Hz.",
         r(k) { k.show(k.s.rsPk); }, f(k) { k.pulse(k.s.rsPk, {amp: 0.08}); }},
-      {say: "[d]RELDISP gives how far each floor moves relative to the mat: [n]23 mm at the roof.",
+      {say: "[d]RELDISP gives how far each floor moves relative to the mat: [n]0.92 inches at the roof.",
         d(k) {
           const s = k.s;
           k.hide([s.ta, s.pa.g, s.equip]); k.show([s.tb, s.pb.g], {delay: 200}); k.draw(s.thd, 1000, {delay: 300});
           k.tween(s, {def: 1}, 1000, {delay: 300});
         },
         n(k) { k.show([k.s.dLab, k.s.thdPk]); }},
-      {say: "[f]STRESS gives the member forces: [n]30 MN of shear at the base of the stick.", hold: 600,
+      {say: "[f]STRESS gives the member forces: [n]6,800 kips of shear at the base of the stick.", hold: 600,
         f(k) { const s = k.s; k.hide([s.tb, s.pb.g]); k.show([s.tc, s.pc.g], {delay: 200}); k.draw(s.fyi, 1000, {delay: 300}); },
         n(k) { k.show([k.s.force, k.s.fyiPk]); }},
     ],
@@ -446,11 +447,11 @@
     build(s) {
       const g = K.g(s.svg);
       s.head = K.heading(s.root, "Why 3.5 Hz?", {x: 120, y: 70, size: "h2"});
-      s.r = rig(g, {x: 500, y: 520, s: 16, soilW: 700, hsH: 80});
+      s.r = rig(g, {x: 500, y: 520, s: 5, soilW: 700, hsH: 80});
       s.cap = K.text(g, 500, 965, CAP, {cls: "t-small", anchor: "middle", hidden: true});
       s.sch = K.text(g, 500, 928, "spring and dashpot symbols: schematic", {cls: "t-small", anchor: "middle", hidden: true});
-      const yR = 520 - 20 * 16;
-      s.h20 = K.dim(g, 740, 520, 740, yR, "20 m", {hidden: true, labelColor: "var(--ink)"});
+      const yR = 520 - 64 * 5;
+      s.h20 = K.dim(g, 740, 520, 740, yR, "64 ft", {hidden: true, labelColor: "var(--ink)"});
       // which part of the computed motion is shown
       s.pS = K.pill(s.root, "the mat slides", {x: 1000, y: 180, color: "var(--spring)", style: {fontSize: "32px"}});
       s.pR = K.pill(s.root, "the mat rocks", {x: 1340, y: 180, color: "var(--spring)", style: {fontSize: "32px"}});
@@ -491,7 +492,7 @@
         b(k) { k.dim(k.s.pS, false); k.show(k.s.bars); k.tween(k.s.bw, {a: 1}, 800); k.show(k.s.barALab, {delay: 400}); }},
       {say: "[x]Rocking lets the roof move 3.5 times more than sliding does.",
         x(k) { k.tween(k.s.bw, {b: 1}, 1000); k.show(k.s.barBLab, {delay: 400}); }},
-      {say: "[h]The roof is 20 m up, so a small tilt at the base becomes a big sway at the top.",
+      {say: "[h]The roof is 64 ft up, so a small tilt at the base becomes a big sway at the top.",
         h(k) { k.show(k.s.h20); k.pulse(k.s.pR, {amp: 0.06}); }},
       {say: "[f]So rocking does most of the softening: that's what takes 5 Hz down to 3.5.", hold: 600,
         f(k) {
@@ -509,10 +510,10 @@
       s.head = K.heading(s.root, "Why the peak stays high", {x: 120, y: 70, size: "h2"});
       // the computed motion on the site, waves spreading into the ground (the waves are schematic)
       s.pic = K.g(g, {hidden: true});
-      s.r = rig(s.pic, {x: 460, y: 520, s: 16, soilW: 680, hsH: 80});
+      s.r = rig(s.pic, {x: 460, y: 520, s: 5, soilW: 680, hsH: 80});
       s.rip = K.ripples(s.pic, {cx: 460, cy: s.r.ys, r0: 40, r1: 330, n: 4, color: C.dash, width: 5, squash: 0.8});
       s.pic.insertBefore(s.rip.g, s.r.springs);
-      K.text(s.pic, 790, s.r.ys + 22 * 16 - 24, "waves: schematic", {cls: "t-small", anchor: "end"});
+      K.text(s.pic, 790, s.r.ys + (16 + 39) * 5 + 80 - 27, "waves: schematic", {cls: "t-small", anchor: "end"});   // near the bottom of the soil
       s.cap = K.text(s.pic, 460, 965, CAP, {cls: "t-small", anchor: "middle"});
       s.radLab = K.text(g, 460, 928, "radiation damping", {cls: "t-label", anchor: "middle", color: "var(--dash)", hidden: true});
       s.ra = 0;
@@ -576,7 +577,7 @@
       s.q = K.card(s.root, {x: 1180, y: 200, w: 640, kind: "check", title: "Check yourself", size: 34,
         body: "A roof component is tuned to 3.6 Hz. Did SSI raise or lower its demand?"});
       s.a = K.card(s.root, {x: 1180, y: 540, w: 640, title: "Answer", size: 34,
-        body: "<b>Raised, about 3 ×:</b> 8.2 g with SSI, 2.8 g on a fixed base."});
+        body: "<b>Raised, about 3 ×:</b> 7.9&nbsp;g with SSI, 2.8&nbsp;g on a fixed base."});
       s.next = K.pill(s.root, "Next · Lesson 5: embedded structures and the flexible-volume method →", {x: 120, y: 880, color: "var(--wave)", style: {fontSize: "30px"}});
     },
     beats: [
@@ -588,7 +589,7 @@
         c(k) { k.show(k.s.list.items[2]); }},
       {say: "[q]Check yourself: a roof component is tuned to 3.6 Hz. Did SSI raise or lower its demand?", gap: 1500,
         q(k) { k.show(k.s.q); }},
-      {say: "[a]It roughly tripled: 8.2 g with SSI, against 2.8 g on a fixed base.",
+      {say: "[a]It roughly tripled: 7.9 g with SSI, against 2.8 g on a fixed base.",
         a(k) { k.show(k.s.a); }},
       {say: "[n]Next: buildings with basements, and how SASSI handles the soil you dig out.",
         n(k) { k.show(k.s.next); }},

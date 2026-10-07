@@ -107,26 +107,26 @@ CRITFREQ,5,50,00041TR_X,ADDM
 * `CRITFREQ,5,50,00085TR_X,ADDF` looks at the peaks of the interpolated roof transfer function
   `00085TR_X.TFI` that are higher than 50 % of its maximum, compares each with the larger of the two
   computed values that bracket it in `00085TR_X.TFU`, and puts the frequency numbers of the peaks that
-  differ by more than 5 % into the variable ADDF. Here: one peak, 3.49 Hz (number 143),
-  $\lvert\mathrm{TFI}\rvert = 13.08$, supported by the computed value 13.08 (difference 0.0 %); ADDF
-  stays empty.
-* On the mat centre (`00041TR_X`) CRITFREQ finds two peaks. The one at 8.72 Hz is supported (0.2 %);
-  the one at 3.39 Hz (number 139) is not: $\lvert\mathrm{TFI}\rvert = 1.71$ against computed
-  neighbours of at most 1.51, 13.0 %, so ADDM = 139. This is the unsupported mat peak that lesson 04
+  differ by more than 5 % into the variable ADDF. Here: one peak, 3.47 Hz (number 142),
+  $\lvert\mathrm{TFI}\rvert = 13.11$, supported by the computed value 13.02 at 3.49 Hz (number 143,
+  difference 0.7 %); ADDF stays empty.
+* On the mat centre (`00041TR_X`) CRITFREQ finds two peaks. The one at 8.89 Hz is supported (0.0 %);
+  the one at 3.37 Hz (number 138) is not: $\lvert\mathrm{TFI}\rvert = 1.70$ against computed
+  neighbours of at most 1.42, 20.2 %, so ADDM = 138. This is the unsupported mat peak that lesson 04
   found by eye.
 
 ### Why it matters
 * **Low-frequency check.** As $f \to 0$ the whole system moves with the free field, so every transfer
   function in the input direction tends to 1. The ANALYS listing reports the largest deviation at the
-  first frequency (0.098 Hz): 0.102 % at node 85. A large deviation points to a modelling error:
+  first frequency (0.098 Hz): 0.103 % at node 85. A large deviation points to a modelling error:
   interaction nodes missing or not connected to the structure, a mechanism, a wrong control direction.
 * **TFU against TFI.** An interpolated peak much higher than its computed neighbours means the
   frequency set does not resolve that peak; a spike between two computed points can be an artefact.
   Either way the ISRS at that frequency rests on interpolation, not on a solution. The check is per
   node and direction: the same frequency set resolves the roof but not the mat centre. Lesson 04's
-  Try this added frequencies around 3.4 Hz, number 139 among them, and computed 1.711 there: the
-  interpolation was right this time, but only the added computed point shows it. The next two steps
-  make this check routine.
+  Try this added five frequencies around 3.4 Hz, among them number 139 (3.39 Hz) next to the flagged
+  138, and computed 1.696 there, the value the interpolation predicted: the interpolation was right
+  this time, but only the added computed points show it. The next two steps make this check routine.
 
 ### Technical basis
 MOTION and STRESS fit, in windows of five consecutive SSI frequencies, the transfer function of a
@@ -154,7 +154,7 @@ explain: CRITFREQ,5,50,00085TR_X,ADDF
 ## Experiment 1: a frequency set that misses the SSI peak
 
 A copy of the model (model 1, directory `ex01c`) with 11 frequencies spaced 1 to 4 Hz apart and
-none at the SSI frequency of the stick (3.49 Hz). SITE, POINT, HOUSE, ANALYS and MOTION run again.
+none at the SSI frequency of the stick (3.47 Hz). SITE, POINT, HOUSE, ANALYS and MOTION run again.
 
 ```sassi
 CPMODEL,1
@@ -186,11 +186,11 @@ the flagged frequency numbers in ADDC; `FCOPY` keeps the result before the next 
 
 ### Why it matters
 With 11 frequencies the computed roof transfer function never sees the resonance: its largest computed
-value is 4.54 at 3.0 Hz. The interpolated one still peaks at 13.09 at 3.49 Hz (13.08 with the full set
-of example 1), and the 5 % roof ISRS hardly changes (8.25 g against 8.24 g, at 3.55 Hz): the two-degree-of-
+value is 4.69 at 3.0 Hz. The interpolated one still peaks at 13.12 at 3.47 Hz (13.11 with the full set
+of example 1), and the 5 % roof ISRS hardly changes (8.04 g against 8.03 g, at 3.55 Hz): the two-degree-of-
 freedom interpolant reconstructed the resonance from points on its flanks. CRITFREQ flags it anyway,
-interpolated 13.09 against computed neighbours of at most 4.54 (188 %), and stores 143 in ADDC. It is
-right to: a peak three times higher than anything computed is a prediction, not a result, until a
+interpolated 13.12 against computed neighbours of at most 4.69 (180 %), and stores 142 in ADDC. It is
+right to: a peak almost three times higher than anything computed is a prediction, not a result, until a
 computed point confirms it.
 
 ### Technical basis
@@ -209,9 +209,9 @@ of the two bracketing SSI frequencies and tol the tolerance in percent (`<tol %>
 ```figure
 freq-interpolation set=coarse modes=2
 This experiment with a stand-in transfer function. On the coarse set no computed point is near
-3.49 Hz, yet the two-degree-of-freedom interpolant recovers the peak, and CRITFREQ flags it because
-no computed value supports it; add the flagged frequency and the flag clears. With three modes the
-interpolant misses the close mode, and it takes a few rounds.
+the SSI peak (about 3.5 Hz), yet the two-degree-of-freedom interpolant recovers the peak, and
+CRITFREQ flags it because no computed value supports it; add the flagged frequency and the flag
+clears. With three modes the interpolant misses the close mode, and it takes a few rounds.
 ```
 
 ```action
@@ -225,7 +225,7 @@ CRITFREQ left the frequency number to add in the variable ADDC. Add it to the se
 check again.
 
 ```sassi
-* append the flagged frequency number (143 = 3.49 Hz) to set 1
+* append the flagged frequency number (142 = 3.47 Hz) to set 1
 FREQ,1,@ADDC[1]
 LFREQ
 AFWRITE
@@ -238,9 +238,9 @@ CRITFREQ,5,50,00085TR_X,ADDC
 ```
 
 ### What this does
-`@ADDC[1]` is the first item of the variable written by CRITFREQ (frequency number 143). `LFREQ`
+`@ADDC[1]` is the first item of the variable written by CRITFREQ (frequency number 142). `LFREQ`
 shows the 12 frequencies in ascending order. After the new run CRITFREQ finds the peak supported by a
-computed value: 13.08 at 3.49 Hz, difference 0.0 %, nothing flagged.
+computed value: 13.11 at 3.47 Hz, difference 0.0 %, nothing flagged.
 
 ### Why it matters
 This is the loop the ACS SASSI workflow prescribes (initiation run, review of the computed against the
@@ -266,9 +266,9 @@ the complete FILE8 exactly).
 Why does the roof transfer function need many frequencies around 3.5 Hz but few between 10 and 20 Hz?
 
 Answer: the response changes fast only near resonances: around the SSI frequency of the stick
-(3.49 Hz) the amplitude rises from about 4.5 to 13 and falls again within about 1 Hz, so the
-interpolation needs computed points close to the peak. Between 10 and 20 Hz the computed roof
-transfer function varies smoothly between 0.74 and 0.87 (`ex01/00085TR_X.TFU`), and a few points
+(3.47 Hz) the computed amplitude rises from 4.7 at 3.0 Hz to 13 and falls back to 4.3 at 4.0 Hz, so
+the interpolation needs computed points close to the peak. Between 10 and 20 Hz the computed roof
+transfer function varies smoothly between 0.76 and 0.88 (`ex01/00085TR_X.TFU`), and a few points
 describe it. Put frequencies where the structure's and the soil column's resonances are,
 and verify with CRITFREQ.
 
@@ -306,12 +306,12 @@ example 1 up to number 410 (10.0 Hz) and runs in its own directory `ex01f`. `ACT
 example 1 the active model again.
 
 ### Why it matters
-The SSI peak is untouched (roof ISRS 8.24 g at 3.55 Hz in both runs) and the zero-period
-accelerations barely move (mat centre 0.361 and 0.365 g, roof 1.290 and 1.288 g at 100 Hz). Between the
+The SSI peak is untouched (roof ISRS 8.03 g at 3.55 Hz in both runs) and the zero-period
+accelerations barely move (mat centre 0.356 and 0.364 g, roof 1.281 and 1.282 g at 100 Hz). Between the
 cut-off and the rigid range, however, the spectra drop: the 5 % ISRS of the mat centre falls at
-10 Hz from 0.95 g to 0.78 g (-18 %), at 12 Hz, the largest drop, from 0.81 g to 0.48 g (-40 %), and
-at 15 Hz from 0.53 g to 0.42 g (-21 %); the roof at 10 Hz from 1.75 g to 1.60 g. Below about 8.5 Hz
-the two runs agree within 5 %. Equipment on the mat with frequencies of 10-15 Hz would be qualified for too little, and
+10 Hz from 0.96 g to 0.79 g (-18 %), at 12 Hz, the largest drop, from 0.82 g to 0.48 g (-41 %), and
+at 15 Hz from 0.51 g to 0.41 g (-20 %); the roof at 10 Hz from 1.77 g to 1.63 g. Below about 8.7 Hz
+the mat-centre and roof spectra of the two runs agree within 5 %. Equipment on the mat with frequencies of 10-15 Hz would be qualified for too little, and
 neither the peak nor the ZPA would warn you. The transfer-function plot shows why: the TFI of the
 10 Hz model stops at 10 Hz.
 
@@ -322,8 +322,8 @@ an ideal low-pass filter on every result. Its choice (User Guide §14 item 9 and
 [03 §2.1](docs/spec/03_guidelines.md)): the frequency content of the control motion, the structural
 modes (the 90 % cumulative modal mass criterion of ASCE 4 Section 3), typically 30-40 Hz for soil and
 60-70 Hz for rock sites, and never above the frequency the mesh passes: soil sublayers and excavation
-elements no thicker than $V_s/(5 f_\text{cut})$ (example 1: 0.5 m sand sublayers pass 120 Hz, 1 m gravel
-sublayers 100 Hz; EDU-10 warns otherwise).
+elements no thicker than $V_s/(5 f_\text{cut})$ (example 1: 1.6 ft sand sublayers pass 125 Hz, 3.25 ft
+gravel sublayers 102 Hz; EDU-10 warns otherwise).
 
 ### Check yourself
 Your equipment is qualified in the 10-30 Hz band and the SSI analysis stopped at 15 Hz to save run
@@ -331,8 +331,8 @@ time. Which part of the ISRS can you use?
 
 Answer: only the part well below 15 Hz, after a check. Between the cut-off and the rigid range the
 ISRS is built from the motion below the cut-off: it is not conservative in general (here a 10 Hz
-cut-off lowered the mat ISRS by 18 % at 10 Hz and 40 % at 12 Hz while the ZPA did not change, and
-only below about 8.5 Hz, 0.85 times the cut-off, did the two runs agree within 5 %). Extend the frequency set
+cut-off lowered the mat ISRS by 18 % at 10 Hz and 41 % at 12 Hz while the ZPA hardly changed, and
+only below about 8.7 Hz, 0.87 times the cut-off, did the mat spectra of the two runs agree within 5 %). Extend the frequency set
 (and check that the soil layers and the mesh pass the new cut-off) or demonstrate by a sensitivity run
 that the band is not affected.
 
@@ -364,8 +364,8 @@ time grows with the cube of the node count. The levers:
   (subtraction method) and FI-EVBN (modified subtraction) use the faces of the excavation, FFV a
   reduced volume; ASCE 4-16 and SRP 3.7.2 require a validation against FV before such a method is used
   in production (the ACS SASSI manual warns that quarter models can hide the instabilities of the
-  subtraction method). Example 2 (lesson 05) shows FI-FSIN with a spurious 6.0 Hz resonance and
-  FI-EVBN within 2.5 % of FV.
+  subtraction method). Example 2 (lesson 05) shows FI-FSIN with a spurious 11 Hz resonance and
+  FI-EVBN within 2.4 % of FV.
 * **Symmetry planes** (`SYMM`): a half or quarter model of a symmetric structure under symmetric or
   antisymmetric loading, one run per input direction; not with incoherency, wave passage or the global
   impedance.
@@ -382,7 +382,7 @@ validated only for stick models on rigid mats (EDU-13 warns).
 * half model about the plane x = 0 for the X input (antisymmetric), nodes 101, 105, 141 in the plane
 SYMM,1,1,101,105,141
 * incoherent motion with wave passage: 2007 hard-rock coherency, no delay, 20 stochastic samples
-HOUSE,9.81,0,0,2,0,1,1,0,0
+HOUSE,32.2,0,0,2,0,1,1,0,0
 WPASS,1e9,0,5
 INCOH,0.1,0.1,0.2,0.5,1,1,0,1,1975,2026,180
 HOUSEX,0,0,20

@@ -48,7 +48,7 @@ ACTM,5
 * optional: a finer wall mesh gives a finer water mesh
 REFINEMODEL
 * offset 12000 >= the building's last node number
-FILLPOOL,1E9,0,1,-1,12000,0
+FILLPOOL,1E8,0,1,-1,12000,0
 ACTM,0
 * every interface node must be found (same number and position)
 LISTPOOLINTER,5
@@ -61,8 +61,8 @@ FIXROT
 (Comments in a `.pre` file are whole lines that start with `*`; there are no inline comments.)
 
 * `FILLPOOL` fills the pool. Here the first Z-level below the wall tops stays empty (`EmptyLevels` = 1,
-  freeboard). The interface springs have a stiffness of 10⁹ along the wall normals (model units: kN/m
-  here) and zero along the walls. No interface-area shells are made (`ShellArea` = −1). The water
+  freeboard). The interface springs have a stiffness of 10⁸ along the wall normals (model units: kip/ft
+  here, §4.4) and zero along the walls. No interface-area shells are made (`ShellArea` = −1). The water
   nodes are numbered from 12001.
 * `LISTPOOLINTER` checks that the wall nodes the springs are attached to still exist in the building,
   with the same number and position.
@@ -72,18 +72,19 @@ FIXROT
 ### 1.2 A tank on its own (as in VP-W1)
 
 ```
-* gravity first: it sets the water density (kN, m, t)
-HOUSE,9.81,0,0,2,0,0,0,0,0
-* ... N / E / THICK commands of the tank walls and floor (SHELL) ...
-* fill up to 2 levels below the wall tops
-FILLPOOL,1E9,0,2
+* gravity first: it sets the water density (kip, ft, s)
+HOUSE,32.2,0,0,2,0,0,0,0,0
+* ... N / E / THICK commands of the tank walls and floor (SHELL), in ft ...
+* fill up to 2 levels below the wall tops; interface springs 1E8 kip/ft
+FILLPOOL,1E8,0,2
 FIXROT
 * interaction nodes: the tank floor only (see 4.8)
 INT,1,63,1,1
 * ... SITE / POINT / ANALYS / FREQ / AOPT, CHECK, AFWRITE, RUNSITE ... RUNANALYS
 ```
 
-The complete model is `tank_lines()` in `sassi/verify/problems/vp_water.py`.
+VP-W1 builds the same kind of model in SI units (`HOUSE,9.81`, springs 10⁹ kN/m): see `tank_lines()` in
+`sassi/verify/problems/vp_water.py`.
 
 ---
 
@@ -139,13 +140,13 @@ The water nodes at the floor level and on the side boundary are attached. The fr
 * For walls that are **not** parallel to a global plane, see §4.7.
 
 **Water material.** A new type-3 M entry (Vp, Vs) holds the D-WAT-01 water in the units implied by the
-HOUSE gravity: kN-m when g < 20, kip-ft otherwise.
+HOUSE gravity: kip-ft when g > 20 (g = 32.2), kN-m otherwise.
 
-* K = 2.2 GPa (2.2 × 10⁶ kPa, or 45,950 ksf);
-* unit weight 9.81 kN/m³ or 0.0624 kcf (62.4 pcf);
+* K = 45,950 ksf (2.2 GPa; 2.2 × 10⁶ kPa in kN-m);
+* unit weight 0.0624 kcf (62.4 pcf; 9.81 kN/m³ in kN-m);
 * G = 10⁻⁸ K, so Vs = 10⁻⁴ Vp;
 * damping 0.5 %;
-* Vp = 1483 m/s (about 4,870 ft/s).
+* Vp ≈ 4,870 ft/s (1,483 m/s).
 
 FILLPOOL prints the material number. For other units, redefine it with
 `M,<n>,<Vp>,<Vs>,<weight>,<Dp>,<Ds>,3`.
@@ -258,7 +259,7 @@ An isotropic elastic solid with bulk modulus K and shear modulus G obeys
 
 If G → 0, the shear term disappears and the only stress is the pressure p = −K ∇·u:
 
-&nbsp;&nbsp;&nbsp;&nbsp;ρ ü = −∇p,  so  p̈ = c² ∇²p with c = √(K/ρ) ≈ 1,480 m/s.
+&nbsp;&nbsp;&nbsp;&nbsp;ρ ü = −∇p,  so  p̈ = c² ∇²p with c = √(K/ρ) ≈ 4,870 ft/s.
 
 This is the **linear acoustic equation** of an inviscid compressible fluid, written in displacements. A
 SOLID with the bulk modulus of water and almost no shear modulus therefore behaves like water, as long
@@ -267,7 +268,7 @@ as nothing excites its (spurious) shear modes; see §4.2.
 ### 3.2 The incompressible limit: Westergaard and Housner
 
 Under seismic excitation the walls move at frequencies far below the compression frequencies of the
-water. The first is f_a = c/(4H), about 74 Hz for H = 5 m of water. In that range the water is
+water. The first is f_a = c/(4H), about 76 Hz for H = 16 ft of water. In that range the water is
 practically incompressible, ∇²p = 0, with these boundary conditions:
 
 * on a wall or the floor, the water follows the wall's normal acceleration: ∂p/∂n = −ρ aₙ (the
@@ -353,8 +354,8 @@ a small double counting.
 ### 4.2 Spurious low-frequency modes
 
 G is small but not zero, so the water has many "shear" modes at very low frequency. With G = 10⁻⁸ K
-they lie below about 0.05 Hz for metre-sized pools. Far above them the water behaves as an inviscid
-fluid (§5).
+(Vs ≈ 0.5 ft/s) they lie below about 0.05 Hz for pools more than a few feet deep. Far above them the
+water behaves as an inviscid fluid (§5).
 
 * Do not interpret the water response below about 0.5 Hz.
 * Do not use f = 0: the static problem is nearly singular.
@@ -378,30 +379,31 @@ The springs impose the normal coupling. They must be stiff compared with the wat
 
 * FILLPOOL prints, per direction, the frequency at which the whole water mass would vibrate on the
   springs alone. Keep it far above the frequencies of interest.
-* The default `Stiff` = 10⁶ is in model units. In kip-ft it is stiff for metre-sized elements; in
-  kN-m it is comparable to the water's own bulk stiffness K × (element size) ≈ 10⁶ kN/m.
-* VP-W1 uses 10⁹ kN/m.
+* The default `Stiff` = 10⁶ is in model units. In kip-ft it is about 10 times the water's own bulk
+  stiffness K × (element size) for 2 ft elements (K h = 45,950 ksf × 2 ft ≈ 9 × 10⁴ kip/ft), which is
+  stiff enough (table below); in kN-m it is only comparable to K h ≈ 10⁶ kN/m (0.5 m elements).
+* The examples of §1 use 10⁸ kip/ft (about 1,000 K h for 2 ft elements); VP-W1 uses 10⁹ kN/m.
 
-At low frequency the result is not very sensitive. In a 0.5 m mesh (L = H = 5 m), F/(m a) changes as
-follows:
+At low frequency the result is not very sensitive. In the 2D slice of §5 with a 2 ft mesh
+(L = H = 16 ft) and an interface spring at every wetted node, F/(m a) changes as follows:
 
 | Stiff / (K h) | 1 Hz | 2 Hz | 5 Hz | 10 Hz |
 |---|---|---|---|---|
-| 0.1 | 0.5075 | 0.5091 | 0.5195 | 0.5617 |
-| 1 | 0.5071 | 0.5075 | 0.5091 | 0.5150 |
-| 10 | 0.5071 | 0.5073 | 0.5081 | 0.5109 |
-| ≥ 100 | 0.5071 | 0.5073 | 0.5080 | 0.5104 |
+| 0.1 | 0.5106 | 0.5114 | 0.5164 | 0.5352 |
+| 1 | 0.5104 | 0.5107 | 0.5118 | 0.5157 |
+| 10 | 0.5104 | 0.5106 | 0.5113 | 0.5138 |
+| ≥ 100 | 0.5104 | 0.5106 | 0.5113 | 0.5136 |
 
 ### 4.5 Mesh
 
 The FE solution converges to the exact potential flow from above, at about O(h²). At 2 Hz, with
-L = H = 5 m:
+L = H = 16 ft (the 2D slice of §5, square elements):
 
 | element size | F/(m a) | error |
 |---|---|---|
-| 1.25 m (4 over the depth) | 0.5333 | +6.7 % |
-| 0.625 m (8 over the depth) | 0.5106 | +2.1 % |
-| 0.3125 m (16 over the depth) | 0.5033 | +0.66 % |
+| 4 ft (4 over the depth) | 0.5333 | +6.7 % |
+| 2 ft (8 over the depth) | 0.5106 | +2.1 % |
+| 1 ft (16 over the depth) | 0.5033 | +0.65 % |
 
 Use about 8–10 water elements over the depth for 2 %. Refine the pool walls with REFINEMODEL before
 FILLPOOL if needed.
@@ -411,8 +413,9 @@ FILLPOOL if needed.
 The incompressible references hold only well below the first compression frequency c/(4H) of the
 water column. As that frequency is approached, the effective mass grows (dynamic amplification):
 
-* for H = 5 m, +1 % at 10 Hz, +3 % at 20 Hz and +6 % at 30 Hz, against 74 Hz;
-* deep pools have lower compression frequencies (12 m of water: 31 Hz).
+* for H = 16 ft (c/(4H) = 76 Hz), F/(m a) is 0.6 % higher at 10 Hz than at 2 Hz, 2.4 % higher at
+  20 Hz and 5.8 % higher at 30 Hz (the §5 slice, G = 10⁻⁸ K row);
+* deep pools have lower compression frequencies (40 ft of water: 30 Hz).
 
 ### 4.7 Oblique walls (D-WAT-01 / OQ-2)
 
@@ -441,31 +444,31 @@ INT (as in VP-W1), or reset the INT flag of the water nodes.
 * The hydrodynamic pressure in a water SOLID is p = −(SXX + SYY + SZZ)/3 (STRESS). With the
   interface-area shells, the spring forces divided by the shell areas give the wall pressures (for
   example, for an ANSYS model).
-* The water material is defined for kN-m or kip-ft. With other units, redefine it with `M`. FILLPOOL
-  warns when the gravity is neither ~9.81 nor ~32.2.
+* The water material is defined for kip-ft or kN-m. With other units, redefine it with `M`. FILLPOOL
+  warns when the gravity is neither ~32.2 nor ~9.81.
 
 ---
 
 ## 5. Choice of the shear modulus (D-WAT-01 amended)
 
 D-WAT-01 proposed ν = 0.49, which is G = 0.0201 K. The table shows why FILLPOOL uses G = 10⁻⁸ K. It
-gives F/(m a) for the 2D slice of tests/unit/test_water_physics.py (L = H = 5 m, 16 × 16 elements,
-exact value 0.500):
+gives F/(m a) for the 2D slice of tests/unit/test_water_physics.py, here in kip-ft with L = H = 16 ft
+(16 × 16 elements, exact value 0.500):
 
 | water model | 0.2 Hz | 0.5 Hz | 1 Hz | 2 Hz | 5 Hz | 10 Hz | 20 Hz | 30 Hz |
 |---|---|---|---|---|---|---|---|---|
-| ν = 0.49 (G = 0.0201 K) | 1.000 | 1.000 | 1.002 | 1.007 | 1.048 | 1.298 | 0.494 | 0.123 |
-| G = 10⁻⁵ K | 1.205 | 0.789 | 0.227 | 0.511 | 0.500 | 0.509 | 0.520 | 0.538 |
-| G = 10⁻⁶ K | 0.293 | 0.508 | 0.496 | 0.503 | 0.508 | 0.511 | 0.521 | 0.539 |
-| G = 10⁻⁷ K | 0.511 | 0.499 | 0.506 | 0.507 | 0.508 | 0.511 | 0.521 | 0.539 |
-| **G = 10⁻⁸ K (FILLPOOL)** | **0.503** | **0.507** | **0.507** | **0.508** | **0.508** | **0.511** | **0.521** | **0.539** |
-| G = 10⁻⁸ K, MOPT,1 (locked) | 1.002 | 1.012 | 1.051 | 1.312 | 0.575 | 0.470 | 0.534 | 0.442 |
+| ν = 0.49 (G = 0.0201 K) | 1.000 | 1.000 | 1.002 | 1.007 | 1.045 | 1.272 | 0.417 | 0.046 |
+| G = 10⁻⁵ K | 1.190 | 0.704 | 1.139 | 0.498 | 0.504 | 0.509 | 0.520 | 0.537 |
+| G = 10⁻⁶ K | 0.686 | 0.475 | 0.490 | 0.503 | 0.508 | 0.510 | 0.520 | 0.537 |
+| G = 10⁻⁷ K | 0.498 | 0.503 | 0.506 | 0.507 | 0.508 | 0.511 | 0.520 | 0.537 |
+| **G = 10⁻⁸ K (FILLPOOL)** | **0.503** | **0.507** | **0.507** | **0.508** | **0.508** | **0.511** | **0.520** | **0.537** |
+| G = 10⁻⁸ K, MOPT,1 (locked) | 1.002 | 1.011 | 1.048 | 1.286 | 0.501 | 0.457 | 0.527 | 0.542 |
 
 What the rows show:
 
-* With ν = 0.49 the "water" is an elastic solid. Its shear modes lie in the seismic band (about 10 Hz
-  for 5 m of water), and below them it moves rigidly with the walls: the whole mass instead of half
-  of it.
+* With ν = 0.49 the "water" is an elastic solid. Its shear modes lie in the seismic band (the first
+  resonance of the slice is near 15 Hz for 16 ft of water), and below them it moves rigidly with the
+  walls: the whole mass instead of half of it.
 * The smaller G is, the lower the spurious modes, and the wider the band in which the water behaves
   as an inviscid fluid.
 * G = 10⁻⁸ K gives that behaviour from 0.2 Hz up.

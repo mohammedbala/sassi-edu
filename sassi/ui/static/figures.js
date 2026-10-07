@@ -131,13 +131,13 @@
 
   // ================================================================== 1. SDOF on sway-rocking springs
   /** One-mode idealisation of the stick of example 1 (lessons 1 and 4): mode 1 of the fixed-base stick
-   *  (M1 = 3063 t, h1 = 15.6 m, 5.05 Hz, beta 5 %; Gamma1 phi1 = 1.34 at the roof), the 20 m x 20 m mat
-   *  (1468 t at grade), and SASSI's impedance of that mat at 3.49 Hz (lesson 4, FOUNSTIF / FOUNDAMP):
-   *  Kx = 1.48e7 kN/m, Ktheta = 1.70e9 kN m/rad, damping ratios 7.7 % (sliding) and 4.9 % (rocking), of
-   *  which 4.8 % is the soil's material damping (hysteretic) and the rest radiation (a dashpot fitted at
-   *  3.49 Hz).  Units: kN, m, t, s. */
-  PH.SSI = {M: 3062.6, h: 15.59, ffb: 5.054, beta: 0.05, m0: 1468, B: 20, Kx: 1.48e7, Kt: 1.70e9,
-    xim: 0.048, xix: 0.077, xit: 0.049, fref: 3.49};
+   *  (M1 = 209.75 kip s2/ft, i.e. 6754 kips, h1 = 49.8 ft, 4.99 Hz elastic, beta 5 %; Gamma1 phi1 = 1.34 at
+   *  the roof), the 64 ft x 64 ft mat (95.4 kip s2/ft, 3072 kips, at grade), and SASSI's impedance of that
+   *  mat at 3.49 Hz (lesson 4, FOUNSTIF / FOUNDAMP): Kx = 1.007e6 kip/ft, Ktheta = 1.182e9 kip ft/rad,
+   *  damping ratios 7.6 % (sliding) and 4.9 % (rocking), of which 4.8 % is the soil's material damping
+   *  (hysteretic) and the rest radiation (a dashpot fitted at 3.49 Hz).  Units: kip, ft, s. */
+  PH.SSI = {M: 209.75, h: 49.84, ffb: 4.987, beta: 0.05, m0: 95.40, B: 64, Kx: 1.007e6, Kt: 1.182e9,
+    xim: 0.048, xix: 0.076, xit: 0.049, fref: 3.49};
   /** The model for a velocity factor s of the site (springs x s^2, dashpots x s). */
   PH.ssiModel = function (s, p) {
     p = Object.assign({}, PH.SSI, p || {});
@@ -184,9 +184,9 @@
   };
 
   // ================================================================== 2. layered soil column (SHAKE)
-  /** Lesson 2 site (example 1): 5 m sand over 12 m gravel over weathered rock; w = unit weight kN/m3. */
-  PH.COLUMN = {g: 9.81, layers: [{h: 5, vs: 300, w: 19.0, beta: 0.05, name: "sand"}, {h: 12, vs: 500, w: 20.0, beta: 0.04, name: "gravel"}],
-    hs: {vs: 1000, w: 21.0, beta: 0.02, name: "weathered rock"}};
+  /** Lesson 2 site (example 1): 16 ft sand over 39 ft gravel over weathered rock; ft, ft/s, w = unit weight kcf. */
+  PH.COLUMN = {g: 32.2, layers: [{h: 16, vs: 1000, w: 0.120, beta: 0.05, name: "sand"}, {h: 39, vs: 1650, w: 0.125, beta: 0.04, name: "gravel"}],
+    hs: {vs: 3300, w: 0.130, beta: 0.02, name: "weathered rock"}};
   /** Complex velocity V* = V (sqrt(1 - beta^2) + i beta) (Theory Eq. 2.2). */
   PH.vstar = (v, beta) => [v * Math.sqrt(1 - beta * beta), v * beta];
   /** Up- and down-going amplitudes E_m, F_m of every layer (the half-space last) at f, with E_1 = F_1 = 1
@@ -398,8 +398,8 @@
     return NaN;
   };
   /** BBCGEN backbone (Theory Section 17): cracking (Vcr/GA, Vcr), 20 points up to the yield (gy, Vu) on
-   *  V = Vcr + (Vu - Vcr)[1 - (1 - xi)^2], failure (0.02, 1.02 Vu).  Lesson 9 wall: Vu = 12 472 kN,
-   *  Vcr = 0.3 Vu, G A_W = 4.5e7 kN (Vcr / gamma_cr with gamma_cr = 8.31e-5). */
+   *  V = Vcr + (Vu - Vcr)[1 - (1 - xi)^2], failure (0.02, 1.02 Vu).  Lesson 9 wall: Vu = 2821 kips,
+   *  Vcr = 0.3 Vu, G A_W = 9.6e6 kips (Vcr / gamma_cr with gamma_cr = 8.82e-5). */
   PH.bbcgen = function (vu, vcr, ga, gy, gf) {
     gy = gy || 0.004; gf = gf || 0.02;
     const gcr = vcr / ga, xs = [gcr], ys = [vcr];
@@ -407,7 +407,7 @@
     xs.push(gf); ys.push(1.02 * vu);
     return {xs, ys};
   };
-  PH.PANEL = {vu: 12472, vcr: 3742, gcr: 8.31e-5};
+  PH.PANEL = {vu: 2821, vcr: 846, gcr: 8.82e-5};
 
   // ================================================================== 6. TF interpolation (Tajirian)
   function quadRoots(a, b, c) {
@@ -536,10 +536,10 @@
   };
 
   // ================================================================== 7. the excavation mesh of lesson 5
-  /** Nodes of the 10 m x 10 m x 5 m excavation (5 x 5 per level at 2.5 m, 6 levels at 1 m, z = -5 ... 0) and
+  /** Nodes of the 32 ft x 32 ft x 16 ft excavation (5 x 5 per level at 8 ft, 6 levels at 3.2 ft, z = -16 ... 0) and
    *  the interaction sets of Theory Section 3.3 (INTGEN 1, 3, 2, 5 with skip 2). */
   PH.boxNodes = function (o) {
-    o = Object.assign({nx: 5, ny: 5, nz: 6, dx: 2.5, dz: 1}, o || {});
+    o = Object.assign({nx: 5, ny: 5, nz: 6, dx: 8, dz: 3.2}, o || {});
     const out = [];
     for (let k = 0; k < o.nz; k++) for (let j = 0; j < o.ny; j++) for (let i = 0; i < o.nx; i++) {
       out.push({i, j, k, x: (i - (o.nx - 1) / 2) * o.dx, y: (j - (o.ny - 1) / 2) * o.dx, z: -(o.nz - 1) * o.dz + k * o.dz});
@@ -1030,10 +1030,10 @@
     params: {f: {def: 3.5, min: 0.2, max: 10, step: 0.01}, s: {def: 1, min: 0.5, max: 4, step: 0.01}},
     tex: ["k^* = \\omega_1^2 M_1\\,c(\\beta),\\qquad S_x = K_x\\,(1 + 2i\\beta_g) + i\\omega c_x,\\qquad S_\\theta = K_\\theta\\,(1 + 2i\\beta_g) + i\\omega c_\\theta",
       "\\left(\\tilde f / f_1\\right)^2 = 1\\big/\\left(1 + k/K_x + k\\,h^2/K_\\theta\\right)"],
-    note: "Computed in closed form: the steady state of the three-degree-of-freedom system (stick deformation, mat sway, rocking) per unit free-field motion. Mode 1 of the example 1 stick (M₁ = 3063 t at h₁ = 15.6 m, 5.05 Hz, β = 5 %), the 1468 t mat, and SASSI's impedance of this mat at 3.49 Hz (lesson 4: K_{x} = 1.48e7 kN/m, K_{θ} = 1.70e9 kN m/rad, 4.8 % material damping β_{g}, radiation dashpots for 7.7 % sliding and 4.9 % rocking) held constant with frequency. The second formula is the Veletsos-Meek estimate without the mat mass. Motion slowed down; wave fronts scaled by the power the dashpots radiate.",
+    note: "Computed in closed form: the steady state of the three-degree-of-freedom system (stick deformation, mat sway, rocking) per unit free-field motion. Mode 1 of the example 1 stick (M₁ = 6,754 kips / g at h₁ = 49.8 ft, 4.99 Hz, β = 5 %), the 3,072 kip mat, and SASSI's impedance of this mat at 3.49 Hz (lesson 4: K_{x} = 1.01e6 kip/ft, K_{θ} = 1.18e9 kip·ft/rad, 4.8 % material damping β_{g}, radiation dashpots for 7.6 % sliding and 4.9 % rocking) held constant with frequency. The second formula is the Veletsos-Meek estimate without the mat mass. Motion slowed down; wave fronts scaled by the power the dashpots radiate.",
     init(fig) {
       fig.slider("f", "Frequency f", {fmt: (v) => fmt(v, 2) + " Hz"});
-      fig.slider("s", "Soil velocities × s", {log: true, fmt: (v) => `× ${fmt(v, 2)} (sand Vs ${Math.round(300 * v)} m/s)`});
+      fig.slider("s", "Soil velocities × s", {log: true, fmt: (v) => `× ${fmt(v, 2)} (sand Vs ${Math.round(1000 * v).toLocaleString("en-US")} ft/s)`});
       fig.drag(() => fig.data.ax && fig.data.ax.box, (x) => fig.set("f", clamp(+fig.data.ax.ix(x).toFixed(2), 0.2, 10)));
       fig.data.pref = null;
     },
@@ -1171,7 +1171,7 @@
       const k = emb ? boxAverage(fig.st.r) : {u: 1, b: 0};
       fig.data.k = k;
       // inertial part: the stick of figure fixed-base-vs-ssi at 0.85 of its SSI frequency (illustrative)
-      if (!fig.data.inr) { const m = PH.ssiModel(1); fig.data.inr = PH.ssiResponse(m, 0.85 * 3.905); }
+      if (!fig.data.inr) { const m = PH.ssiModel(1); fig.data.inr = PH.ssiResponse(m, 0.85 * 3.87); }
       fig.read(emb ? [`D/λ = ${fmt(fig.st.r, 3)}`, `foundation input motion: translation ${fmt(k.u, 2)} × free-field surface motion (mid-depth), plus rocking`]
         : ["surface mat, vertically incident waves: the foundation input motion is the free-field motion (lesson 1, massless run), so all of the SSI effect is inertial"]);
     },
@@ -1369,14 +1369,14 @@
     title: "A vertically propagating shear wave in the layered site",
     alt: "Animated displacement profile of the lesson 2 soil column over a half-space at the chosen frequency, with the amplification of the surface over the outcrop and the within motion at the top of the rock.",
     animated: true,
-    params: {f: {def: 7.3, min: 0.2, max: 25, step: 0.01}, vhs: {def: 1000, min: 400, max: 100000, step: 10}, damp: {def: 1, min: 0.25, max: 3, step: 0.01}},
+    params: {f: {def: 7.3, min: 0.2, max: 25, step: 0.01}, vhs: {def: 3300, min: 1300, max: 330000, step: 30}, damp: {def: 1, min: 0.25, max: 3, step: 0.01}},
     tex: ["G^* = G\\,c(\\beta),\\quad V^* = V\\left(\\sqrt{1-\\beta^2} + i\\beta\\right),\\quad k^* = \\omega/V^*",
       "u_m(z) = E_m\\,e^{ik^*_m z} + F_m\\,e^{-ik^*_m z}",
       "\\text{within} = E + F,\\qquad \\text{outcrop} = 2E"],
-    note: "Exact one-dimensional solution in each layer with the transfer of the up- and down-going amplitudes E, F across the interfaces (the SHAKE recursion of Theory Section 12.1), normalised to unit motion at the surface (the control point of lesson 2). Site of lesson 2: 5 m sand (Vs 300 m/s, 5 %), 12 m gravel (500 m/s, 4 %), rock half-space (1000 m/s, 2 %). Profile scaled to its largest amplitude; motion slowed down.",
+    note: "Exact one-dimensional solution in each layer with the transfer of the up- and down-going amplitudes E, F across the interfaces (the SHAKE recursion of Theory Section 12.1), normalised to unit motion at the surface (the control point of lesson 2). Site of lesson 2: 16 ft sand (Vs 1,000 ft/s, 5 %), 39 ft gravel (1,650 ft/s, 4 %), rock half-space (3,300 ft/s, 2 %). Profile scaled to its largest amplitude; motion slowed down.",
     init(fig) {
       fig.slider("f", "Frequency f", {fmt: (v) => fmt(v, 2) + " Hz"});
-      fig.slider("vhs", "Rock Vs", {log: true, fmt: (v) => `${Math.round(v)} m/s` + (v >= 50000 ? " (≈ rigid)" : "")});
+      fig.slider("vhs", "Rock Vs", {log: true, fmt: (v) => `${Math.round(v).toLocaleString("en-US")} ft/s` + (v >= 165000 ? " (≈ rigid)" : "")});
       fig.slider("damp", "Soil damping ×", {fmt: (v) => `× ${fmt(v, 2)} (${fmt(5 * v, 1)} %, ${fmt(4 * v, 1)} %)`});
       fig.drag(() => fig.data.ax && fig.data.ax.box, (x) => fig.set("f", clamp(+fig.data.ax.ix(x).toFixed(2), 0.2, 25)));
     },
@@ -1394,14 +1394,14 @@
       const rr = PH.columnRatios(col, st.f);
       d.wv = rr.wv; d.rr = rr;
       const zs = [];
-      for (let z = 0; z <= 22.0001; z += 0.25) zs.push(z);
+      for (let z = 0; z <= 72.0001; z += 0.8) zs.push(z);
       d.prof = zs.map((z) => [z, PH.columnU(rr.wv, col, z)]);
       d.pmax = Math.max(...d.prof.map((q) => C.abs(q[1])));
       const cv = d.curve, n = rr.wv.E.length - 1;
-      const vbar = (5 * 300 + 12 * 500) / 17;
-      fig.read([`f = ${fmt(st.f, 2)} Hz`, `surface / outcrop ${fmt(C.abs(rr.outcrop), 2)}`, `surface / within (17 m) ${fmt(C.abs(rr.within), 2)}`,
-        `first peaks: outcrop ${fmt(cv.oc[cv.io], 2)} at ${fmt(cv.fs[cv.io], 1)} Hz, within ${fmt(cv.wi[cv.iw], 1)} at ${fmt(cv.fs[cv.iw], 1)} Hz`,
-        `V̄s/4H = ${fmt(vbar, 0)}/(4 × 17) = ${fmt(vbar / 68, 1)} Hz`, `at 17 m per unit surface motion: within |E+F|/2 = ${fmt(C.abs(C.add(rr.wv.E[n], rr.wv.F[n])) / 2, 2)}, outcrop |E| = ${fmt(C.abs(rr.wv.E[n]), 2)}`]);
+      const vbar = (16 * 1000 + 39 * 1650) / 55;
+      fig.read([`f = ${fmt(st.f, 2)} Hz`, `surface / outcrop ${fmt(C.abs(rr.outcrop), 2)}`, `surface / within (55 ft) ${fmt(C.abs(rr.within), 2)}`,
+        `first peaks: outcrop ${fmt(cv.oc[cv.io], 2)} at ${fmt(cv.fs[cv.io], 2)} Hz, within ${fmt(cv.wi[cv.iw], 1)} at ${fmt(cv.fs[cv.iw], 2)} Hz`,
+        `V̄s/4H = ${fmt(vbar, 0)}/(4 × 55) = ${fmt(vbar / 220, 1)} Hz`, `at 55 ft per unit surface motion: within |E+F|/2 = ${fmt(C.abs(C.add(rr.wv.E[n], rr.wv.F[n])) / 2, 2)}, outcrop |E| = ${fmt(C.abs(rr.wv.E[n]), 2)}`]);
     },
     layout(fig, W) {
       const pad = 8;
@@ -1420,19 +1420,19 @@
       const phi = TAU * VIS * fig.t, e = [Math.cos(phi), Math.sin(phi)];
       const re = (z) => z[0] * e[0] - z[1] * e[1];
       frame(p, b, false);
-      const top = b.y + 26, H = b.h - 34, zmax = 22, Z = (z) => top + z / zmax * H;
+      const top = b.y + 26, H = b.h - 34, zmax = 72, Z = (z) => top + z / zmax * H;
       const cw = Math.min(110, 0.36 * b.w), cx = b.x + 12 + cw / 2 + 18;
-      p.rect(cx - cw / 2, Z(0), cw, Z(5) - Z(0), c.soil1);
-      p.rect(cx - cw / 2, Z(5), cw, Z(17) - Z(5), c.soil2);
-      p.rect(cx - cw / 2, Z(17), cw, Z(zmax) - Z(17), c.rock);
-      for (const z of [0, 5, 10, 17, 22]) p.text(`${z} m`, cx - cw / 2 - 4, Z(z), {size: 9.5, color: c.muted, align: "right", halo: false});
+      p.rect(cx - cw / 2, Z(0), cw, Z(16) - Z(0), c.soil1);
+      p.rect(cx - cw / 2, Z(16), cw, Z(55) - Z(16), c.soil2);
+      p.rect(cx - cw / 2, Z(55), cw, Z(zmax) - Z(55), c.rock);
+      for (const z of [0, 16, 32, 55, 72]) p.text(`${z} ft`, cx - cw / 2 - 4, Z(z), {size: 9.5, color: c.muted, align: "right", halo: false});
       const lx = cx + cw / 2 + 10, lw = b.x + b.w - lx - 4;
       const st = fig.st;
       const lab = (y, a, bb) => { p.text(a, lx, y - 6, {size: 10.5, color: c.ink, halo: false}); p.text(bb, lx, y + 7, {size: 9.5, color: c.muted, halo: false}); };
       if (lw > 70) {
-        lab(Z(2.5), "sand", `Vs 300 m/s, β ${fmt(5 * st.damp, 1)} %`);
-        lab(Z(11), "gravel", `Vs 500 m/s, β ${fmt(4 * st.damp, 1)} %`);
-        lab(Z(19.5), "rock half-space", `Vs ${Math.round(st.vhs)} m/s, 2 %`);
+        lab(Z(8), "sand", `Vs 1,000 ft/s, β ${fmt(5 * st.damp, 1)} %`);
+        lab(Z(36), "gravel", `Vs 1,650 ft/s, β ${fmt(4 * st.damp, 1)} %`);
+        lab(Z(63), "rock half-space", `Vs ${Math.round(st.vhs).toLocaleString("en-US")} ft/s, 2 %`);
       }
       // displacement profile and its envelope
       const A = 0.42 * cw / d.pmax;
@@ -1442,18 +1442,18 @@
       const prof = d.prof.map(([z, u]) => [cx + A * re(u), Z(z)]);
       p.line(prof, c.s1, 2.2);
       for (const [z, u] of d.prof.filter((q, i) => i % 8 === 0)) p.circle(cx + A * re(u), Z(z), 2.4, c.s1);
-      p.line([[cx - cw / 2, Z(17)], [cx + cw / 2, Z(17)]], c.ink, 1.2);
+      p.line([[cx - cw / 2, Z(55)], [cx + cw / 2, Z(55)]], c.ink, 1.2);
       p.text("control point (surface)", cx, Z(0) - 9, {size: 9.5, color: c.muted, align: "center"});
       // chart
       const cv = d.curve;
       const ax = axes(p, fig.L.chart, {x0: 0, x1: 25, y0: 0.2, y1: 100, ylog: true, yt: [0.2, 0.5, 1, 2, 5, 10, 20, 50, 100], xlabel: "f (Hz)", ylabel: "amplification of the surface motion"});
       d.ax = ax;
-      const vbar = (5 * 300 + 12 * 500) / 17, fq = vbar / 68;
+      const vbar = (16 * 1000 + 39 * 1650) / 55, fq = vbar / 220;
       p.line([[ax.X(fq), ax.box.y], [ax.X(fq), ax.box.y + ax.box.h]], c.ref, 1, [2, 3]);
       p.text("V̄s/4H", ax.X(fq) - 3, ax.box.y + ax.box.h - 8, {size: 9.5, color: c.muted, align: "right"});
       plot(p, ax, cv.fs, cv.wi, c.s2, 2);
       plot(p, ax, cv.fs, cv.oc, c.s1, 2);
-      p.text("surface / within at 17 m (E+F)", ax.X(cv.fs[cv.iw]) + 6, ax.Y(Math.min(90, cv.wi[cv.iw])) + 2, {size: 10.5, color: c.ink});
+      p.text("surface / within at 55 ft (E+F)", ax.X(cv.fs[cv.iw]) + 6, ax.Y(Math.min(90, cv.wi[cv.iw])) + 2, {size: 10.5, color: c.ink});
       p.text("surface / outcrop (2E)", ax.X(cv.fs[cv.io]) + 6, ax.Y(cv.oc[cv.io]) - 9, {size: 10.5, color: c.ink});
       const X = ax.X(st.f);
       p.line([[X, ax.box.y], [X, ax.box.y + ax.box.h]], c.ink, 1, [3, 3]);
@@ -1463,27 +1463,27 @@
   };
 
   // ================================================================== figure: impedance ellipse
-  const IMP = {k: 2.82e6, U: 1e-3};       // lesson 3: Kx of the 12 m mat (2 m mesh, 0.2 Hz) in kN/m; U = 1 mm
+  const IMP = {k: 1.88e5, U: 0.04 / 12};  // lesson 3: Kx of the 39 ft mat (6.5 ft mesh, 0.2 Hz) in kip/ft; U = 0.04 in (ft)
   FIG["impedance-ellipse"] = {
     title: "A spring and a dashpot under harmonic motion: K(ω) = k + iωc",
     alt: "A footing on a spring and a dashpot moved harmonically, the force and displacement histories with their phase lag, and the force-displacement ellipse whose area is the energy dissipated per cycle.",
     animated: true,
-    params: {f: {def: 5, min: 0.2, max: 12, step: 0.01}, c: {def: 5.76e4, min: 0, max: 2e5, step: 100}},
+    params: {f: {def: 5, min: 0.2, max: 12, step: 0.01}, c: {def: 3.84e3, min: 0, max: 1.35e4, step: 10}},
     tex: ["K(\\omega) = k + i\\omega c,\\qquad F = k\\,u + c\\,\\dot u,\\quad u = U\\sin\\omega t",
       "\\varphi = \\arctan\\frac{\\omega c}{k},\\qquad E_D = \\oint F\\,du = \\pi c\\,\\omega\\,U^2,\\qquad E_S = \\tfrac12 k U^2",
       "\\xi = \\frac{E_D}{4\\pi E_S} = \\frac{\\omega c}{2k}"],
-    note: "Defaults from lesson 3: k = 2.82e6 kN/m (Kx of the 12 m × 12 m mat at 0.2 Hz) and c = ρVsA = 5.76e4 kN s/m (the plane-wave dashpot the FOUNDASH values approach); U = 1 mm (illustrative). Motion slowed down.",
+    note: "Defaults from lesson 3: k = 1.88e5 kip/ft (Kx of the 39 ft × 39 ft mat at 0.2 Hz) and c = ρVsA = 3.84e3 kip·s/ft (the plane-wave dashpot the FOUNDASH values approach); U = 0.04 in (illustrative). Motion slowed down.",
     init(fig) {
       fig.slider("f", "Frequency f", {fmt: (v) => fmt(v, 2) + " Hz"});
-      fig.slider("c", "Dashpot c", {fmt: (v) => fmtSig(v, 3) + " kN s/m"});
+      fig.slider("c", "Dashpot c", {fmt: (v) => fmtSig(v, 3) + " kip·s/ft"});
     },
     change(fig) {
       const w = TAU * fig.st.f, c = fig.st.c, k = IMP.k, U = IMP.U;
       const d = fig.data;
       d.w = w; d.phi = Math.atan2(w * c, k); d.ED = Math.PI * c * w * U * U; d.ES = 0.5 * k * U * U; d.xi = w * c / (2 * k);
       d.Fmax = U * Math.hypot(k, w * c);
-      fig.read([`ω = ${fmt(w, 1)} rad/s`, `φ = atan(ωc/k) = ${fmt(d.phi * 180 / Math.PI, 1)}°`, `E_{D} = πcωU² = ${fmt(d.ED, 2)} kJ`,
-        `E_{S} = ½kU² = ${fmt(d.ES, 2)} kJ`, `ξ = E_{D}/(4πE_{S}) = ωc/(2k) = ${fmt(d.xi, 3)}`, `|K| = ${fmtSig(Math.hypot(k, w * c), 3)} kN/m`]);
+      fig.read([`ω = ${fmt(w, 1)} rad/s`, `φ = atan(ωc/k) = ${fmt(d.phi * 180 / Math.PI, 1)}°`, `E_{D} = πcωU² = ${fmt(d.ED, 3)} kip·ft`,
+        `E_{S} = ½kU² = ${fmt(d.ES, 3)} kip·ft`, `ξ = E_{D}/(4πE_{S}) = ωc/(2k) = ${fmt(d.xi, 3)}`, `|K| = ${fmtSig(Math.hypot(k, w * c), 3)} kip/ft`]);
     },
     layout(fig, W) {
       const pad = 8;
@@ -1537,10 +1537,10 @@
       p.text("u", at.X(1.25) + 4, at.Y(1) + 8, {size: 10.5, color: c.ink});
       p.text("F", at.X(1.25 - d.phi / TAU) - 4, at.Y(1) - 8, {size: 10.5, color: c.ink, align: "right"});
       // ---- force-displacement ellipse
-      const Fm = d.Fmax, U = IMP.U, kN = (v) => v;              // forces in kN, displacement in mm
-      const ae = axes(p, L.e, {x0: -1.25, x1: 1.25, y0: -1.25 * Fm, y1: 1.25 * Fm, xlabel: "u (mm)", ylabel: "F (kN)"});
+      const Fm = d.Fmax, U = IMP.U, kip = (v) => v;             // forces in kips, displacement in units of U
+      const ae = axes(p, L.e, {x0: -1.25, x1: 1.25, y0: -1.25 * Fm, y1: 1.25 * Fm, xlabel: "u / U  (U = 0.04 in)", ylabel: "F (kips)"});
       const ell = [];
-      for (let i = 0; i <= 160; i++) { const ps = TAU * i / 160; ell.push([ae.X(Math.sin(ps)), ae.Y(kN(Fm * Math.sin(ps + d.phi)))]); }
+      for (let i = 0; i <= 160; i++) { const ps = TAU * i / 160; ell.push([ae.X(Math.sin(ps)), ae.Y(kip(Fm * Math.sin(ps + d.phi)))]); }
       p.poly(ell, withAlpha(c.s2, 0.14), null);
       p.poly([[ae.X(0), ae.Y(0)], [ae.X(1), ae.Y(0)], [ae.X(1), ae.Y(IMP.k * U)]], withAlpha(c.s3, 0.18), null);
       p.line([[ae.X(-1.2), ae.Y(-1.2 * IMP.k * U)], [ae.X(1.2), ae.Y(1.2 * IMP.k * U)]], c.s3, 1.5, [5, 3]);
@@ -1665,9 +1665,9 @@
   // ================================================================== figure: interaction-node sets
   const SET_INFO = {
     fv: ["FV", "every node of the excavated soil is an interaction node: the exact substructuring equation, the reference."],
-    fsin: ["FI-FSIN", "only the lateral and bottom faces (subtraction method). The interior and the roof-slab nodes hang on the excavated soil alone: spurious peaks at the frequencies of that sub-system (near 6 Hz in lesson 5)."],
+    fsin: ["FI-FSIN", "only the lateral and bottom faces (subtraction method). The interior and the roof-slab nodes hang on the excavated soil alone: spurious peaks at the frequencies of that sub-system (near 11 Hz in lesson 5)."],
     evbn: ["FI-EVBN", "FSIN plus the ground-surface face (modified subtraction). The surface nodes raise the frequencies of the unphysical sub-system."],
-    ffv: ["FFV", "EVBN plus the interior of every second internal level (z = −3 m and −1 m): small, stiff sub-volumes, close to FV."],
+    ffv: ["FFV", "EVBN plus the interior of every second internal level (z = −9.6 ft and −3.2 ft): small, stiff sub-volumes, close to FV."],
   };
   FIG["interaction-sets"] = {
     title: "Interaction-node sets on the excavation mesh of lesson 5",
@@ -1675,7 +1675,7 @@
     animated: true,
     params: {method: {def: "fv", values: ["fv", "fsin", "evbn", "ffv"]}},
     tex: ["\\text{memory of } X_{ff} = (3N_{\\text{int}})^2 \\times 16\\ \\text{bytes},\\qquad \\text{time} \\propto N_{\\text{int}}^3"],
-    note: "10 m × 10 m × 5 m excavation, nodes every 2.5 m horizontally and 1 m vertically (150 nodes, numbered bottom-up). The sets are those of INTGEN 1, 3, 2 and 5 (skip 2); the counts are what INTCOUNT reports in the lesson. Drag the view to turn it.",
+    note: "32 ft × 32 ft × 16 ft excavation, nodes every 8 ft horizontally and 3.2 ft vertically (150 nodes, numbered bottom-up). The sets are those of INTGEN 1, 3, 2 and 5 (skip 2); the counts are what INTCOUNT reports in the lesson. Drag the view to turn it.",
     init(fig) {
       fig.choice("method", "Interaction set", ["fv", "fsin", "evbn", "ffv"].map((m) => [m, SET_INFO[m][0]]));
       fig.data.nodes = PH.boxNodes();
@@ -1697,22 +1697,21 @@
       const c = p.c, W = fig.W, H = fig.H, nodes = fig.data.nodes, o = nodes.o, m = fig.st.method;
       const a = 0.62 + 0.22 * Math.sin(0.35 * fig.t) + fig.data.rot, ca = Math.cos(a), sa = Math.sin(a);
       // projection fitted to the canvas (true vertical scale), above the legend
-      const G = 7, raw = (x, y, z) => [x * ca - y * sa, -z + (x * sa + y * ca) * 0.42];
-      const x1 = G * Math.SQRT2, x0 = -x1, y0 = -0.42 * G * Math.SQRT2, y1 = 5 + 0.42 * 5 * Math.SQRT2;   // any rotation
+      const G = 22.4, hx = 16, D = 16, raw = (x, y, z) => [x * ca - y * sa, -z + (x * sa + y * ca) * 0.42];   // ft
+      const x1 = G * Math.SQRT2, x0 = -x1, y0 = -0.42 * G * Math.SQRT2, y1 = D + 0.42 * hx * Math.SQRT2;   // any rotation
       const avW = W - 40, avH = H - 56, s = Math.min(avW / (x1 - x0), avH / (y1 - y0));
       const ox = (W - s * (x1 + x0)) / 2, oy = 10 + (avH - s * (y1 - y0)) / 2 - s * y0;
       const P = (x, y, z) => { const r = raw(x, y, z); return [ox + s * r[0], oy + s * r[1]]; };
       const depth = (x, y) => x * sa + y * ca;
       // ground surface around the excavation
       p.poly([P(-G, -G, 0), P(G, -G, 0), P(G, G, 0), P(-G, G, 0)], withAlpha(c.soil1, 0.8), c.soilLine, 1);
-      const hx = 5;
       p.poly([P(-hx, -hx, 0), P(hx, -hx, 0), P(hx, hx, 0), P(-hx, hx, 0)], c.bg, c.ink, 1);
       // grid lines of the mesh (faint)
       for (let k = 0; k < o.nz; k++) {
         const z = -(o.nz - 1) * o.dz + k * o.dz;
         p.poly([P(-hx, -hx, z), P(hx, -hx, z), P(hx, hx, z), P(-hx, hx, z)], null, withAlpha(c.axis, 0.7), 0.8);
       }
-      for (const [x, y] of [[-hx, -hx], [hx, -hx], [hx, hx], [-hx, hx]]) p.line([P(x, y, 0), P(x, y, -5)], c.axis, 1);
+      for (const [x, y] of [[-hx, -hx], [hx, -hx], [hx, hx], [-hx, hx]]) p.line([P(x, y, 0), P(x, y, -D)], c.axis, 1);
       const sorted = nodes.map((nd) => ({nd, d: depth(nd.x, nd.y)})).sort((u, v) => u.d - v.d || u.nd.z - v.nd.z);
       for (const {nd} of sorted) {
         const [x, y] = P(nd.x, nd.y, nd.z), on = PH.inSet(m, nd, o);
@@ -1720,7 +1719,7 @@
       }
       const lab = (t, q, dy) => p.text(t, Math.min(q[0] + 8, W - 4 - p.measure(t, 10)), q[1] + dy, {size: 10, color: c.muted});
       lab("z = 0 (grade)", P(hx, -hx, 0), -6);
-      lab("z = −5 m", P(hx, -hx, -5), 0);
+      lab("z = −16 ft", P(hx, -hx, -D), 0);
       p.circle(14, H - 30, 4.3, c.s1, c.bg, 1.4); p.text(`interaction node (${fig.data.counts[m]})`, 24, H - 30, {size: 10.5, color: c.ink});
       p.circle(14, H - 13, 3, c.bg, c.ref, 1.3); p.text(`excavated-soil node only (${150 - fig.data.counts[m]})`, 24, H - 13, {size: 10.5, color: c.ink});
     },
@@ -1728,9 +1727,9 @@
 
   // ================================================================== figure: SV, SH and P waves
   const WAVES = [
-    {name: "SV wave · X input", sub: ["WAVE,2", "V_{s} = 300 m/s"], V: 300, dir: [1, 0], axis: "x"},
-    {name: "SH wave · Y input", sub: ["WAVE,4", "V_{s} = 300 m/s"], V: 300, dir: [0.62, -0.36], axis: "y"},
-    {name: "P wave · Z input", sub: ["WAVE,3", "V_{p} = 600 m/s"], V: 600, dir: [0, -1], axis: "z"},
+    {name: "SV wave · X input", sub: ["WAVE,2", "V_{s} = 1,000 ft/s"], V: 1000, dir: [1, 0], axis: "x"},
+    {name: "SH wave · Y input", sub: ["WAVE,4", "V_{s} = 1,000 ft/s"], V: 1000, dir: [0.62, -0.36], axis: "y"},
+    {name: "P wave · Z input", sub: ["WAVE,3", "V_{p} = 2,000 ft/s"], V: 2000, dir: [0, -1], axis: "z"},
   ];
   FIG["wave-types"] = {
     title: "Vertically propagating SV, SH and P waves: the three input directions",
@@ -1738,16 +1737,16 @@
     animated: true,
     params: {fp: {def: 4, min: 2, max: 10, step: 0.1}},
     tex: ["u(z,t) = p\\!\\left(t + \\tfrac{z}{V}\\right) + p\\!\\left(t - \\tfrac{z}{V}\\right),\\qquad V = V_s\\ (\\text{SV, SH}),\\ V_p\\ (\\text{P})"],
-    note: "A Ricker pulse p(t) in a uniform half-space with a free surface (the sand of lesson 7: Vs = 300 m/s, Vp = 600 m/s), z the depth; each incident pulse reaches the surface at the same instant, where incident and reflected waves add (twice the incident motion). Particle motion along x (SV), y (SH) or z (P), the wave travels vertically. 40 m of soil shown; time slowed down about 12 times.",
+    note: "A Ricker pulse p(t) in a uniform half-space with a free surface (the sand of lesson 7: Vs = 1,000 ft/s, Vp = 2,000 ft/s), z the depth; each incident pulse reaches the surface at the same instant, where incident and reflected waves add (twice the incident motion). Particle motion along x (SV), y (SH) or z (P), the wave travels vertically. 130 ft of soil shown; time slowed down about 12 times.",
     init(fig) { fig.slider("fp", "Pulse frequency", {fmt: (v) => fmt(v, 1) + " Hz"}); },
     change(fig) {
       const f = fig.st.fp;
-      fig.read([`wavelength at ${fmt(f, 1)} Hz: S ${fmt(300 / f, 0)} m, P ${fmt(600 / f, 0)} m`, "surface motion = incident + reflected = 2 × incident (free surface)"]);
+      fig.read([`wavelength at ${fmt(f, 1)} Hz: S ${fmt(1000 / f, 0)} ft, P ${fmt(2000 / f, 0)} ft`, "surface motion = incident + reflected = 2 × incident (free surface)"]);
     },
     layout(fig, W) { return W >= 600 ? 360 : 340; },
     draw(fig, p) {
-      const c = p.c, W = fig.W, H = fig.H, fp = fig.st.fp, Zm = 40;
-      const T0 = Zm / 300 + 1.4 / fp, tphys = ((fig.t * 0.08) % (2 * T0)) - T0;
+      const c = p.c, W = fig.W, H = fig.H, fp = fig.st.fp, Zm = 130;
+      const T0 = Zm / 1000 + 1.4 / fp, tphys = ((fig.t * 0.08) % (2 * T0)) - T0;
       const colw = (W - 28) / 3, cw = Math.min(150, colw - 40), dep = Math.min(42, cw * 0.38);
       const th = Math.max(...WAVES.map((wv) => wrap(p, wv.name, colw - 8, 11, 600).length)) * 14;
       const top = 6 + th + 30 + 50, bot = H - 22, hh = bot - top;
@@ -1853,11 +1852,11 @@
     if (mode === "panel") {
       const P = PH.PANEL, bb = PH.bbcgen(P.vu, P.vcr, P.vcr / P.gcr);
       const bk = PH.polyline(bb.xs, bb.ys);
-      return {bk, xref: P.gcr, xlo: P.gcr / 10, xhi: 0.02, xunit: (x) => fmt(100 * x, 4) + " %", xs: 100, xlabel: "shear strain γ (%)", ylabel: "panel shear V (kN)", ref: "γ_{cr}", F: "V"};
+      return {bk, xref: P.gcr, xlo: P.gcr / 10, xhi: 0.02, xunit: (x) => fmt(100 * x, 4) + " %", xs: 100, xlabel: "shear strain γ (%)", ylabel: "panel shear V (kips)", ref: "γ_{cr}", F: "V"};
     }
-    const rho = 19 / 9.81, G0 = rho * 250 * 250, gr = PH.sandRefStrain();       // kPa, strain in %
-    const bk = PH.hyperbolic(G0 / 100, gr);                                     // tau (kPa) of strain in %
-    return {bk, xref: gr, xlo: 1e-4, xhi: 1, xunit: (x) => fmtSig(x, 3) + " %", xs: 1, xlabel: "shear strain γ (%)", ylabel: "shear stress τ (kPa)", ref: "γ_{r}", F: "τ", G0, gr};
+    const rho = 0.120 / 32.2, G0 = rho * 800 * 800, gr = PH.sandRefStrain();     // ksf, strain in %
+    const bk = PH.hyperbolic(G0 / 100, gr);                                     // tau (ksf) of strain in %
+    return {bk, xref: gr, xlo: 1e-4, xhi: 1, xunit: (x) => fmtSig(x, 3) + " %", xs: 1, xlabel: "shear strain γ (%)", ylabel: "shear stress τ (ksf)", ref: "γ_{r}", F: "τ", G0, gr};
   }
   FIG.hysteresis = {
     title: "Backbone, hysteresis loop, secant stiffness and equivalent damping",
@@ -1880,8 +1879,8 @@
       d.xa = xa; d.loop = PH.masing(M.bk, xa);
       d.curve = PH.logspace(M.xlo, M.xhi, 90).map((x) => { const l = PH.masing(M.bk, x); return [x, l.ratio, 100 * l.xi]; });
       const parts = [`x_{a} = ${M.xunit(xa)} (${fmtSig(xa / M.xref, 3)} ${M.ref})`, `K_{sec}/K_{el} = ${fmt(d.loop.ratio, 3)}`,
-        fig.st.mode === "soil" ? `E_{D} = ${fmtSig(0.01 * d.loop.ED, 3)} kJ/m³, E_{S} = ${fmtSig(0.01 * d.loop.ES, 3)} kJ/m³`
-          : `E_{D} = ${fmtSig(100 * d.loop.ED, 3)} kN·%, E_{S} = ${fmtSig(100 * d.loop.ES, 3)} kN·%`,
+        fig.st.mode === "soil" ? `E_{D} = ${fmtSig(0.01 * d.loop.ED, 3)} kip·ft/ft³, E_{S} = ${fmtSig(0.01 * d.loop.ES, 3)} kip·ft/ft³`
+          : `E_{D} = ${fmtSig(100 * d.loop.ED, 3)} kip·%, E_{S} = ${fmtSig(100 * d.loop.ES, 3)} kip·%`,
         `ξ_{h} = E_{D}/(4πE_{S}) = ${fmt(100 * d.loop.xi, 1)} %`];
       if (fig.st.mode === "soil") {
         const s = PH.SAND, lg = Math.log10(xa);
@@ -1890,8 +1889,8 @@
       }
       fig.read(parts);
       d.noteEl.replaceChildren(richSpan(fig.st.mode === "soil"
-        ? `Hyperbolic backbone with G_{max} of the lesson's sand (Vs = 250 m/s, 19 kN/m³: ${fmt(M.G0 / 1000, 0)} MPa) and γ_{r} = ${fmt(M.gr, 3)} %, where the SHAKE91 library Sand curve (points) has G/G_{max} = 0.5; Masing loops. SOIL's equivalent-linear iterations read G/G_{max} and damping from the library curves instead; Masing damping overshoots the measured curve at large strains.`
-        : "The BBCGEN backbone of the lesson's wall panels (ACI 318-08: V_{u} = 12 472 kN, cracking at 0.3 V_{u} = 3742 kN, γ_{cr} = 8.31e-5, yield at 0.4 %), with loops by the Masing rule (GMR, used by Option NON for springs). The panels of lesson 9 use the Cheng-Mertz shear rules instead: their pinched loops dissipate much less (ξ_{h} about 10-12 % between γ = 2e-4 and 1e-2, against 28-50 % for these Masing loops; sassi/core/hysteresis.py)."));
+        ? `Hyperbolic backbone with G_{max} of the lesson's sand (Vs = 800 ft/s, 0.120 kcf: ${fmt(M.G0, 0)} ksf) and γ_{r} = ${fmt(M.gr, 3)} %, where the SHAKE91 library Sand curve (points) has G/G_{max} = 0.5; Masing loops. SOIL's equivalent-linear iterations read G/G_{max} and damping from the library curves instead; Masing damping overshoots the measured curve at large strains.`
+        : "The BBCGEN backbone of the lesson's wall panels (ACI 318-08: V_{u} = 2,821 kips, cracking at 0.3 V_{u} = 846 kips, γ_{cr} = 8.82e-5, yield at 0.4 %), with loops by the Masing rule (GMR, used by Option NON for springs). The panels of lesson 9 use the Cheng-Mertz shear rules instead: their pinched loops dissipate much less (ξ_{h} about 10-12 % between γ = 2e-4 and 1e-2, against 28-50 % for these Masing loops; sassi/core/hysteresis.py)."));
     },
     layout(fig, W) {
       const pad = 8;
@@ -1962,8 +1961,8 @@
     coarse: [4, 41, 82, 123, 164, 205, 287, 369, 492, 655, 819],
   };
   const TRUE_MODES = {
-    "2": [{f: 3.49, beta: 0.052, P: 1.34}, {f: 13.0, beta: 0.10, P: -0.34}],
-    "3": [{f: 3.49, beta: 0.052, P: 1.0}, {f: 4.6, beta: 0.04, P: 0.34}, {f: 13.0, beta: 0.10, P: -0.34}],
+    "2": [{f: 3.47, beta: 0.052, P: 1.34}, {f: 13.0, beta: 0.10, P: -0.34}],
+    "3": [{f: 3.47, beta: 0.052, P: 1.0}, {f: 4.6, beta: 0.04, P: 0.34}, {f: 13.0, beta: 0.10, P: -0.34}],
   };
   FIG["freq-interpolation"] = {
     title: "Computed and interpolated transfer functions, and CRITFREQ",
@@ -1972,7 +1971,7 @@
     params: {modes: {def: "2", values: ["2", "3"]}, set: {def: "coarse", values: ["lesson", "coarse"]}},
     tex: ["H(\\omega) = \\frac{C_1\\,\\omega^4 + C_2\\,\\omega^2 + C_3}{\\omega^4 + C_4\\,\\omega^2 + C_5}",
       "100\\,\\frac{\\lvert A_I(f_p) - A_\\text{ref}\\rvert}{A_\\text{ref}} > \\text{tol}"],
-    note: "True transfer function (grey): 1 + Σ P r²/(c(β) − r²) with the SSI mode of lesson 1 (3.49 Hz, 5.2 %, P = 1.34) and an illustrative mode at 13 Hz (P = −0.34); 'three modes' adds an illustrative close mode at 4.6 Hz. The dots are its values at the SSI frequencies f = nΔf (Δf = 0.0244 Hz); the blue curve is MOTION's interpolation, option 1 (five-point windows of the 2-DOF form, with the spurious-pole guard of Theory Section 10.1). CRITFREQ,5,50: peaks above 50 % of the maximum are compared with the larger of the two bracketing computed values. Click the plot to add a frequency there.",
+    note: "True transfer function (grey): 1 + Σ P r²/(c(β) − r²) with the SSI mode of lesson 1 (3.47 Hz, 5.2 %, P = 1.34) and an illustrative mode at 13 Hz (P = −0.34); 'three modes' adds an illustrative close mode at 4.6 Hz. The dots are its values at the SSI frequencies f = nΔf (Δf = 0.0244 Hz); the blue curve is MOTION's interpolation, option 1 (five-point windows of the 2-DOF form, with the spurious-pole guard of Theory Section 10.1). CRITFREQ,5,50: peaks above 50 % of the maximum are compared with the larger of the two bracketing computed values. Click the plot to add a frequency there.",
     init(fig) {
       fig.choice("set", "Frequencies", [["lesson", "lesson 1 set (22)"], ["coarse", "coarse set (11, lesson 10)"]]);
       fig.choice("modes", "True TF", [["2", "two modes"], ["3", "three modes"]]);

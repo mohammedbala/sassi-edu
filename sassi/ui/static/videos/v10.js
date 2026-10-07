@@ -2,8 +2,8 @@
  * One idea: an SSI run can finish without an error and still be wrong; four quick checks catch it.
  * Numbers: sassi/ui/lessons/10_good_practice.md; curves: d10.js (the lesson's runs: example 1, the coarse
  * frequency set ex01c and the 10 Hz cut-off ex01f; python -m sassi.ui.video_data).
- * Pictures: example 1 to scale (20 m x 20 m mat, 9 x 9 nodes at 2.5 m, the stick on node 41, four 5 m storeys,
- * 5 m sand and 12 m gravel over rock); the slow-shake motion from the computed transfer functions at 0.098 Hz;
+ * Pictures: example 1 to scale (64 ft x 64 ft mat, 9 x 9 nodes at 8 ft, the stick on node 41, four 16 ft storeys,
+ * 16 ft sand and 39 ft gravel over rock); the slow-shake motion from the computed transfer functions at 0.098 Hz;
  * every plot annotation from the data it names (CRITFREQ with SV.K.PH.critfreq). */
 "use strict";
 
@@ -141,8 +141,9 @@
   });
 
   // ---------------------------------------------------------------- 2. check 1: before you run
-  // example 1 to scale (15 px/m): elevation (mat 20 m x 1.5 m, stick nodes at 5, 10, 15, 20 m) and plan (9 x 9 nodes at 2.5 m)
-  const E1 = {S: 15, ex: 1135, gy: 680, px: 1625, py: 530};
+  // example 1 to scale (4.69 px/ft): elevation (mat 64 ft x 5 ft, stick nodes at 16, 32, 48, 64 ft above the mat's
+  // mid-plane) and plan (9 x 9 nodes at 8 ft)
+  const E1 = {S: 300 / 64, ex: 1135, gy: 680, px: 1625, py: 530};
   scenes.push({
     id: "model-checks", title: "Check 1: before you run",
     build(s) {
@@ -164,14 +165,14 @@
       const ex = E1.ex, gy = E1.gy;
       K.text(EL, ex, 318, "elevation", {cls: "t-small", anchor: "middle", size: 26});
       K.soil(EL, {x: ex - 165, y: gy, w: 330, layers: [{h: 40, kind: "sand"}], labels: false});
-      s.stick = K.stick(EL, {x: ex, y: gy - 1.5 * S, z: [5, 10, 15, 20].map((h) => h * S - 0.75 * S), matW: 20 * S, matH: 1.5 * S, r: 13, slabW: 0});
-      K.dim(EL, ex - 10 * S, gy + 72, ex + 10 * S, gy + 72, "20 m");
-      K.dim(EL, ex + 10 * S + 22, gy - 0.75 * S, ex + 10 * S + 22, gy - 0.75 * S - 20 * S, "4 × 5 m");
-      s.elSpider = K.line(g, ex - 2.5 * S, gy - 0.75 * S, ex + 2.5 * S, gy - 0.75 * S, {stroke: C.ssi, "stroke-width": 7, "stroke-linecap": "round", hidden: true});
-      s.elRing = K.circle(g, ex, gy - 0.75 * S, 20, {fill: "none", stroke: C.ssi, "stroke-width": 4, hidden: true, in: "pop"});
-      // plan: the mat edge runs through the edge nodes (nodes at -10 ... 10 m)
+      s.stick = K.stick(EL, {x: ex, y: gy - 5 * S, z: [16, 32, 48, 64].map((h) => h * S - 2.5 * S), matW: 64 * S, matH: 5 * S, r: 13, slabW: 0});
+      K.dim(EL, ex - 32 * S, gy + 72, ex + 32 * S, gy + 72, "64 ft");
+      K.dim(EL, ex + 32 * S + 22, gy - 2.5 * S, ex + 32 * S + 22, gy - 2.5 * S - 64 * S, "4 × 16 ft");
+      s.elSpider = K.line(g, ex - 8 * S, gy - 2.5 * S, ex + 8 * S, gy - 2.5 * S, {stroke: C.ssi, "stroke-width": 7, "stroke-linecap": "round", hidden: true});
+      s.elRing = K.circle(g, ex, gy - 2.5 * S, 20, {fill: "none", stroke: C.ssi, "stroke-width": 4, hidden: true, in: "pop"});
+      // plan: the mat edge runs through the edge nodes (nodes at -32 ... 32 ft)
       const P = K.g(g, {hidden: true}); s.plan = P;
-      const cx = E1.px, cy = E1.py, dx = 2.5 * S, x0 = cx - 4 * dx, y0 = cy - 4 * dx;
+      const cx = E1.px, cy = E1.py, dx = 8 * S, x0 = cx - 4 * dx, y0 = cy - 4 * dx;
       K.text(P, cx, 318, "plan", {cls: "t-small", anchor: "middle", size: 26});
       K.rect(P, x0, y0, 8 * dx, 8 * dx, {fill: "#3b4a5e", stroke: C.concrete, "stroke-width": 3});
       for (let i = 0; i <= 8; i++) {
@@ -181,8 +182,8 @@
       const pts = [];
       for (let j = 0; j <= 8; j++) for (let i = 0; i <= 8; i++) pts.push([x0 + i * dx, y0 + j * dx]);
       s.matNodes = K.nodes(P, pts, {r: 5.5, color: C.concrete});
-      K.dim(P, x0, gy + 72, x0 + 8 * dx, gy + 72, "20 m");
-      K.dim(P, x0, y0 - 22, x0 + dx, y0 - 22, "2.5 m");
+      K.dim(P, x0, gy + 72, x0 + 8 * dx, gy + 72, "64 ft");
+      K.dim(P, x0, y0 - 22, x0 + dx, y0 - 22, "8 ft");
       // the stick base, node 41 (the centre of the 9 x 9 grid)
       K.circle(P, cx, cy, 11, {fill: C.steel, stroke: "#0a111d", "stroke-width": 3});
       s.n41 = K.g(g, {hidden: true, in: "pop"});
@@ -229,24 +230,24 @@
   });
 
   // ---------------------------------------------------------------- 3. check 2: the slow-shake test
-  // example 1 to scale (17 px/m): 5 m sand, 12 m gravel, rock (cut with a fade); the mat and the 4 x 5 m stick.
+  // example 1 to scale (5.31 px/ft): 16 ft sand, 39 ft gravel, rock (cut with a fade); the mat and the 4 x 16 ft stick.
   // Motion: the computed transfer functions (amplitude and phase) at the first SSI frequency, 0.098 Hz.
   const F0 = FLOOR_TFU[0].f[0];
   const H0 = FLOOR_TFU.map((d) => [d.amp[0] * Math.cos(d.ph[0]), d.amp[0] * Math.sin(d.ph[0])]);
-  const SLOW = {S: 17, cx: 450, gy: 590, U: 40, period: 3.4};
+  const SLOW = {S: 340 / 64, cx: 450, gy: 590, U: 40, period: 3.4};
   scenes.push({
     id: "low-frequency", title: "Check 2: the slow-shake test",
     build(s) {
       const g = K.g(s.svg), S = SLOW.S, gy = SLOW.gy;
       s.head = K.heading(s.root, "Check 2 · The slow-shake test", {x: 110, y: 70, size: "h2"});
       s.soil = K.soil(g, {x: 130, y: gy, w: 640, labels: false, hidden: true,
-        layers: [{h: 5 * S, kind: "sand"}, {h: 12 * S, kind: "gravel"}], hs: {h: 100, kind: "rock"}});
+        layers: [{h: 16 * S, kind: "sand"}, {h: 39 * S, kind: "gravel"}], hs: {h: 100, kind: "rock"}});
       // layer labels beyond the largest soil displacement (the column moves by up to U)
-      [["sand, 5 m", "Vs = 300 m/s", gy + 2.5 * S], ["gravel, 12 m", "Vs = 500 m/s", gy + 11 * S], ["rock", "Vs = 1000 m/s", gy + 17 * S + 50]].forEach(([n, v, y]) => {
+      [["sand, 16 ft", "Vs = 1,000 ft/s", gy + 8 * S], ["gravel, 39 ft", "Vs = 1,650 ft/s", gy + 35.5 * S], ["rock", "Vs = 3,300 ft/s", gy + 55 * S + 50]].forEach(([n, v, y]) => {
         K.text(s.soil.g, 130 + 640 + SLOW.U + 26, y - 4, n, {cls: "t-label", size: 26});
         K.text(s.soil.g, 130 + 640 + SLOW.U + 26, y + 26, v, {cls: "t-small", size: 22});
       });
-      s.stick = K.stick(g, {x: SLOW.cx, y: gy - 1.5 * S, z: [5, 10, 15, 20].map((h) => h * S - 0.75 * S), matW: 20 * S, matH: 1.5 * S, r: 16, slabW: 0, hidden: true});
+      s.stick = K.stick(g, {x: SLOW.cx, y: gy - 5 * S, z: [16, 32, 48, 64].map((h) => h * S - 2.5 * S), matW: 64 * S, matH: 5 * S, r: 16, slabW: 0, hidden: true});
       // the ground motion, to the same scale: +-1 (unit control motion)
       s.gnd = K.g(g, {hidden: true});
       K.arrow(s.gnd, 210 - SLOW.U, gy - 26, 210 + SLOW.U, gy - 26, {color: C.wave, width: 4, head: 14, both: true});
@@ -264,7 +265,7 @@
       s.line = s.p.line(xs, ys, {color: C.ssi, width: 6, draw: true});
       s.dots = dots(s.p, R_TFU, {b: 2, r: 10});
       s.first = ring(s.p, R_TFU.f[0], R_TFU.amp[0], "", {color: "var(--good)", r: 22});
-      s.stat = K.stat(s.root, {x: 1020, y: 600, w: 440, value: "0.102 %", label: "worst miss, at the roof", color: "var(--good)", vsize: 96});
+      s.stat = K.stat(s.root, {x: 1020, y: 600, w: 440, value: "0.103 %", label: "worst miss, at the roof", color: "var(--good)", vsize: 96});
       s.pass = K.pill(s.root, "✓ pass", {x: 1520, y: 640, color: "var(--good)", style: {fontSize: "36px"}});
       // the free-field column at F0 (one-dimensional wave solution of the example 1 site)
       const wv = PH.columnWaves(PH.COLUMN, F0);
@@ -335,14 +336,14 @@
   const CF = PH.critfreq(CO_TFU.f, CO_TFU.amp, CO_TFI.f, CO_TFI.amp, 5, 50, DF).filter((r) => r.flag)[0];
   const CF_M = CO_TFU.f.reduce((m, f, i) => (f <= CF.f ? i : m), 0);                         // the bracketing computed points m, m + 1
   const CF_ADD = AD_TFU.f.findIndex((f) => Math.abs(f - CF.f) < DF);                           // the added computed point
-  const PK = argmax(R_TFU.amp);                                                                // the SSI peak of the full set
+  const PK = argmax(R_TFI.amp);                                                                // the SSI peak of the full set (3.47 Hz)
   scenes.push({
     id: "critfreq", title: "Check 3: is every peak backed?",
     build(s) {
       s.head = K.heading(s.root, "Check 3 · Is every peak backed?", {x: 110, y: 70, size: "h2"});
       s.p = K.plot(s.svg, {x: 230, y: 190, w: 960, h: 480, xr: [0, 20], yr: [0, 14], xticks: [0, 4, 8, 12, 16, 20], yticks: [0, 4, 8, 12],
         xlabel: "frequency (Hz)", ylabel: "roof amplification", ylabelOffset: 62});
-      const fpk = R_TFU.f[PK];
+      const fpk = R_TFI.f[PK];
       s.pk = s.p.vline(fpk, {color: C.muted, hidden: true});
       s.pkL = s.p.text(fpk, 14, `peak: ${fpk.toFixed(2)} Hz`, {cls: "t-label", color: "var(--ink2)", dx: 16, dy: 34, hidden: true});
       s.dots = dots(s.p, CO_TFU, {color: C.violet, r: 11});
@@ -351,7 +352,7 @@
       s.ceil = s.p.hline(top, {color: C.violet, dash: "10 8", width: 3, hidden: true});
       s.ceilL = s.p.text(19.6, top, `highest computed: ${top.toFixed(2)}`, {cls: "t-label", anchor: "end", color: "var(--violet)", dy: -16, hidden: true});
       s.co = s.p.line(CO_TFI.f, CO_TFI.amp, {color: C.violet, width: 6, draw: true});
-      s.top = ring(s.p, CF.f, CF.amp, CF.amp.toFixed(2), {color: "var(--ink)", r: 22, size: 36, dx: 30, dy: 12});
+      s.top = ring(s.p, CF.f, CF.amp, CF.amp.toFixed(2), {color: "var(--ink)", r: 22, size: 36, dx: -30, dy: 12, anchor: "end"});
       // CRITFREQ: the peak against the larger of its two computed neighbours
       s.cmp = K.g(s.p.g, {hidden: true});
       const fa = CF.f + 1.6, xa = s.p.X(fa);
@@ -360,7 +361,7 @@
       K.text(s.cmp, xa + 22, s.p.Y((CF.amp + CF.ref) / 2) + 12, `${(CF.amp / CF.ref).toFixed(1)} × (+${CF.d.toFixed(0)} %)`, {cls: "t-label", color: "var(--bad)", size: 36});
       s.added = s.p.dot(AD_TFU.f[CF_ADD], AD_TFU.amp[CF_ADD], {color: C.good, r: 14, hidden: true});
       s.code = K.code(s.root, ["CRITFREQ,5,50,00085TR_X,ADDC", "FREQ,1,@ADDC[1]"], {x: 1290, y: 190, w: 540, size: 27});
-      s.isrs = K.stat(s.root, {x: 1290, y: 420, w: 540, value: "8.25", unit: "g", label: "roof spectrum peak,<br>resting on that guess", color: "var(--violet)", vsize: 100});
+      s.isrs = K.stat(s.root, {x: 1290, y: 420, w: 540, value: "8.04", unit: "g", label: "roof spectrum peak,<br>resting on that guess", color: "var(--violet)", vsize: 100});
       s.flag = K.pill(s.root, `⚑ flagged: ${CF.amp.toFixed(1)} against ${CF.ref.toFixed(1)}`, {x: 1300, y: 660, color: "var(--bad)", style: {fontSize: "32px"}});
       s.okp = K.pill(s.root, `✓ confirmed: ${AD_TFU.amp[CF_ADD].toFixed(2)} computed`, {x: 1300, y: 660, color: "var(--good)", style: {fontSize: "32px"}});
       s.luck = K.card(s.root, {x: 230, y: 830, w: 1590, title: "Lucky this time", size: 32,
@@ -369,11 +370,11 @@
     beats: [
       {say: "Check three. [q]What if the computed points miss a peak entirely?",
         go(k) { k.show(k.s.head); }, q(k) { k.show(k.s.p.g); k.show([k.s.pk, k.s.pkL], {delay: 300}); }},
-      {say: "[c]We rerun the example with only 11 frequencies, [n]and none at the 3.49 hertz peak.",
+      {say: "[c]We rerun the example with only 11 frequencies, [n]and none at the 3.47 hertz peak.",
         c(k) { k.show(k.s.dots, {stagger: 100}); k.show(k.s.n11, {delay: 400}); }, n(k) { k.pulse(k.s.pkL); }},
-      {say: "[m]The highest computed point reaches only 4.5.",
+      {say: "[m]The highest computed point reaches only 4.7.",
         m(k) { k.show([k.s.ceil, k.s.ceilL]); }},
-      {say: "[i]Yet the filled-in curve still shoots up to 13. [s]And the roof spectrum peak, 8.25 g, rests on it.",
+      {say: "[i]Yet the filled-in curve still shoots up to 13. [s]And the roof spectrum peak, 8.04 g, rests on it.",
         i(k) { k.hide([k.s.n11, k.s.pkL]); k.draw(k.s.co, 1000); k.show(k.s.top, {delay: 400}); }, s(k) { k.show(k.s.isrs.el); }},
       {say: "[k]That's the job of CRITFREQ. [e]It compares every big peak with its computed neighbours.",
         k(k) { k.show(k.s.code.el); k.type(k.s.code.lines[0], {cps: 30}); },
@@ -449,7 +450,7 @@
         z(k) { k.hide(k.s.last); k.show([k.s.cut20, k.s.zone]); k.draw(k.s.tail20, 600); k.show(k.s.zero, {delay: 300}); k.show(k.s.lowpass, {delay: 400}); }},
       {say: "[c]Let's stop the same model at 10 hertz instead of 20.",
         c(k) { k.show([k.s.cutDim, k.s.cut10]); k.draw(k.s.t10, 1000, {delay: 200}); }, hold: 600},
-      {say: "[a]The big roof peak doesn't move: 8.24 g in both runs. [z]The ZPA barely changes either.",
+      {say: "[a]The big roof peak doesn't move: 8.03 g in both runs. [z]The ZPA barely changes either.",
         a(k) {
           const s = k.s;
           k.hide([s.a.g, s.lowpass, s.cutDim]);
@@ -459,7 +460,7 @@
         z(k) { k.show(k.s.s2.el); }},
       {say: "[r]But look at the mat, between 10 and 15 hertz.",
         r(k) { k.show([k.s.band, k.s.bandL]); }},
-      {say: "[d]At 12 hertz, the spectrum drops from 0.81 g to 0.48: [p]40 percent less.",
+      {say: "[d]At 12 hertz, the spectrum drops from 0.82 g to 0.48: [p]41 percent less.",
         d(k) { k.show(k.s.mk); }, p(k) { k.show(k.s.s3.el); }},
       {say: "[w]Equipment there would be designed for too little, and neither the peak nor the ZPA warns you.",
         w(k) { k.show(k.s.warn); k.show(k.s.rule, {delay: 400}); }},

@@ -371,7 +371,7 @@
         const ly = top + Math.min(L.h, 120) / 2 + (L.halfspace ? 4 : 0);
         const lab = K.g(lg, {});
         K.text(lab, lx, ly - (L.vs ? 4 : -8), L.name || "", {cls: "t-label", anchor, size: o.labelSize || 26});
-        if (L.vs) K.text(lab, lx, ly + 28, typeof L.vs === "number" ? `Vs = ${L.vs} m/s` : L.vs, {cls: "t-small", anchor, size: (o.labelSize || 26) - 4});
+        if (L.vs) K.text(lab, lx, ly + 28, typeof L.vs === "number" ? `Vs = ${L.vs.toLocaleString("en-US")} ft/s` : L.vs, {cls: "t-small", anchor, size: (o.labelSize || 26) - 4});
         item.label = lab;
       }
       res.layers.push(item);

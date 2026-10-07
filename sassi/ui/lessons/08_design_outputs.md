@@ -21,7 +21,7 @@ transient analysis of one model. With SSI there are two routes:
    ANSYS model of the structure, loaded by that motion, gives the forces. Module **LOADGEN** writes the
    ANSYS loads.
 
-This lesson does both on example 1, the four-storey stick on a 20 m × 20 m surface mat of lesson 04.
+This lesson does both on example 1, the four-storey stick on a 64 ft × 64 ft surface mat of lesson 04.
 Opening the lesson runs the complete example (about 4 s): the setup below reads
 `ex01_surface_stick.pre`, which builds the model and runs SITE, POINT, HOUSE, ANALYS, MOTION, STRESS
 and RELDISP. The steps then run in about 3 s.
@@ -40,9 +40,9 @@ you would do on any ANSYS result.
 * the shear at the bottom of the top storey (element 4, FYI) and the roof acceleration (g)
 READTH,BEAMS_002_00004_FYI.THS,0,1
 READTH,00085TR_X.ACC,0,2
-* roof mass x absolute roof acceleration = (9810 kN / g) x a(g)
-LINECOMBIN,3,2,9810
-LINENAME,3,roof mass x roof acceleration (kN)
+* roof mass x absolute roof acceleration = (2200 kips / g) x a(g)
+LINECOMBIN,3,2,2200
+LINENAME,3,roof mass x roof acceleration (kips)
 WRITETH,roof_inertia.th,3
 ```
 
@@ -53,28 +53,28 @@ WRITETH,roof_inertia.th,3
   K node, i.e. +X) and MZI (moment about local axis 3 at the bottom end I) are saved as histories
   `BEAMS_002_0000k_FYI.THS` and `..._MZI.THS`.
 * `READTH,<file>,0,<line>` loads a history (format 0: time step first, then values),
-  `LINECOMBIN,3,2,9810` scales the roof acceleration (in g) by the roof weight (9810 kN), and
+  `LINECOMBIN,3,2,2200` scales the roof acceleration (in g) by the roof weight (2,200 kips), and
   `WRITETH` writes the result as a history.
 
 ### Why it matters
 The STRESS listing gives the maxima of the storey shear FYI and moment MZI (bottom of each storey,
-kN and kN m):
+kips and kip·ft):
 
-| Storey | Max shear FYI | Max moment MZI |
+| Storey | Max shear FYI (kips) | Max moment MZI (kip·ft) |
 |---|---|---|
-| 1 (base, element 1) | 30 304 | 460 633 |
-| 2 | 27 509 | 309 629 |
-| 3 | 21 789 | 172 069 |
-| 4 (top, element 4) | 12 625 | 63 126 |
+| 1 (base, element 1) | 6,764 | 328,742 |
+| 2 | 6,137 | 220,554 |
+| 3 | 4,847 | 122,489 |
+| 4 (top, element 4) | 2,808 | 44,935 |
 
 All maxima occur at $t \approx 1.85\,\text{s}$. The two histories of the first plot lie on top of each
 other: the stick is massless, so the top storey carries exactly the roof mass times its absolute
-acceleration (peak $1000\,\text{t} \times 1.288\,\text{g} = 12\,636\,\text{kN}$ against
-$\mathrm{FYI} = 12\,625\,\text{kN}$, 0.09 % apart: MOTION interpolates the nodal transfer functions,
+acceleration (peak $2{,}200\,\text{kips} \times 1.278\,\text{g} = 2{,}811\,\text{kips}$ against
+$\mathrm{FYI} = 2{,}808\,\text{kips}$, 0.09 % apart: MOTION interpolates the nodal transfer functions,
 STRESS the force transfer functions). FYI is the force exerted on the element at its lower end, so it
-has the sign of $m\,a$. The shear grows down the stick to 30.3 MN at the base, 0.77 times the weight
-of the four floors. These forces contain the SSI effects directly: the foundation flexibility, the
-rocking and the radiation damping of the soil are in them.
+has the sign of $m\,a$. The shear grows down the stick to 6,764 kips at the base, 0.77 times the weight
+of the four floors (8,800 kips). These forces contain the SSI effects directly: the foundation
+flexibility, the rocking and the radiation damping of the soil are in them.
 
 ### Technical basis
 HOUSE stores per element a complex recovery operator $S$ (for a beam the local end forces $k_L T u$
@@ -124,9 +124,10 @@ RUNRELDISP
   reference; the `MAT_` copies keep the old one.
 
 ### Why it matters
-The roof moves 23.2 mm relative to the mat centre (floors 4.7, 10.6, 16.9 and 23.2 mm, all at
-$t = 1.855\,\text{s}$) but 25.3 mm relative to the free field; the mat centre itself moves up to 2.3
-mm relative to the free field (at 6.2 s): the foundation translates and rocks on the soil. A
+The roof moves 0.0766 ft (0.92 in) relative to the mat centre (floors 0.0155, 0.0349, 0.0559 and
+0.0766 ft, all at $t \approx 1.86\,\text{s}$) but 0.0835 ft (1.00 in) relative to the free field; the
+mat centre itself moves up to 0.0074 ft (0.09 in) relative to the free field (at 6.2 s): the foundation
+translates and rocks on the soil. A
 fixed-base model would report only the deformation of the stick.
 
 Which one to use:
@@ -162,7 +163,7 @@ explain: RDND,85,1,0,0,0,0,0
 Walls and mats are shells or solids: the design needs **resultants** over a section (shear, normal
 force, moment), not element stresses. STRESS writes the element-centre stresses of every time step,
 and a section cut integrates them over a plane. Here: the basemat across its full width at
-$x = 3.75\,\text{m}$, between the stick's base spider and the mat edge.
+$x = 12\,\text{ft}$, between the stick's base spider and the mat edge.
 
 ```sassi
 * SHELL forces of the 64 basemat elements (FXX FYY FXY MXX MYY MXY), maxima only
@@ -176,9 +177,9 @@ STRESSX,0,0,5
 AOPT,0,0,0,0,0,0,0,0,0,0,0,1,0,0
 AFWRITE
 RUNSTRESS
-* cut 1 = the 8 elements between x = 2.5 and 5 m; resultants on the plane x = 3.75 m
-CUTVOL,1,2.4,5.1,-10.1,10.1,-0.1,0.1
-CALCSECTHIST,NSTRESS/ESTRESS.lst,1,3.75,0,0,1,0,0,0,1,0,0,0.025,mat_cut_x375.csv
+* cut 1 = the 8 elements between x = 8 and 16 ft; resultants on the plane x = 12 ft
+CUTVOL,1,7.9,16.1,-32.1,32.1,-0.1,0.1
+CALCSECTHIST,NSTRESS/ESTRESS.lst,1,12,0,0,1,0,0,0,1,0,0,0.025,mat_cut_x12.csv
 * back to the example's STRESS settings for later runs
 STRESS,0,0,1,1,1
 SECDATAOPT,0
@@ -194,22 +195,22 @@ STRESSX,0,0,1
 * `SECDATAOPT,1` makes STRESS write a frame of element-centre stresses per output step;
   `STRESSX,0,0,5` (`<skip>` = 5) keeps every fifth step ($\Delta t = 0.025\,\text{s}$, 960 frames, 7.5
   MB) to keep the files small.
-* `CUTVOL,1,...` puts into cut 1 the elements whose nodes all lie in the box ($x$ from 2.5 to 5 m, the
+* `CUTVOL,1,...` puts into cut 1 the elements whose nodes all lie in the box ($x$ from 8 to 16 ft, the
   full width in $y$). `CALCSECTHIST,<list>,<cut>,<px,py,pz>,<nx,ny,nz>,<rx,ry,rz>,<sysno>,<ts>,<csv>`
-  integrates them on the plane through (3.75, 0, 0) with normal X, local $x$ axis along global Y, for
+  integrates them on the plane through (12, 0, 0) with normal X, local $x$ axis along global Y, for
   every frame of the list, and writes a CSV of time, $F_x$, $F_y$, $F_z$ (normal force), $M_x$, $M_y$,
   $M_z$ (torsion)
   with a final row of signed absolute maxima. `<ts>` = 0.025 s is the time between frames.
 
 ### Why it matters
-The CSV ends with the maxima: a bending moment $M_x =$ **116 100 kN m** across the 20 m width at
-$t = 1.85\,\text{s}$ (the time of the peak base moment), about 5.8 MN m per metre on average, and a
-normal (membrane) force $F_z = 11\,700\,\text{kN}$ at $t = 6.2\,\text{s}$, the time when the mat
-slides most relative to the free field. The section moment is the sum of the shell moments MXX of the
-eight cut elements times their 2.5 m width (2.2 to 10.0 MN m/m in the STRESS listing, largest in the
-middle strips under the stick). The transverse shear $F_y$ is zero: the Kirchhoff SHELL element
-reports no transverse shear forces; model the mat with TSHELL (Mindlin, QXZ and QYZ output) when you
-need them.
+The CSV ends with the maxima: a bending moment $M_x =$ **82,740 kip·ft** across the 64 ft width at
+$t = 1.85\,\text{s}$ (the time of the peak base moment), about 1,290 kip·ft per foot on average, and a
+normal (membrane) force $F_z = 2{,}592\,\text{kips}$ at the same time, with an almost equal peak
+(2,591 kips) at $t = 6.2\,\text{s}$, the time when the mat slides most relative to the free field. The
+section moment is the sum of the shell moments MXX of the eight cut elements times their 8 ft width
+(480 to 2,230 kip·ft/ft in the STRESS listing, largest in the middle strips under the stick). The
+transverse shear $F_y$ is zero: the Kirchhoff SHELL element reports no transverse shear forces; model
+the mat with TSHELL (Mindlin, QXZ and QYZ output) when you need them.
 
 The same commands give the base shear and overturning moment of a shear wall, the forces across a
 construction joint or the moment in a slab strip: the resultants you size reinforcement for.
@@ -228,9 +229,9 @@ repeated for every result set in a `*DO` loop over `SET`; in Workbench, a constr
 force and moment reaction probes.
 
 ```action
-open-file: ex01/mat_cut_x375.csv
+open-file: ex01/mat_cut_x12.csv
 open-listing: STRESS
-explain: CALCSECTHIST,NSTRESS/ESTRESS.lst,1,3.75,0,0,1,0,0,0,1,0,0,0.025,mat_cut_x375.csv
+explain: CALCSECTHIST,NSTRESS/ESTRESS.lst,1,12,0,0,1,0,0,0,1,0,0,0.025,mat_cut_x12.csv
 ```
 
 ## Option A: equivalent static loads for ANSYS (LOADGEN)
@@ -269,13 +270,13 @@ RUNLOADGEN,STATIC
   direction. `RUNLOADGEN,STATIC` writes the deck `ex01.lgn`, runs LOADGEN and writes `ex01_LGS.inp`.
 
 ### Why it matters
-The LOADGEN listing reports: masses 5468 t per direction ($4 \times 1000\,\text{t}$ of floors plus
-1468 t of mat; the mat nodes are interface nodes, so their inertia goes straight to the reactions),
-the critical time **$t = 1.855\,\text{s}$**, and a base shear of **30 335 kN** (sum of the 12 inertia
-forces of the floors). The STRESS base shear of the stick at that time is 30 304 kN: the two routes
-agree within 0.1 %. The moment of the inertia forces about the base is 460 615 kN m (STRESS: 460 633
-kN m). `ex01_LGS.inp` holds the 12 `F` commands and 243 `D` commands (81 interface nodes × 3
-translations).
+The LOADGEN listing reports: masses of 368.7 kip·s²/ft per direction, i.e. 11,872 kips of weight
+($4 \times 2{,}200\,\text{kips}$ of floors plus 3,072 kips of mat; the mat nodes are interface nodes,
+so their inertia goes straight to the reactions), the critical time **$t = 1.855\,\text{s}$**, and a
+base shear of **6,772 kips** (sum of the 12 inertia forces of the floors). The STRESS base shear of the
+stick at that time is 6,764 kips: the two routes agree to 0.12 %. The moment of the inertia forces
+about the base is 329,113 kip·ft (STRESS: 328,742 kip·ft, 0.11 % apart). `ex01_LGS.inp` holds the 12
+`F` commands and 243 `D` commands (81 interface nodes × 3 translations).
 
 The listing also warns that the interface rotations are not prescribed (`<rotdisp>` 0): with 81
 interface nodes the translations restrain the ANSYS model; set `<rotdisp>` 1 for a single interface
@@ -283,7 +284,7 @@ node (a stick on one support).
 
 In ANSYS: `/INPUT,ex01,inp` (the structure, written in the next step), then `/INPUT,ex01_LGS,inp`
 (loads, then SOLVE); in POST1 `PRRSOL,F` must show a total X reaction equal to the sum of the applied
-inertia forces with the opposite sign (30 335 kN): by equilibrium the reactions balance the applied
+inertia forces with the opposite sign (6,772 kips): by equilibrium the reactions balance the applied
 forces whatever the ANSYS mesh. Dead load is not included: combine with a gravity load case as your
 design code requires.
 

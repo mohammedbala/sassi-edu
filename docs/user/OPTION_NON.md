@@ -405,18 +405,19 @@ cracked stiffness); the damping ratios map to ANSYS material damping as for the 
 ## 11. Tutorial: example 7
 
 `examples/ex07_option_non.pre` is a complete Option NON analysis of a two-storey reinforced-concrete
-shear-wall box (12 m x 12 m, storeys of 4 m, 0.3 m walls, 400 t of equipment on each slab) on a
-surface mat, 10 m of soil (Vs 400 m/s) on rock, under the RG 1.60 record of the examples scaled to
-0.6 g in X and Y and 0.4 g in Z (Demo 9 of the manual is an RC shear-wall building at 0.60 g). It runs
-in 30–120 s and leaves about 95 MB in `examples/ex07/`: 35 MB of text results and 60 MB of binary
-inter-module files (FILE2, the ANALYS restart files `COOTKnnn`, …), which can be deleted after the run.
+shear-wall box (40 ft x 40 ft, storeys of 13 ft, 1 ft walls, 875 kips of equipment on each slab) on a
+surface mat, 32.5 ft of soil (Vs 1,300 ft/s) on rock, under the RG 1.60 record of the examples scaled to
+0.6 g in X and Y and 0.4 g in Z (Demo 9 of the manual is an RC shear-wall building at 0.60 g). Units are
+ft, kip, s (`HOUSE,32.2`). It runs in 30–120 s and leaves about 105 MB in `examples/ex07/`: 34 MB of
+text results and 72 MB of binary inter-module files (FILE2, the ANALYS restart files `COOTKnnn`, …),
+which can be deleted after the run.
 
 | Step | Commands | Remarks |
 |---|---|---|
-| model | `L`, `TOPL` (25 sublayers of 0.4 m), `N`/`FILL`/`NGEN`, `M,11` … `M,18`, `GROUP,2` … `GROUP,9` (SHELL, one per wall and storey), `GROUP,10` (slabs), `MT`, `INT`, `POINT`, `HOUSE` | one material per panel (D-NON-12) |
+| model | `L`, `TOPL` (25 sublayers of 1.3 ft), `N`/`FILL`/`NGEN`, `M,11` … `M,18`, `GROUP,2` … `GROUP,9` (SHELL, one per wall and storey), `GROUP,10` (slabs), `MT`, `INT`, `POINT`, `HOUSE` | one material per panel (D-NON-12) |
 | panels | `PNLGEN`, `PLIST` | panels 1–4: storey-1 walls S, E, N, W; 5–8: storey 2 |
-| capacities | `SHEAR,0,30000,420000,0.005,0` | SI (g = 9.81): f'c 30 MPa, f_y 420 MPa, ρ 0.5 %; per wall ACI 12 472 kN, Wood 9 824 kN, Barda 11 576 kN, Gulec-Whittaker 7 527 kN |
-| backbones | `BBCGEN,0,1,30000,420000,0.005,0,0,0,0.3` | ACI 318-08 V_u, cracking at 0.3 V_u (γ_cr = 8.31e-5) |
+| capacities | `SHEAR,0,4,60,0.005,0` | British (g = 32.2: ft, ksi, kips): f'c 4 ksi, f_y 60 ksi, ρ 0.5 %; per wall ACI 2,821 kips, Wood 2,186 kips (its lower bound 6√f'c A_W), Barda 2,608 kips, Gulec-Whittaker 1,716 kips |
+| backbones | `BBCGEN,0,1,4,60,0.005,0,0,0,0.3` | ACI 318-08 V_u, cracking at 0.3 V_u (V_cr = 846 kips, γ_cr = 8.82e-5) |
 | options | `EQL,0.8,1,0,0,1`, `NONLINMOTDISP` | EDF 0.8; ξ = 4 % + ξ_h; the 12 corner nodes in NOUT/RDND |
 | elastic SSI | three `SITE` runs (FILE1X/Y/Z), `ANALYS,0,0,0,1,1,…,1`, `RUNPOINT`, `RUNHOUSE`, `RUNANALYS` | restart files saved, X/Y/Z cases |
 | elastic NONLINEAR | `NONLINBAT,1`, `NONLINRESET`, `VAR` NLDX/NLDY/NLDZ/NLNON, `FOREACH` …, `NONLINSAVE,elastic` | analysis 0 |
@@ -427,21 +428,21 @@ Convergence history (`NONLINEAR_CONVERGENCE.TXT`; analysis 0 = the elastic model
 
 | analysis | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 |
 |---|---|---|---|---|---|---|---|---|
-| max \|dE/E\| % | 28.0 | 22.9 | 17.1 | 11.5 | 6.6 | 4.2 | 2.4 | **1.3** |
-| max \|dξ\| % | 7.39 | 3.14 | 1.46 | 0.61 | 0.12 | 0.03 | 0.01 | **0.01** |
+| max \|dE/E\| % | 25.5 | 20.9 | 16.1 | 11.1 | 7.4 | 4.0 | 2.6 | **1.7** |
+| max \|dξ\| % | 6.86 | 3.02 | 1.54 | 0.70 | 0.33 | 0.07 | 0.02 | **0.01** |
 
 Converged properties (`Panel_EQL_Matl_Prop.txt`, `Panel.fmu`):
 
 | Panels | E/E_el | ξ_h | ξ | max\|γ\| | γ_eq | μ | F_μ |
 |---|---|---|---|---|---|---|---|
-| 1–4 (storey 1) | 0.351 | 12.7 % | 16.7 % | 3.69e-4 | 2.95e-4 | 4.43 | 3.34 |
-| 5–8 (storey 2) | 1.000 | 0 | 4.0 % | 6.9e-5 | 5.6e-5 | 0.84 | 1.00 |
+| 1–4 (storey 1) | 0.374 | 12.5 % | 16.5 % | 3.64e-4 | 2.91e-4 | 4.13 | 3.14 |
+| 5–8 (storey 2) | 1.000 | 0 | 4.0 % | 7.3e-5 | 5.8e-5 | 0.82 | 1.00 |
 
 The four storey-1 walls behave alike because the building is symmetric and the same record drives X and
-Y. They are cracked: 4.4 times the cracking strain, but far from the yield strain of 0.4 %. Their shear
-at the peak strain, 4 962 kN, is 40 % of V_u; the initial stiffness at the same strain would give
-K_el·max\|γ\| = 16 584 kN, hence F_μ = 3.3. The storey-2
-walls stay below the cracking strain (μ = 0.84), so they keep E_el and the elastic 4 %. The 16.7 %
+Y. They are cracked: 4.1 times the cracking strain, but far from the yield strain of 0.4 %. Their shear
+at the peak strain, 1,114 kips, is 39 % of V_u; the initial stiffness at the same strain would give
+K_el·max\|γ\| = 3,493 kips, hence F_μ = 3.1. The storey-2
+walls stay below the cracking strain (μ = 0.82), so they keep E_el and the elastic 4 %. The 16.5 %
 damping is above the 7 % that ASCE 4 accepts for cracked concrete. The method gives it, but a design
 analysis would cap it (`<dampCutoff>` 7).
 
@@ -450,8 +451,8 @@ The same model with one change (iteration counts of this build):
 | Variant | Change | Result |
 |---|---|---|
 | the example | — | converged after 7 iterations |
-| damping cut-off 7 % | `EQL,0.8,1,7,0,1` | not converged after 10 passes, although the changes still fall (28.0 … 4.4, 2.9 %). With less damping the walls deform more: E/E_el = 0.18, ξ = 7 %, max\|γ\| = 1.0e-3 (μ = 12.5) |
-| Gulec-Whittaker, cracking 3√f'c A_W | `BBCGEN,0,4,30000,420000,0.005,0,0,0,0` | converged after 5 iterations (max \|dE/E\| 9.1, 8.1, 7.1, 7.1, 6.9, 1.2 %; the damping changed by 4.2 % at analysis 4): E/E_el = 0.66, ξ = 15.1 %, μ = 1.9 |
+| damping cut-off 7 % | `EQL,0.8,1,7,0,1` | not converged after 10 passes, although the changes still fall (25.5 … 3.9, 3.2 %). With less damping the walls deform more: E/E_el = 0.21, ξ = 7 %, max\|γ\| = 9.0e-4 (μ = 10.3) |
+| Gulec-Whittaker, cracking 3√f'c A_W | `BBCGEN,0,4,4,60,0.005,0,0,0,0` | converged after 5 iterations (max \|dE/E\| 7.3, 6.1, 6.0, 5.6, 5.3, 1.7 %; the damping changed by 3.6 % at analysis 4): E/E_el = 0.72, ξ = 13.5 %, μ = 1.8 |
 
 These variants show the points of §8. In force control the converged state depends strongly on the
 damping, and the convergence rate depends on the shape of the backbone near the solution. The

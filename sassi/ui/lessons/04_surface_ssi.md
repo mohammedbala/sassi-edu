@@ -9,64 +9,65 @@ summary: Build example 1 command by command, run the SASSI chain, and read the t
 objectives: [Build a stick model on a mat with BEAMS SHELL masses and rigid links, Choose the frequency set (df and NFFT and cut-off), Run SITE POINT HOUSE and ANALYS and check the solution, Produce ISRS with MOTION and check the interpolation, Get relative displacements with RELDISP and member forces with STRESS, Explain the frequency shift and the system damping with the foundation impedance]
 prerequisites: [02-free-field, 03-impedance]
 ---
-This lesson builds example 1 command by command: the four-storey stick on a 20 m × 20 m mat that
+This lesson builds example 1 command by command: the four-storey stick on a 64 ft × 64 ft mat that
 lesson 1 ran in one go. The structure is modelled the way you would model it in ANSYS (beams,
 shells, lumped masses, a rigid region); what is new is everything around it: the frequency set,
 the soil impedance on the interaction nodes, and the way results are produced from transfer
 functions.
 
-The site is the one built in lesson 2 (5 m of sand, $V_s = 300\,\text{m/s}$, on 12 m of gravel,
-$V_s = 500\,\text{m/s}$, on weathered rock, $V_s = 1000\,\text{m/s}$); it is restored automatically
+The site is the one built in lesson 2 (16 ft of sand, $V_s = 1000\,\text{ft/s}$, on 39 ft of gravel,
+$V_s = 1650\,\text{ft/s}$, on weathered rock, $V_s = 3300\,\text{ft/s}$); it is restored automatically
 when the lesson opens:
 
 ```sassi-setup
 MDL,ex01,ex01
 TIT,Ex01 - 4-mass stick on a rigid surface mat, vertical SV (X) input
-L,1,0.5,19.0,600,300,0.05,0.05
-L,2,1.0,20.0,1000,500,0.04,0.04
-L,3,1.0,21.0,2000,1000,0.02,0.02
+L,1,1.6,0.120,2000,1000,0.05,0.05
+L,2,3.25,0.125,3300,1650,0.04,0.04
+L,3,3.25,0.130,6600,3300,0.02,0.02
 TOPL,1,1,1,1,1,1,1,1,1,1
 TOPL,2,2,2,2,2,2,2,2,2,2
 TOPL,2,2
 WAVE,2,1,1,1,0
 ```
 
-Units are m, kN, t and s; the vertical axis is Z, up; the input is a vertically propagating SV wave
+Units are ft, kip and s (US customary: masses in kip·s²/ft, entered as weights in kips, and
+$g = 32.2\,\text{ft/s}^2$); the vertical axis is Z, up; the input is a vertically propagating SV wave
 with the control motion in X at the ground surface.
 
 ## The basemat
 
 ```sassi
-GRAVITY,9.81
-* mat nodes 1..81: a 9 x 9 grid at grade, 2.5 m spacing, numbered row by row (x fastest)
-N,1,-10,-10,0
-N,9,10,-10,0
+GRAVITY,32.2
+* mat nodes 1..81: a 9 x 9 grid at grade, 8 ft spacing, numbered row by row (x fastest)
+N,1,-32,-32,0
+N,9,32,-32,0
 FILL,1,9
-NGEN,8,9,1,9,1,0,2.5,0
-* M,<nm>,<E>,<nu>,<weight>,<pdamp>,<sdamp>,<type 1>: 10 x concrete stiffness, 24 kN/m3
-M,1,3.0E8,0.2,24.0,0.05,0.05,1
+NGEN,8,9,1,9,1,0,8,0
+* M,<nm>,<E>,<nu>,<weight>,<pdamp>,<sdamp>,<type 1>: 10 x concrete stiffness, 0.150 kcf
+M,1,5.76E6,0.2,0.150,0.05,0.05,1
 GROUP,1,SHELL
 GTIT,1,basemat
 MACT,1
 E,1,1,2,11,10
 EGEN,7,1,1
 EGEN,7,9,1,8
-THICK,1,64,1,1.5
+THICK,1,64,1,5.0
 ```
 
 ```action
 plot-model
-explain: NGEN,8,9,1,9,1,0,2.5,0
+explain: NGEN,8,9,1,9,1,0,8,0
 explain: EGEN,7,9,1,8
 ```
 
 ### What this does
 `N` defines nodes 1 and 9 at the two ends of the first row and `FILL` puts nodes 2 to 8 between
-them; `NGEN,8,9,1,9,1,0,2.5,0` copies that row 8 times, adding 9 to the node numbers and 2.5 m to Y
-each time: 81 nodes. `M,1` is the mat material ($E = 3 \times 10^8\,\text{kPa}$, ten times concrete,
-$\nu = 0.2$, unit weight 24 kN/m³, 5 % damping). `GROUP,1,SHELL` opens a shell group;
-`E,1,1,2,11,10` is the first 2.5 m × 2.5 m element, `EGEN` copies it 7 times along X (node increment
-1) and that row 7 times along Y (increment 9): 64 elements. `THICK` gives them 1.5 m.
+them; `NGEN,8,9,1,9,1,0,8,0` copies that row 8 times, adding 9 to the node numbers and 8 ft to Y
+each time: 81 nodes. `M,1` is the mat material ($E = 5.76 \times 10^6\,\text{ksf}$, i.e. 40,000 ksi,
+ten times concrete, $\nu = 0.2$, unit weight 0.150 kcf, 5 % damping). `GROUP,1,SHELL` opens a shell
+group; `E,1,1,2,11,10` is the first 8 ft × 8 ft element, `EGEN` copies it 7 times along X (node
+increment 1) and that row 7 times along Y (increment 9): 64 elements. `THICK` gives them 5 ft.
 
 ### Why it matters
 The mat is deliberately almost rigid, so that the results can be compared with a rigid-foundation
@@ -92,16 +93,16 @@ only the nodes. A SHELL group is a set of shell elements with a section thicknes
 ## The stick and the floor masses
 
 ```sassi
-* stick nodes 82..85 above the mat centre (node 41), 5 m storeys
-N,82,0,0,5
-NGEN,3,1,82,82,1,0,0,5
+* stick nodes 82..85 above the mat centre (node 41), 16 ft storeys
+N,82,0,0,16
+NGEN,3,1,82,82,1,0,0,16
 * beam orientation (K) nodes 86..89 beside each storey in +X
-N,86,10,0,2.5
-NGEN,3,1,86,86,1,0,0,5
+N,86,32,0,8
+NGEN,3,1,86,86,1,0,0,16
 * stick: concrete, massless (the masses are lumped at the floors)
-M,2,3.0E7,0.2,0.0,0.05,0.05,1
-* R,<nm>,<A>,<As2>,<As3>,<J>,<I2>,<I3>: the shear-wall core
-R,1,20.0,10.0,10.0,400.0,200.0,200.0
+M,2,5.76E5,0.2,0.0,0.05,0.05,1
+* R,<nm>,<A>,<As2>,<As3>,<J>,<I2>,<I3> (ft2, ft4): the shear-wall core
+R,1,215.0,108.0,108.0,46000.0,23000.0,23000.0
 GROUP,2,BEAMS
 GTIT,2,stick
 MACT,2
@@ -109,28 +110,29 @@ RACT,1
 E,1,41,82,86
 E,2,82,83,87
 EGEN,2,1,2
-* 1000 t per floor, entered as weights (9810 kN)
+* 2,200 kips per floor, entered as weights
 VAR,FLOOR,82,83,84,85
-FOREACH,FLOOR,MT,@FLOOR[#],9810,9810,9810
+FOREACH,FLOOR,MT,@FLOOR[#],2200,2200,2200
 ```
 
 ```action
 plot-model
-explain: R,1,20.0,10.0,10.0,400.0,200.0,200.0
-explain: FOREACH,FLOOR,MT,@FLOOR[#],9810,9810,9810
+explain: R,1,215.0,108.0,108.0,46000.0,23000.0,23000.0
+explain: FOREACH,FLOOR,MT,@FLOOR[#],2200,2200,2200
 ```
 
 ### What this does
 Four BEAMS elements from the mat centre (node 41) to the roof (node 85), each with a K node that
 fixes the orientation of the local axes (local axis 2 points to +X, so bending in X is about local
-axis 3). `R` gives the section: $A = 20\,\text{m}^2$, shear areas 10 m², $J = 400\,\text{m}^4$,
-$I = 200\,\text{m}^4$. The material
+axis 3). `R` gives the section: $A = 215\,\text{ft}^2$, shear areas 108 ft²,
+$J = 46{,}000\,\text{ft}^4$, $I = 23{,}000\,\text{ft}^4$. The material
 is massless (`<weight>` = 0) because the floor masses are lumped: `VAR` lists the floor nodes and
-`FOREACH` runs `MT,<node>,9810,9810,9810` for each, i.e. 9810 kN of weight (1000 t) in X, Y and Z.
+`FOREACH` runs `MT,<node>,2200,2200,2200` for each, i.e. 2,200 kips of weight (a mass of
+68.3 kip·s²/ft) in X, Y and Z.
 
 ### Why it matters
 This is the classical lumped-mass stick of nuclear practice. Its fixed-base first mode is at
-5.05 Hz and the second at 19 Hz ([examples/README.md](examples/README.md#example-1-lumped-mass-stick-on-a-rigid-surface-mat));
+4.97 Hz and the second at 18.5 Hz ([examples/README.md](examples/README.md#example-1-lumped-mass-stick-on-a-rigid-surface-mat));
 lesson 1 reproduced the first on a rigid site. Masses are entered as weights by default
 (`MUNITS`); forgetting this, or the gravity, is the classic unit error.
 
@@ -144,9 +146,9 @@ checked by VP-37).
 
 ```sassi
 * K node of the horizontal rigid links (any point off their axes)
-N,90,0,0,2.5
-M,3,3.0E10,0.2,0.0,0.0,0.0,1
-R,2,6.25,5.2,5.2,5.5,3.26,3.26
+N,90,0,0,8
+M,3,5.76E8,0.2,0.0,0.0,0.0,1
+R,2,64.0,53.0,53.0,576.0,341.0,341.0
 GROUP,3,BEAMS
 GTIT,3,rigid links
 MACT,3
@@ -169,13 +171,14 @@ explain: FIXROT
 ```
 
 ### What this does
-Eight stiff, massless beams ($E = 3 \times 10^{10}\,\text{kPa}$) connect the stick base to the eight
-mat nodes around it: a single shell node cannot take the concentrated base moment of the stick
-without a large, mesh-dependent local rotation. `FIXROT` fixes the rotation about the shell normal
-(ROTZ) at the 72 mat nodes that are connected to shells only; the stick base and the spider ends
-keep it, because the beams give it stiffness and because fixing it there would clamp the torsion of
-the whole mat to the ground. `INT,1,81,1,1` makes the 81 mat nodes interaction nodes. `CALCM` checks
-the mass: 1468 t of mat (element weight 14,400 kN) plus 4000 t of floors, 5468 t in total.
+Eight stiff, massless beams ($E = 5.76 \times 10^8\,\text{ksf}$, 1000 times concrete) connect the
+stick base to the eight mat nodes around it: a single shell node cannot take the concentrated base
+moment of the stick without a large, mesh-dependent local rotation. `FIXROT` fixes the rotation
+about the shell normal (ROTZ) at the 72 mat nodes that are connected to shells only; the stick base
+and the spider ends keep it, because the beams give it stiffness and because fixing it there would
+clamp the torsion of the whole mat to the ground. `INT,1,81,1,1` makes the 81 mat nodes interaction
+nodes. `CALCM` checks the mass: 95.4 kip·s²/ft of mat (element weight 3,072 kips) plus
+273.3 kip·s²/ft of floors (4 × 2,200 kips), 368.7 kip·s²/ft in total, a weight of 11,872 kips.
 
 ### Why it matters
 For a surface foundation the interaction nodes are simply the foundation nodes at grade; every
@@ -228,10 +231,10 @@ The frequency set is the main accuracy and cost decision of an SSI analysis:
   low-pass filter on every result. It must cover the input's frequency content and the important
   modes; the manual quotes 30-40 Hz for soil sites and 60-70 Hz for rock sites. The 20 Hz of this
   tutorial keeps it fast; it removes almost nothing from the peak of this record (0.3239 g becomes
-  0.3235 g, lesson 1), but it sits just above the stick's second fixed-base mode (19 Hz), so a
+  0.3235 g, lesson 1), but it sits just above the stick's second fixed-base mode (18.5 Hz), so a
   production analysis would go higher;
 * points must be **dense where the response changes fast**: around the SSI frequencies, which are
-  often well below the fixed-base ones (here 3.5 Hz against 5.05 Hz). The manual recommends 40-80
+  often well below the fixed-base ones (here 3.5 Hz against 4.97 Hz). The manual recommends 40-80
   frequencies for stick models and 100-300 for large FE models; this tutorial uses 22 to stay fast;
 * the **quiet zone** must be long enough for the free vibration to decay, or it wraps around to the
   start of the record (EDU-19).
@@ -241,7 +244,7 @@ $\Delta f = 1/(\Delta t \cdot \text{NFFT})$, $f = n\,\Delta f$; MOTION interpola
 functions from the analysis frequencies to every Fourier frequency $k\,\Delta f$ up to the cut-off
 ([User Guide §9](docs/user/USER_GUIDE.md#9-frequencies-and-the-fft),
 [Theory §10](docs/theory/THEORY_MANUAL.md#10-transfer-function-interpolation)). The sublayers must
-pass the cut-off (lesson 2: 100-120 Hz here).
+pass the cut-off (lesson 2: 102 and 125 Hz here).
 
 ### Check yourself
 Your record has 4000 points at $\Delta t = 0.01\,\text{s}$ and you choose $\text{NFFT} = 4096$. What
@@ -254,10 +257,10 @@ $\text{NFFT} = 8192$ ($\Delta f = 0.0122\,\text{Hz}$).
 ## Run the SSI solution: SITE, POINT, HOUSE, ANALYS
 
 ```sassi
-* POINT: surface foundation, R0 = 0.9 x 2.5 m
-POINT,0,0,2.25
-* HOUSE,<gravity>,<gelev>,<opmode>,<dim>,<imp>,...: SI gravity, ground at z = 0, 3D, FV
-HOUSE,9.81,0,0,2,0,0,0,0,0
+* POINT: surface foundation, R0 = 0.9 x 8 ft
+POINT,0,0,7.2
+* HOUSE,<gravity>,<gelev>,<opmode>,<dim>,<imp>,...: g = 32.2 ft/s2, ground at z = 0, 3D, FV
+HOUSE,32.2,0,0,2,0,0,0,0,0
 * ANALYS: seismic initiation run, control point at the origin; <impe> = 2 also writes the
 * 6 x 6 foundation impedance of the mat (FOUNSTIF ...), used in the last step
 ANALYS,0,0,0,0,1,0,0,0,0,0,2
@@ -278,8 +281,9 @@ open-dialog: ANALYSIS/ANALYS
 ```
 
 ### What this does
-`POINT,0,0,2.25`: point loads at the surface only, central zone $R_0 = 0.9 \times 2.5\,\text{m}$.
-`HOUSE` sets gravity 9.81, ground elevation 0, a 3D model and the FV method (`<imp>` = 0; for a
+`POINT,0,0,7.2`: point loads at the surface only, central zone
+$R_0 = 0.9 \times 8\,\text{ft} = 7.2\,\text{ft}$. `HOUSE` sets gravity 32.2 ft/s² (the listing
+reports British units), ground elevation 0, a 3D model and the FV method (`<imp>` = 0; for a
 surface foundation all methods coincide). `ANALYS,0,0,0,...`: solution, seismic (`<type>` 0),
 initiation run (`<mode>` 0), no restart files, amplitudes in the listing; `<impe>` = 2 adds the
 global impedance of lesson 3. `CHECK` and `AFWRITE` check the model and write the four decks;
@@ -290,7 +294,8 @@ about 0.7 s:
 * ANALYS: at each frequency the structure is condensed onto the 243 interaction DOFs (a Schur
   complement, the same static condensation as an ANSYS superelement), the dense soil impedance is
   added there, and the condensed system is solved; the **low-frequency check** finds every
-  transfer function within 0.10 % of 1 at 0.098 Hz.
+  transfer function within about 0.1 % of 1 at 0.098 Hz (the largest deviation, 0.103 %, is at the
+  roof).
 
 ### Why it matters
 This is the SSI analysis proper; MOTION, STRESS and RELDISP afterwards only post-process FILE8. The
@@ -354,16 +359,17 @@ X axis (their motion is the rocking of the mat).
 
 Results (MOTION listing and files):
 
-* roof transfer function: 1.00 at 0.1 Hz, peak **13.1 at 3.49 Hz**; mat centre 1.51 at 3.49 Hz;
-  the two mat edges move vertically by 1.59 at 3.49 Hz, in opposite directions: the mat rocks;
-* peak accelerations: 0.36 g (mat), 0.48, 0.66, 0.94 and **1.29 g** (roof);
-* 5 % ISRS: roof 8.2 g at 3.5 Hz, mat 1.39 g at 3.2 Hz.
+* roof transfer function: 1.00 at 0.1 Hz, **13.0 at 3.49 Hz** (the computed frequency closest to
+  the peak; the interpolated peak is 13.1 at 3.47 Hz); mat centre 1.42 at 3.49 Hz; the two mat
+  edges move vertically by 1.58 at 3.49 Hz, in opposite directions: the mat rocks;
+* peak accelerations: 0.36 g (mat), 0.47, 0.65, 0.93 and **1.28 g** (roof);
+* 5 % ISRS: roof 8.03 g at 3.55 Hz, mat 1.39 g at 3.2 Hz.
 
 ### Why it matters
 These are your design ISRS (for one direction, one soil case, before broadening). Before using them,
 compare the computed (`.TFU`) and interpolated (`.TFI`) transfer functions: the interpolation is
 trusted only where computed points support it. The mat-centre plot shows an interpolated peak of
-1.71 at 3.39 Hz between computed values of 1.34 (3.00 Hz) and 1.51 (3.49 Hz): exactly the situation
+1.70 at 3.37 Hz between computed values of 1.35 (3.00 Hz) and 1.42 (3.49 Hz): exactly the situation
 in which the manual recommends adding an analysis frequency (Try this).
 
 ### Technical basis
@@ -377,9 +383,9 @@ VP-28 interpolation, VP-30 spectra).
 
 ### Try this
 Add five frequencies around the mat peak, rerun the chain and look at the mat-centre TFU again. The
-computed value at 3.394 Hz is 1.711, the value the interpolation predicted, and the ISRS do not
-change (8.24 g at the roof): here the interpolation was right. Lesson 10 shows how `CRITFREQ` finds
-such frequencies automatically.
+computed value at 3.394 Hz (number 139) is 1.696, the value the interpolation predicted there, and
+the ISRS do not change (8.03 g at the roof): here the interpolation was right. Lesson 10 shows how
+`CRITFREQ` finds such frequencies automatically.
 
 ```sassi-show
 FREQ,1,131,135,139,147,151
@@ -416,8 +422,9 @@ open-listing: RELDISP
 
 ### What this does
 RELDISP computes the X displacement of each requested node relative to the reference given by
-`RELFILE`, here the mat centre. The maxima (RELDISP listing): 4.7, 10.6, 16.9 and **23.2 mm** at the
-four floors, all at $t = 1.86\,\text{s}$, and exactly 0 for the mat centre itself.
+`RELFILE`, here the mat centre. The maxima (RELDISP listing, in ft): 0.0155, 0.0349, 0.0559 and
+**0.0766 ft** (0.19, 0.42, 0.67 and 0.92 in) at the four floors, all at $t = 1.86\,\text{s}$, and
+exactly 0 for the mat centre itself.
 
 ### Why it matters
 Relative displacements are design quantities of their own: seismic gaps between buildings, the
@@ -448,10 +455,10 @@ spectrum and $d(t)$ the relative displacement history.
 Watch the earthquake response in time. `RELDX,0,1` (*Restart For Frame Generation*) makes RELDISP
 write one frame per time step in `ex01/THD/`: the X displacements of the five requested nodes relative
 to the mat centre, 4800 frames for the 24 s of output, about 40 MB on disk once `PROCFRAME` has stored
-them as well (about a second each to write and to store). `DEFORMPLOT` then plays the first 6 s,
+them as well (a second or two each to write and to store). `DEFORMPLOT` then plays the first 6 s,
 every fourth frame (0.02 s apart), with the displacements drawn 100 times larger: the stick sways back
-and forth, its roof reaching 23 mm at 1.86 s. Only the five frame nodes move; the mat has no frame
-data and stays at rest.
+and forth, its roof reaching 0.077 ft (0.92 in) at 1.86 s. Only the five frame nodes move; the mat
+has no frame data and stays at rest.
 Delete the two folders afterwards (Learn > Free Disk Space removes the whole workspace).
 
 ```sassi-show
@@ -487,15 +494,16 @@ open-file: ex01/ex01.pre
 ### What this does
 `EOUT` asks for the end forces of the four stick elements (group 2): the maximum of all twelve
 components, plus the history of the shear FYI and the moment MZI at the bottom of each storey. The
-STRESS listing gives the storey shears 30.3, 27.5, 21.8 and 12.6 MN (bottom to top) and the base
-moment $4.61 \times 10^5\,\text{kN\,m}$. `WRITE` saves the whole model as a `.pre` command file that
-`INP` can read back.
+STRESS listing gives the storey shears 6,764, 6,137, 4,847 and 2,808 kips (bottom to top) and the
+base moment $3.29 \times 10^5\,\text{kip\,ft}$. `WRITE` saves the whole model as a `.pre` command
+file that `INP` can read back.
 
 ### Why it matters
 These are the seismic member forces for one direction and one soil case, the input to the
-design of the walls and the basemat. A quick equilibrium check: the top-storey shear (12.6 MN)
-equals the roof mass times the roof acceleration,
-$1000\,\text{t} \times 1.29\,\text{g} = 12.6\,\text{MN}$, because the stick itself is massless.
+design of the walls and the basemat. A quick equilibrium check: the top-storey shear (2,808 kips)
+equals the roof weight times the roof acceleration in g,
+$2{,}200\,\text{kips} \times 1.278 = 2{,}811\,\text{kips}$ (both peak at $t = 1.85\,\text{s}$), because
+the stick itself is massless.
 
 ### Technical basis
 STRESS forms the **force** transfer functions element by element (the recovery operator times the
@@ -513,8 +521,9 @@ combination).
 
 ## Why 3.5 Hz: the foundation springs and dashpots
 
-The stick has its first fixed-base mode at 5.05 Hz; on the soil its first mode is at 3.49 Hz, and
-its peak is not damped much more than on a fixed base (lesson 1). The impedance written by ANALYS
+The stick has its first fixed-base mode at 4.97 Hz; on the soil its first mode is at 3.47 Hz (the
+interpolated roof peak; 3.49 Hz is the computed frequency next to it), and its peak is not damped
+much more than on a fixed base (lesson 1). The impedance written by ANALYS
 explains both.
 
 ```sassi
@@ -529,53 +538,54 @@ HARMFRAME,FILE8,3.49,HARM_349R,24,41
 open-file: ex01/FOUNSTIF
 open-file: ex01/FOUNDAMP
 open-listing: MOTION
-animate: ex01/HARM_349 | deformed 0.2 front | Total motion at 3.49 Hz
-animate: ex01/HARM_349R | deformed 0.2 front | Relative to the mat centre at 3.49 Hz
+animate: ex01/HARM_349 | deformed 0.6 front | Total motion at 3.49 Hz
+animate: ex01/HARM_349R | deformed 0.6 front | Relative to the mat centre at 3.49 Hz
 ```
 
 ### What this does
-`LLIST` gives $G = 174{,}312\,\text{kPa}$ for the sand and 509,684 kPa for the gravel. FOUNSTIF and
+`LLIST` gives $G = 3{,}726.7\,\text{ksf}$ for the sand and 10,568.7 ksf for the gravel. FOUNSTIF and
 FOUNDAMP hold the 6 × 6 impedance of the mat about its centre at each frequency. At 0.098 Hz:
-$K_x = 1.72 \times 10^7\,\text{kN/m}$ and $K_{yy} = 1.77 \times 10^9\,\text{kN\,m/rad}$ (rocking
-about Y); at 3.49 Hz $K_x = 1.48 \times 10^7\,\text{kN/m}$,
-$K_{yy} = 1.70 \times 10^9\,\text{kN\,m/rad}$, with damping ratios 7.7 % in sliding and 4.9 % in
+$K_x = 1.17 \times 10^6\,\text{kip/ft}$ and $K_{yy} = 1.23 \times 10^9\,\text{kip\,ft/rad}$ (rocking
+about Y); at 3.49 Hz $K_x = 1.01 \times 10^6\,\text{kip/ft}$,
+$K_{yy} = 1.18 \times 10^9\,\text{kip\,ft/rad}$, with damping ratios 7.6 % in sliding and 4.9 % in
 rocking (FOUNDAMP).
 
 The two `HARMFRAME` commands write the steady-state motion at 3.49 Hz in 24 frames over one period,
 per unit harmonic control motion: the total motion, and the motion relative to the mat centre
 (`<Ref>` = 41 subtracts the X, Y and Z motion of node 41 from every node). The animations show the
 three parts of conclusion 1 below. In the total motion the mat slides and rocks under the swinging
-stick. Relative to the mat centre the sliding is gone: the mat turns about its centre (edges ±1.59)
-and the stick tilts with it while it bends; the roof moves 11.9 relative to the mat centre instead
-of 13.1 in total.
+stick. Relative to the mat centre the sliding is gone: the mat turns about its centre (edges ±1.58)
+and the stick tilts with it while it bends; the roof moves 12.0 relative to the mat centre instead
+of 13.0 in total.
 
 ### Why it matters
 Three conclusions an engineer can take from these numbers:
 
-1. **Rocking governs the soil flexibility.** For a force at the roof ($h = 20\,\text{m}$) the soil
-   adds a sliding flexibility of $1/K_x = 0.068\,\text{mm/MN}$ and a rocking flexibility of
-   $h^2/K_{yy} = 0.235\,\text{mm/MN}$, 3.5 times more. The transfer functions at 3.49 Hz (MOTION
-   listing) agree: the mat edges, 10 m either side of the centre, move vertically by ±1.59, so the
-   rocking alone moves the roof (20 m up) by $2 \times 1.59 = 3.2$ times the control motion, against
-   a mat translation of 1.51. The three parts are not in phase (compare the phases in the listing),
-   so they add as complex numbers: subtracting the mat translation and the rocking from the roof
-   transfer function (13.1) leaves about 8.7 for the bending and shear of the stick.
+1. **Rocking governs the soil flexibility.** For a force at the roof ($h = 64\,\text{ft}$) the soil
+   adds a sliding flexibility of $1/K_x = 0.0119\,\text{in}$ per 1,000 kips and a rocking flexibility
+   of $h^2/K_{yy} = 0.0416\,\text{in}$ per 1,000 kips, 3.5 times more. The transfer functions at
+   3.49 Hz (MOTION listing) agree: the mat edges, 32 ft either side of the centre, move vertically
+   by ±1.58, so the rocking alone moves the roof (64 ft up) by $2 \times 1.58 = 3.2$ times the
+   control motion, against a mat translation of 1.42. The three parts are not in phase (compare the
+   phases in the listing), so they add as complex numbers: subtracting the mat translation and the
+   rocking from the roof transfer function (13.0) leaves about 8.8 for the bending and shear of the
+   stick.
 2. **Rocking gets almost no radiation damping here.** At 3.49 Hz the rocking damping ratio (4.9 %)
    is hardly more than the material damping of the soil (4.8 % at 0.1 Hz, where nothing radiates);
-   sliding has about 3 % of radiation damping on top of it (7.7 %). On a layered site a foundation
+   sliding has about 3 % of radiation damping on top of it (7.6 %). On a layered site a foundation
    radiates little energy below the first resonance of the soil column, and that threshold depends
    on the motion. Horizontal motion radiates mainly shear waves: the threshold is the shear
    resonance, about 7.3 Hz here ($V_s/(4H)$, lesson 2). Vertical and rocking motion radiate mainly
    compression waves: the threshold is higher, towards the compression resonance $V_p/(4H)$, which
    is twice the shear one here because $V_p = 2V_s$. FOUNDAMP shows it: the sliding damping climbs
-   from about 5 Hz (13 % at 5 Hz, 29 % at 7 Hz), the rocking damping only from about 10 Hz (10.5 %
-   at 10 Hz, 22 % at 12 Hz). On a uniform half-space (lesson 3) the same $a_0$ would already give
+   from about 5 Hz (12 % at 5 Hz, 27 % at 7 Hz), the rocking damping only from about 10 Hz (9.8 %
+   at 10 Hz, 20 % at 12 Hz). On a uniform half-space (lesson 3) the same $a_0$ would already give
    some radiation damping in rocking. A rocking-dominated SSI mode on a layered site therefore stays
    lightly damped, which is why the peak barely dropped.
-3. **Hand springs need the layering.** Pais and Kausel with the sand modulus ($B = 10\,\text{m}$)
-   give $K_x = 5.52\,GB = 9.6 \times 10^6\,\text{kN/m}$ and
-   $K_{yy} = 6.0\,GB^3 = 1.05 \times 10^9\,\text{kN\,m/rad}$, 44 % and 41 % below the SASSI static
-   values: the gravel at 5 m depth, half the mat width, stiffens the foundation (the coarse
+3. **Hand springs need the layering.** Pais and Kausel with the sand modulus (half-width
+   $B = 32\,\text{ft}$) give $K_x = 5.52\,GB = 6.6 \times 10^5\,\text{kip/ft}$ and
+   $K_{yy} = 6.0\,GB^3 = 7.3 \times 10^8\,\text{kip\,ft/rad}$, 44 % and 40 % below the SASSI static
+   values: the gravel at 16 ft depth, only $B/2$ below the mat, stiffens the foundation (the coarse
    interaction-node mesh adds a few percent, lesson 3). Half-space formulas on a layered site are a
    first estimate only.
 
@@ -591,9 +601,9 @@ with $T$ the fixed-base period and $\tilde{T}$ the period on the soil springs. T
 combines the foundation damping with the structural damping reduced by $(\tilde{T}/T)^n$ ($n = 2$
 for hysteretic damping): the longer the period, the smaller the share of the structure's own
 damping. The $h^2$ term is why rocking dominates for tall, stiff structures. The formula ignores the
-mass of the mat (1468 t here) and the sliding-rocking coupling of a welded mat
-($K_{x,yy} = -3.1 \times 10^6\,\text{kN}$ at 3.49 Hz), which SASSI includes; VP-17 checks SASSI
-against the exact 3-DOF solution of an SDOF on a rigid disk and against Veletsos-Meek
+mass of the mat (95.4 kip·s²/ft here, a weight of 3,072 kips) and the sliding-rocking coupling of
+a welded mat ($K_{x,yy} = -7.1 \times 10^5\,\text{kip}$ at 3.49 Hz), which SASSI includes; VP-17
+checks SASSI against the exact 3-DOF solution of an SDOF on a rigid disk and against Veletsos-Meek
 ([VP-17](docs/verification/VERIFICATION_MANUAL.md#vp-17)). The layer resonances that set the onset
 of radiation damping are checked by VP-13 on a disk on a layer over a rigid base, where below them
 no energy radiates at all: the horizontal ones fall at $(2n-1)\,V_s/(4H)$ within 1.3 %; for vertical
@@ -602,22 +612,23 @@ motion radiation sets in slightly below $V_p/(4H)$ ([R2 C.7](docs/spec/R2_benchm
 
 ```figure
 fixed-base-vs-ssi f=3.49
-The estimate computed exactly for one mode: $M_1 = 3063\,\text{t}$ at $h_1 = 15.6\,\text{m}$ and the
-mat on the springs and dashpots that FOUNSTIF and FOUNDAMP give at 3.49 Hz. The peak lands near
-3.9 Hz, the value of Try this, against SASSI's 3.49 Hz (Try this explains the difference); the
-rocking dashpot adds almost nothing to the material damping, so the system damping stays near 5 %.
+The estimate computed exactly for one mode: $M_1 = 209.8\,\text{kip\,s}^2/\text{ft}$ (a weight of
+6,754 kips) at $h_1 = 49.8\,\text{ft}$ and the mat on the springs and dashpots that FOUNSTIF and
+FOUNDAMP give at 3.49 Hz. The peak lands near 3.9 Hz, the value of Try this, against SASSI's
+3.47 Hz (Try this explains the difference); the rocking dashpot adds almost nothing to the material
+damping, so the system damping stays near 5 %.
 ```
 
 ### Try this
 Use the formula with the effective mass and height of mode 1 from a modal analysis of the stick in
 ANSYS ($k = \omega_1^2 M_1$) and $K_x$, $K_{yy}$ at 3.5 Hz from FOUNSTIF. The estimate lands above
-the SASSI value (about 3.9 Hz against 3.49 Hz). The mat mass and the sway-rocking coupling are not
+the SASSI value (about 3.9 Hz against 3.47 Hz). The mat mass and the sway-rocking coupling are not
 the reason: the whole stick and mat on the same 6 x 6 springs and dashpots, frequency-dependent and
-complex, peaks at 3.86 Hz. The reason is the mat itself. $K_G$ assumes that the 81 interaction nodes
+complex, peaks at 3.83 Hz. The reason is the mat itself. $K_G$ assumes that the 81 interaction nodes
 move as one rigid body, but the spider clamps the stick to the nine central mat nodes only, and the
-1.5 m mat, ten times as stiff as concrete, still bends under the rocking moment, which softens the
-rocking spring. Make the mat 1000 times as stiff as concrete (`M,1,3.0E10,...`) and SASSI's roof
-peak moves to 3.86 Hz (|H| = 12.6). A foundation that looks rigid in a static check can be flexible
+5 ft mat, ten times as stiff as concrete, still bends under the rocking moment, which softens the
+rocking spring. Make the mat 1000 times as stiff as concrete (`M,1,5.76E8,...`) and SASSI's roof
+peak moves to 3.83 Hz (|H| = 12.7). A foundation that looks rigid in a static check can be flexible
 for SSI; this is why SASSI keeps the real mat and all its interaction nodes rather than a rigid-body
 spring set. Then repeat lesson 1's Try this ($V_s$ of the sand and the gravel doubled): the frequency
 moves back towards 5 Hz (about 4.1 Hz).
@@ -627,7 +638,7 @@ Your fixed-base ISRS of this building peaks at 5 Hz. After the SSI analysis the 
 with about the same height. A component on the roof has its own frequency at 3.6 Hz. What happened
 to its demand, and what else would you check before accepting the SSI result?
 
-Answer: its demand went up about threefold: at 3.6 Hz the 5 % roof ISRS is 8.2 g with SSI against
+Answer: its demand went up about threefold: at 3.6 Hz the 5 % roof ISRS is 7.9 g with SSI against
 2.8 g on the low-frequency flank of the fixed-base peak (lesson 1's two runs). Before accepting,
 check the soil cases (lower and upper bound shift the peak), the interpolation around the peak
 (TFU against TFI), the cut-off and the quiet zone, and envelope and broaden the spectra over the

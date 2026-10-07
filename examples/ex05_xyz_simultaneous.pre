@@ -22,9 +22,10 @@
 * The three directional responses are combined afterwards by the user (SRSS or 100-40-40);
 * this is post-processing outside the SASSI modules.
 *
-* The structure: a 12 m x 12 m basemat (SHELL, 1.5 m) on the layered site of example 1, a
-* two-storey stick (4 m storeys) clamped to the mat by a rigid spider, and a 300 t roof mass
-* 2.24 m off the stick axis (node 30 at x = 2, y = 1), tied to the stick top by a rigid link.
+* The structure: a 40 ft x 40 ft basemat (SHELL, 5 ft) on the layered site of example 1, a
+* two-storey stick (13 ft storeys) clamped to the mat by a rigid spider, and a 660 kip roof
+* weight 7.27 ft off the stick axis (node 30 at x = 6.5, y = 3.25), tied to the stick top by a
+* rigid link.
 *
 * How to run (the working directory must be the examples directory, see examples/README.md):
 *     cd examples
@@ -32,15 +33,17 @@
 *   or from the repository root:  .venv/bin/sassi --cwd examples run ex05_xyz_simultaneous.pre
 * Results: examples/ex05/.
 *
-* Units: m, kN, t, s.  Gravity 9.81 m/s2.
+* Units: ft, kip, s.  Gravity 32.2 ft/s2.  Unit weights in kcf, moduli in ksf, masses given as
+* weights (kips).
 * ======================================================================================
 MDL,ex05,ex05
 TIT,Ex05 - eccentric two-storey stick, X + Y + Z input with ANALYS simul = 1
 *
 * ---------------------------------------------------------------------- site (as example 1)
-L,1,0.5,19.0,600,300,0.05,0.05
-L,2,1.0,20.0,1000,500,0.04,0.04
-L,3,1.0,21.0,2000,1000,0.02,0.02
+* 10 x 1.6 ft of sand (Vs 1,000 ft/s), 12 x 3.25 ft of gravel (Vs 1,650 ft/s), rock (Vs 3,300 ft/s)
+L,1,1.6,0.120,2000,1000,0.05,0.05
+L,2,3.25,0.125,3300,1650,0.04,0.04
+L,3,3.25,0.130,6600,3300,0.02,0.02
 TOPL,1,1,1,1,1,1,1,1,1,1
 TOPL,2,2,2,2,2,2,2,2,2,2
 TOPL,2,2
@@ -49,31 +52,35 @@ FREQ,1,4,20,41,61,82,102,123,143,164,184
 FREQ,1,205,246,287,328,369,410,492,573,614
 *
 * ---------------------------------------------------------------------- structure
-* basemat nodes 1..25 (5 x 5 grid, 3 m spacing), centre node 13
-N,1,-6,-6,0
-N,5,6,-6,0
+* basemat nodes 1..25 (5 x 5 grid, 10 ft spacing), centre node 13
+N,1,-20,-20,0
+N,5,20,-20,0
 FILL,1,5
-NGEN,4,5,1,5,1,0,3,0
-* stick nodes 26 (z = 4) and 27 (z = 8); K nodes 28, 29 beside the storeys (+X side)
-N,26,0,0,4
-N,27,0,0,8
-N,28,6,0,2
-N,29,6,0,6
+NGEN,4,5,1,5,1,0,10,0
+* stick nodes 26 (z = 13) and 27 (z = 26); K nodes 28, 29 beside the storeys (+X side)
+N,26,0,0,13
+N,27,0,0,26
+N,28,20,0,6.5
+N,29,20,0,19.5
 * eccentric roof mass node 30 and the K node 31 of the rigid links
-N,30,2,1,8
-N,31,0,0,2
-M,1,3.0E8,0.2,24.0,0.05,0.05,1
-M,2,3.0E7,0.2,0.0,0.05,0.05,1
-M,3,3.0E10,0.2,0.0,0.0,0.0,1
-R,1,10.0,5.0,5.0,10.0,5.0,5.0
-R,2,9.0,7.5,7.5,11.4,6.75,6.75
+N,30,6.5,3.25,26
+N,31,0,0,6.5
+* basemat: ten times the stiffness of concrete (576,000 ksf = 4,000 ksi), 0.150 kcf
+M,1,5.76E6,0.2,0.150,0.05,0.05,1
+* stick: concrete, massless (the storey masses are lumped)
+M,2,5.76E5,0.2,0.0,0.05,0.05,1
+* rigid links: 1000 x concrete, massless
+M,3,5.76E8,0.2,0.0,0.0,0.0,1
+* R,<nm>,<A>,<As2>,<As3>,<J>,<I2>,<I3> (ft2, ft4): the stick, and a 10 ft square for the rigid links
+R,1,116.0,58.0,58.0,1240.0,620.0,620.0
+R,2,100.0,83.3,83.3,1406.0,833.3,833.3
 * group 1: basemat shells (drilling rotations: FIXROT below)
 GROUP,1,SHELL
 MACT,1
 E,1,1,2,7,6
 EGEN,3,1,1
 EGEN,3,5,1,4
-THICK,1,16,1,1.5
+THICK,1,16,1,5.0
 * group 2: the stick
 GROUP,2,BEAMS
 MACT,2
@@ -92,17 +99,18 @@ E,9,27,30,31
 * shells alone.  The stick base 13 and the spider ends keep ROTZ (the beams stiffen it), so the
 * torsion of the foundation is resisted by the soil, as it must be in a torsion example.
 FIXROT
-* storey masses 300 t (weights 2943 kN): floor 1 on the stick, roof at the eccentric node
-MT,26,2943,2943,2943
-MT,30,2943,2943,2943
-* rotary inertia of each 12 m x 12 m floor slab (MR, also in weight units: I x g):
-*   about Z (torsion)   I = m (a2 + b2)/12 = 300 x 288/12 = 7200 t m2  -> 70632
-*   about X and Y       I = m a2/12        = 300 x 144/12 = 3600 t m2  -> 35316
-MR,26,35316,35316,70632
-MR,30,35316,35316,70632
+* storey weights 660 kips (masses 660/32.2 = 20.5 kip s2/ft): floor 1 on the stick, roof at the
+* eccentric node
+MT,26,660,660,660
+MT,30,660,660,660
+* rotary inertia of each 40 ft x 40 ft floor slab (MR, also in weight units: I x g, kip ft2):
+*   about Z (torsion)   I g = W (a2 + b2)/12 = 660 x 3200/12 = 176,000 kip ft2
+*   about X and Y       I g = W a2/12        = 660 x 1600/12 =  88,000 kip ft2
+MR,26,88000,88000,176000
+MR,30,88000,88000,176000
 INT,1,25,1,1
-POINT,0,0,2.7
-HOUSE,9.81,0,0,2,0,0,0,0,0
+POINT,0,0,9.0
+HOUSE,32.2,0,0,2,0,0,0,0,0
 *
 * ======================================================================================
 * 1. Three SITE runs -> FILE1X, FILE1Y, FILE1Z
@@ -164,7 +172,7 @@ FCOPY,00030TR_Y.TFU,X2Y_00030TR_Y.TFU
 FCOPY,00030TR_Y.TFI,X2Y_00030TR_Y.TFI
 FCOPY,00030TR_Y01.RS,X2Y_00030TR_Y01.RS
 FCOPY,00027R_ZZ.TFU,X2Y_00027R_ZZ.TFU
-* ---- Y input: Y response, and the roof drift relative to the free field (RELDISP)
+* ---- Y input: Y response, and the roof drift relative to the free field (RELDISP, ft)
 EDUOPT,TFFILE,FILE8Y
 NOUT,0
 NOUT,2,1,1,0,0,1,1,13,26,27,30

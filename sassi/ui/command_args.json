@@ -7170,7 +7170,7 @@
   "summary": "Assigns to SOIL sublayer <layer> an L soil-layer property (thickness, unit weight, Vp, Vs, damping) and the label of its G/Gmax and damping curves (DYNP); the last SPRO sublayer is the half-space.",
   "configures": "SOIL module options: soil profile",
   "source": "spec 07 §9.2.33",
-  "notes": "A sublayer without a label stays linear; the label of the half-space (last) sublayer is ignored. SASSI-EDU: with no SPRO entry at all SOIL uses the default profile (the TOPL layers, Sand below Vs = 760 m/s, Rock above, the SITE half-space last), reported as EDU-29.",
+  "notes": "A sublayer without a label stays linear; the label of the half-space (last) sublayer is ignored. SASSI-EDU: with no SPRO entry at all SOIL uses the default profile (the TOPL layers, Sand below Vs = 2,493 ft/s (760 m/s), Rock above, the SITE half-space last), reported as EDU-29.",
   "args": [
    {
     "pos": 1,

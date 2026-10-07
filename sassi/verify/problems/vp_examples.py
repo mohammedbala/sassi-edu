@@ -125,18 +125,20 @@ def listing_status(directory: Path) -> Dict[str, str]:
 # ======================================================================================
 # Example 1 written by hand (VP-E1)
 # ======================================================================================
-GRAVITY = 9.81
+#: example 1 is in US customary units (ft, kip, s): g in ft/s2
+GRAVITY = 32.2
 #: ex01 frequency numbers (FREQ set 1), dt 0.005 s, NFFT 8192
 EX01_FNUM = [4, 20, 41, 61, 82, 102, 123, 143, 164, 184, 205, 225, 246, 287, 328, 369, 410, 492, 573, 655, 737, 819]
-#: (thick, weight, Vp, Vs, damping) of L 1, L 2 and the half-space L 3
-EX01_L = {1: (0.5, 19.0, 600.0, 300.0, 0.05), 2: (1.0, 20.0, 1000.0, 500.0, 0.04), 3: (1.0, 21.0, 2000.0, 1000.0, 0.02)}
+#: (thick ft, weight kcf, Vp ft/s, Vs ft/s, damping) of L 1, L 2 and the half-space L 3
+EX01_L = {1: (1.6, 0.120, 2000.0, 1000.0, 0.05), 2: (3.25, 0.125, 3300.0, 1650.0, 0.04),
+          3: (3.25, 0.130, 6600.0, 3300.0, 0.02)}
 EX01_TOPL = [1] * 10 + [2] * 12
 #: mat nodes around the stick base 41 tied to it by the rigid spider
 EX01_SPIDER = (31, 32, 33, 40, 42, 49, 50, 51)
 
 
 def ex01_site() -> B.Site:
-    """The TOPL layers and the half-space of example 1 (weights converted with g = 9.81)."""
+    """The TOPL layers and the half-space of example 1 (unit weights in kcf converted with g = 32.2 ft/s2)."""
     def layer(no: int, thick: Optional[float] = None) -> B.SoilLayer:
         t, w, vp, vs, beta = EX01_L[no]
         return B.SoilLayer(t if thick is None else thick, vs, vp, w / GRAVITY, beta, beta)
@@ -146,13 +148,16 @@ def ex01_site() -> B.Site:
 def ex01_house(site: B.Site) -> B.HouseBuilder:
     """Example 1 as HOUSE deck data, numbered exactly as the ``.pre`` file numbers it.
 
-    * nodes 1-81: 9 x 9 mat grid (2.5 m) at grade, ROTZ (shell drilling) fixed by FIXROT at the
+    Units ft, kip, s (US customary).
+
+    * nodes 1-81: 9 x 9 mat grid (8 ft) at grade, ROTZ (shell drilling) fixed by FIXROT at the
       shell-only nodes, i.e. all but the stick base 41 and the spider ends; 82-85: the stick at
-      z = 5, 10, 15, 20; 86-89: beam K nodes at (10, 0, 2.5 + 5 k); 90: K node of the rigid links at
-      (0, 0, 2.5).  K-only nodes are written with every DOF fixed (D-CHK-08), as AFWRITE does;
-    * group 1 SHELL basemat (M 1, 1.5 m), group 2 BEAMS stick (M 2, R 1), group 3 BEAMS rigid spider
-      (M 3, R 2) from the stick base 41 to its 8 neighbours;
-    * masses: 9810 kN at each floor as *weights* (MT with the MUNITS default 1).
+      z = 16, 32, 48, 64 ft; 86-89: beam K nodes at (32, 0, 8 + 16 k); 90: K node of the rigid links at
+      (0, 0, 8).  K-only nodes are written with every DOF fixed (D-CHK-08), as AFWRITE does;
+    * group 1 SHELL basemat (M 1: 10 x concrete, E 5.76e6 ksf, 0.150 kcf; 5 ft thick), group 2 BEAMS
+      stick (M 2: concrete, E 576,000 ksf, massless; R 1), group 3 BEAMS rigid spider (M 3, R 2) from the
+      stick base 41 to its 8 neighbours;
+    * masses: 2200 kips at each floor as *weights* (MT with the MUNITS default 1).
     """
     hb = B.HouseBuilder(site, dim=2, imp=0, incomp=1, title="Ex01 - 4-mass stick on a rigid surface mat, "
                                                                 "vertical SV (X) input")
@@ -160,28 +165,28 @@ def ex01_house(site: B.Site) -> B.HouseBuilder:
     for j in range(9):
         for i in range(9):
             n = 9 * j + i + 1
-            hb.add_node(-10.0 + 2.5 * i, -10.0 + 2.5 * j, 0.0, fix=(0, 0, 0, 0, 0, int(n not in beam_ends)), nid=n)
+            hb.add_node(-32.0 + 8.0 * i, -32.0 + 8.0 * j, 0.0, fix=(0, 0, 0, 0, 0, int(n not in beam_ends)), nid=n)
     for k in range(4):
-        hb.add_node(0.0, 0.0, 5.0 * (k + 1), nid=82 + k)
+        hb.add_node(0.0, 0.0, 16.0 * (k + 1), nid=82 + k)
     for k in range(4):
-        hb.add_node(10.0, 0.0, 2.5 + 5.0 * k, fix=(1,) * 6, nid=86 + k, register=False)
-    hb.add_node(0.0, 0.0, 2.5, fix=(1,) * 6, nid=90, register=False)
-    m_mat = hb.material(1, 3.0e8, 0.2, 24.0, 0.05, 0.05)
-    m_stick = hb.material(1, 3.0e7, 0.2, 0.0, 0.05, 0.05)
-    m_rigid = hb.material(1, 3.0e10, 0.2, 0.0, 0.0, 0.0)
-    r_core = hb.section(20.0, 10.0, 10.0, 400.0, 200.0, 200.0)
-    r_link = hb.section(6.25, 5.2, 5.2, 5.5, 3.26, 3.26)
+        hb.add_node(32.0, 0.0, 8.0 + 16.0 * k, fix=(1,) * 6, nid=86 + k, register=False)
+    hb.add_node(0.0, 0.0, 8.0, fix=(1,) * 6, nid=90, register=False)
+    m_mat = hb.material(1, 5.76e6, 0.2, 0.150, 0.05, 0.05)
+    m_stick = hb.material(1, 5.76e5, 0.2, 0.0, 0.05, 0.05)
+    m_rigid = hb.material(1, 5.76e8, 0.2, 0.0, 0.0, 0.0)
+    r_core = hb.section(215.0, 108.0, 108.0, 46000.0, 23000.0, 23000.0)
+    r_link = hb.section(64.0, 53.0, 53.0, 576.0, 341.0, 341.0)
     g_mat, g_stick, g_link = hb.group(3, "basemat"), hb.group(2, "stick"), hb.group(2, "rigid links")
     for j in range(8):
         for i in range(8):
             n1 = 9 * j + i + 1
-            hb._element(g_mat, (n1, n1 + 1, n1 + 10, n1 + 9), etype=1, mat=m_mat, prop=1, thick=1.5)
+            hb._element(g_mat, (n1, n1 + 1, n1 + 10, n1 + 9), etype=1, mat=m_mat, prop=1, thick=5.0)
     for (i, j, k) in ((41, 82, 86), (82, 83, 87), (83, 84, 88), (84, 85, 89)):
         hb._element(g_stick, (i, j, k), etype=1, mat=m_stick, prop=r_core)
     for n in EX01_SPIDER:
         hb._element(g_link, (41, n, 90), etype=1, mat=m_rigid, prop=r_link)
     for n in range(82, 86):
-        hb.mass(n, 9810.0, 9810.0, 9810.0, units=1)
+        hb.mass(n, 2200.0, 2200.0, 2200.0, units=1)
     hb.set_interaction(range(1, 82))
     return hb
 
@@ -192,7 +197,7 @@ def write_ex01_by_hand(wd: Path, model: str = "ex01") -> Dict[str, decks.Deck]:
     fs = B.FrequencySet.fourier(0.005, 8192, EX01_FNUM)
     title = "Ex01 - 4-mass stick on a rigid surface mat, vertical SV (X) input"
     out = {"SITE": B.site_deck(site, fs, wave="SV", cl=1, model=model, title=title),
-           "POINT": B.point_deck(fs, layer=0, rad=2.25, model=model, title=title),
+           "POINT": B.point_deck(fs, layer=0, rad=7.2, model=model, title=title),
            "HOUSE": fs.fill(ex01_house(site).deck(model, title)),
            "ANALYS": B.analys_deck(fs, gravity=GRAVITY, model=model, title=title, type=0, mode=0, save=0,
                                    prnt=1, fopt=0, impe=0, simul=0)}

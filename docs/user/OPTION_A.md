@@ -279,6 +279,10 @@ plot the base shear and to see what the critical times are.
 
 ### 5.4 An equivalent static file
 
+The beginning of a file of the VP-LA1 model of section 8, which keeps the SI units of the verification
+problem (for a kip-ft model the Units line reads `the SSI model's consistent units, British-like (ft, s):
+g = 32.2 length/s^2; ...`):
+
 ```
 ! SASSI-EDU 0.1.0  LOADGEN (Option A): ANSYS equivalent static seismic load, file 1 of 3
 ! Load step  : SSI time t = 6.8 s (sample 341 of 1024, dt 0.02 s); critical time 1 by base shear

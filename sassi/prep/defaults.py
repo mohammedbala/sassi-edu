@@ -22,8 +22,8 @@ RSOUT / ACCOUT i         ``<model>_eq<i>.rso`` / ``<model>_eq<i>.acc`` in the mo
                          spectrum i that runs (D-W5-08)
 DYNP label not defined   the library curve Clay, Sand or Rock of that label (a model DYNP of the same
                          label wins; labels are case-sensitive) (D-W5-09)
-no SPRO entry at all     the SITE profile: SPRO k = TOPL layer k with Sand (Vs < 760 m/s, 2493 ft/s)
-                         or Rock (Vs >= 760 m/s), the SITE half-space ``<hs>`` as the last, linear
+no SPRO entry at all     the SITE profile: SPRO k = TOPL layer k with Sand (Vs < 2493 ft/s, 760 m/s)
+                         or Rock (Vs >= 2493 ft/s), the SITE half-space ``<hs>`` as the last, linear
                          sublayer (D-W5-10)
 =======================  ============================================================================
 
@@ -215,7 +215,7 @@ def soil_profile(model) -> Tuple[List[Tuple[int, object]], Optional[DefaultUse],
     when there is no profile, why the default does not apply.
 
     Stored SPRO entries are used as they are.  With no SPRO entry at all the SITE profile is the default
-    (D-W5-10): sublayer k = TOPL layer k, labelled Rock when its Vs >= 760 m/s (2493 ft/s) and Sand
+    (D-W5-10): sublayer k = TOPL layer k, labelled Rock when its Vs >= 2493 ft/s (760 m/s) and Sand
     otherwise, then the SITE half-space layer ``<hs>`` without a label (linear)."""
     stored = [(k, rec) for k, rec in get_entries(model, "SPRO") if isinstance(k, int)]
     if stored:

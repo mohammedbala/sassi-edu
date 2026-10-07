@@ -23,7 +23,7 @@
 *   soil that is not an interaction node enters the equations only through the subtracted
 *   -(K_e - w2 M_e).  What to observe (see examples/README.md):
 *     - all three sets agree at low frequency (rigid-body motion with the ground, ATF -> 1);
-*     - FI-FSIN shows a spurious peak of the roof response and of the rocking near 6-7 Hz:
+*     - FI-FSIN shows a spurious peak of the roof response and of the rocking near 11 Hz:
 *       the roof slab sits on top-face nodes that are NOT interaction nodes, so the slab and
 *       the subtracted soil under it form an unphysical oscillator;
 *     - FI-EVBN (the same set plus the top face) removes it and follows FV closely.
@@ -36,50 +36,52 @@
 *   or from the repository root:  .venv/bin/sassi --cwd examples run ex02_embedded_box.pre
 * Results: examples/ex02/ (FV), examples/ex02_fsin/ (FI-FSIN), examples/ex02_evbn/ (FI-EVBN).
 *
-* Units: m, kN, t, s.  Gravity 9.81 m/s2.
+* Units: ft, kip, s.  Gravity 32.2 ft/s2.
 * ======================================================================================
 MDL,ex02,ex02
-TIT,Ex02 - embedded basement 10 x 10 x 5 m, FV interaction set
+TIT,Ex02 - embedded basement 32 x 32 x 16 ft, FV interaction set
 *
 * ---------------------------------------------------------------------- soil profile
 * L,<nm>,<thick>,<weight>,<Vp>,<Vs>,<pdamp>,<sdamp>
-*   L 1-5: 5 m of medium-dense sand (Vs 250 m/s), the five 1 m EMBEDMENT layers: the
+*   L 1-5: 16 ft of medium-dense sand (Vs 800 ft/s), the five 3.2 ft EMBEDMENT layers: the
 *          excavation depth coincides with a layer interface, as it must (interaction nodes on
 *          interfaces).  The manual rule for embedded models: an L number may be repeated in
 *          TOPL for identical layers, but NOT for embedment layers -- each embedment layer gets
 *          its own L number, and the excavated elements of that layer use it (MSET, below).
 *          Here the five layers are identical; after SOIL (SITEX,1, example 4) they would not be.
-*   L 6:   16 m of dense gravel (Vs 400 m/s) in 1 m sublayers (repeated: not embedment layers)
-*   L 7:   half-space (Vs 800 m/s)
-L,1,1.0,19.0,500,250,0.05,0.05
-L,2,1.0,19.0,500,250,0.05,0.05
-L,3,1.0,19.0,500,250,0.05,0.05
-L,4,1.0,19.0,500,250,0.05,0.05
-L,5,1.0,19.0,500,250,0.05,0.05
-L,6,1.0,20.0,800,400,0.04,0.04
-L,7,1.0,21.0,1600,800,0.02,0.02
+*   L 6:   51.2 ft of dense gravel (Vs 1,300 ft/s) in 3.2 ft sublayers (repeated: not embedment
+*          layers)
+*   L 7:   half-space (Vs 2,600 ft/s)
+L,1,3.2,0.120,1600,800,0.05,0.05
+L,2,3.2,0.120,1600,800,0.05,0.05
+L,3,3.2,0.120,1600,800,0.05,0.05
+L,4,3.2,0.120,1600,800,0.05,0.05
+L,5,3.2,0.120,1600,800,0.05,0.05
+L,6,3.2,0.125,2600,1300,0.04,0.04
+L,7,3.2,0.130,5200,2600,0.02,0.02
 TOPL,1,2,3,4,5
 TOPL,6,6,6,6,6,6,6,6,6,6
 TOPL,6,6,6,6,6,6
 *
 * ---------------------------------------------------------------------- frequencies
-* dt 0.005 s, NFFT 8192: df = 0.0244 Hz; 21 SSI frequencies from 0.1 to 20 Hz
+* dt 0.005 s, NFFT 8192: df = 0.0244 Hz; 22 SSI frequencies from 0.1 to 20 Hz, every 1 Hz from
+* 5 to 12 Hz (11 Hz resolves the spurious FI-FSIN resonance of model 2)
 FREQ,1,4,20,41,61,82,102,123,143,164,184
-FREQ,1,205,246,287,328,369,410,492,573,655,737
-FREQ,1,819
+FREQ,1,205,246,287,328,369,410,450,492,573,655
+FREQ,1,737,819
 * SITE: 20 generated half-space sublayers, half-space = L 7, control point at the free surface
 SITE,0,1,0,20,7,1,0,1,4096,1,0,0.005,8192,1
 WAVE,2,1,1,1,0
 *
 * ---------------------------------------------------------------------- nodes
-* A 5 x 5 grid (2.5 m spacing) on each of the 6 interface levels z = -5, -4, ..., 0.
+* A 5 x 5 grid (8 ft spacing) on each of the 6 interface levels z = -16, -12.8, ..., 0.
 * Numbering is bottom-up (interaction nodes must be numbered from the bottom up, EDU-21):
-*     node(i, j, k) = 25 k + 5 j + i + 1      i, j = 0..4 (x, y),  k = 0..5 (z = -5 + k)
-N,1,-5,-5,-5
-N,5,5,-5,-5
+*     node(i, j, k) = 25 k + 5 j + i + 1      i, j = 0..4 (x, y),  k = 0..5 (z = -16 + 3.2 k)
+N,1,-16,-16,-16
+N,5,16,-16,-16
 FILL,1,5
-NGEN,4,5,1,5,1,0,2.5,0
-NGEN,5,25,1,25,1,0,0,1
+NGEN,4,5,1,5,1,0,8,0
+NGEN,5,25,1,25,1,0,0,3.2
 *
 * ---------------------------------------------------------------------- excavated soil
 * Groups 1-5: 4 x 4 x 5 = 80 SOLID elements filling the excavation, one group per embedment
@@ -89,35 +91,35 @@ NGEN,5,25,1,25,1,0,0,1
 * (layer) number: group k lies in TOPL layer k, whose L number is k (CHECK EDU-08 verifies it).
 * SOLID node order: bottom face I J K L (counter-clockwise seen from above), then the top face.
 GROUP,1,SOLID
-GTIT,1,excavated soil 0 to -1 m
+GTIT,1,excavated soil 0 to -3.2 ft
 MACT,1
 E,1,101,102,107,106,126,127,132,131
 EGEN,3,1,1
 EGEN,3,5,1,4
 ETYPE,1,16,1,2
 GROUP,2,SOLID
-GTIT,2,excavated soil -1 to -2 m
+GTIT,2,excavated soil -3.2 to -6.4 ft
 MACT,2
 E,1,76,77,82,81,101,102,107,106
 EGEN,3,1,1
 EGEN,3,5,1,4
 ETYPE,1,16,1,2
 GROUP,3,SOLID
-GTIT,3,excavated soil -2 to -3 m
+GTIT,3,excavated soil -6.4 to -9.6 ft
 MACT,3
 E,1,51,52,57,56,76,77,82,81
 EGEN,3,1,1
 EGEN,3,5,1,4
 ETYPE,1,16,1,2
 GROUP,4,SOLID
-GTIT,4,excavated soil -3 to -4 m
+GTIT,4,excavated soil -9.6 to -12.8 ft
 MACT,4
 E,1,26,27,32,31,51,52,57,56
 EGEN,3,1,1
 EGEN,3,5,1,4
 ETYPE,1,16,1,2
 GROUP,5,SOLID
-GTIT,5,excavated soil -4 to -5 m
+GTIT,5,excavated soil -12.8 to -16 ft
 MACT,5
 E,1,1,2,7,6,26,27,32,31
 EGEN,3,1,1
@@ -127,10 +129,10 @@ ETYPE,1,16,1,2
 * ---------------------------------------------------------------------- basement structure
 * Material 1: reinforced concrete  M,<nm>,<E>,<nu>,<weight>,<pdamp>,<sdamp>,<type 1>
 * (M and L are different tables: MACT,1 below means M 1 for the shells)
-M,1,3.0E7,0.2,24.0,0.05,0.05,1
+M,1,576000,0.2,0.150,0.05,0.05,1
 * Group 6: SHELL basement on the excavation boundary
-*   elements  1-16  base slab (z = -5), 1.0 m        elements 17-32 roof slab (z = 0), 0.5 m
-*   elements 33-112 walls y = -5, y = +5, x = -5, x = +5, 0.5 m
+*   elements  1-16  base slab (z = -16), 3.2 ft      elements 17-32 roof slab (z = 0), 1.6 ft
+*   elements 33-112 walls y = -16, y = +16, x = -16, x = +16, 1.6 ft
 GROUP,6,SHELL
 GTIT,6,basement
 MACT,1
@@ -138,24 +140,24 @@ E,1,1,2,7,6
 EGEN,3,1,1
 EGEN,3,5,1,4
 EGEN,1,125,1,16
-* wall y = -5 (j = 0)
+* wall y = -16 (j = 0)
 E,33,1,2,27,26
 EGEN,3,1,33
 EGEN,4,25,33,36
-* wall y = +5 (j = 4)
+* wall y = +16 (j = 4)
 E,53,21,22,47,46
 EGEN,3,1,53
 EGEN,4,25,53,56
-* wall x = -5 (i = 0)
+* wall x = -16 (i = 0)
 E,73,1,6,31,26
 EGEN,3,5,73
 EGEN,4,25,73,76
-* wall x = +5 (i = 4)
+* wall x = +16 (i = 4)
 E,93,5,10,35,30
 EGEN,3,5,93
 EGEN,4,25,93,96
-THICK,1,16,1,1.0
-THICK,17,112,1,0.5
+THICK,1,16,1,3.2
+THICK,17,112,1,1.6
 *
 * Shell drilling rotations: a flat shell has no stiffness for the rotation about its normal,
 * and the excavated SOLID elements that share these nodes have no rotations at all.  Fix the
@@ -167,11 +169,11 @@ THICK,17,112,1,0.5
 VAR,ZS,7,12,17,132,137,142
 VAR,ZE,9,14,19,134,139,144
 FOREACH,ZS,D,@ZS[#],@ZE[#],1,1,ROTZ
-*   walls y = -5 and y = +5 (normal Y): rows of 3 nodes on the levels k = 1..4
+*   walls y = -16 and y = +16 (normal Y): rows of 3 nodes on the levels k = 1..4
 VAR,YS,27,52,77,102,47,72,97,122
 VAR,YE,29,54,79,104,49,74,99,124
 FOREACH,YS,D,@YS[#],@YE[#],1,1,ROTY
-*   walls x = -5 and x = +5 (normal X): columns of 3 nodes, increment 5
+*   walls x = -16 and x = +16 (normal X): columns of 3 nodes, increment 5
 VAR,XS,31,56,81,106,35,60,85,110
 VAR,XE,41,66,91,116,45,70,95,120
 FOREACH,XS,D,@XS[#],@XE[#],5,1,ROTX
@@ -184,18 +186,18 @@ VAR,LLAST,25,50,75,100,125,150
 FOREACH,LFIRST,INT,@LFIRST[#],@LLAST[#],1,1
 *
 * ---------------------------------------------------------------------- module options
-* POINT: 5 embedded TOPL layers (point loads at interfaces 1..6), R0 = 0.9 x 2.5 m
-POINT,0,5,2.25
-HOUSE,9.81,0,0,2,0,0,0,0,0
+* POINT: 5 embedded TOPL layers (point loads at interfaces 1..6), R0 = 0.9 x 8 ft
+POINT,0,5,7.2
+HOUSE,32.2,0,0,2,0,0,0,0,0
 ANALYS,0,0,0,0,1,0,0,0,0,0,0
 MOTION,0,0,0,20,0,0.1,100,301,1,0,1,0,0,0,0,1,0,0,1
 DAMP,0.05
 THFILE,../data/rg160h_030g.acc
 THTIT,RG 1.60 horizontal spectrum-compatible motion (EQUAKE, seed 11975)
-* X at the base-slab centre (13) and the roof centre (138); Z at the roof edges x = -5 / +5
+* X at the base-slab centre (13) and the roof centre (138); Z at the roof edges x = -16 / +16
 NOUT,1,1,1,0,0,1,1,13,138
 NOUT,3,1,0,0,0,0,1,136,140
-* STRESS: bending moments of the four bottom wall panels of wall x = -5 (group 6, 73-76)
+* STRESS: bending moments of the four bottom wall panels of wall x = -16 (group 6, 73-76)
 STRESS,0,0,1,0,1
 EOUT,1,1,1,2,2,1,0,0,0,0,0,0,6,73-76
 AOPT,0,0,0,1,1,1,0,0,1,0,1,1,0,0
@@ -219,14 +221,14 @@ WRITE
 CPMODEL,2
 ACTM,2
 MDL,ex02fsin,../ex02_fsin
-TIT,Ex02 - embedded basement 10 x 10 x 5 m, FI-FSIN interaction set
+TIT,Ex02 - embedded basement 32 x 32 x 16 ft, FI-FSIN interaction set
 * FI-FSIN keeps the lateral faces and the bottom face: reset the interior nodes (i, j = 1..3)
 * of the levels above the bottom (k = 1..5).  Each row of 3 interior nodes is one INT range.
 VAR,RFIRST,32,37,42,57,62,67,82,87,92,107,112,117,132,137,142
 VAR,RLAST,34,39,44,59,64,69,84,89,94,109,114,119,134,139,144
 FOREACH,RFIRST,INT,@RFIRST[#],@RLAST[#],1,0
 * HOUSE <imp> = 2 (FI) is informative: the interaction set defines the method
-HOUSE,9.81,0,0,2,2,0,0,0,0
+HOUSE,32.2,0,0,2,2,0,0,0,0
 * The site, the frequencies and the embedment are unchanged: reuse FILE1 (free field) and
 * FILE3 (point-load solutions) of model 1 instead of running SITE and POINT again.  SITE stays
 * enabled in AOPT because HOUSE reads the layer table of the .sit deck.
@@ -247,7 +249,7 @@ WRITE
 CPMODEL,3
 ACTM,3
 MDL,ex02evbn,../ex02_evbn
-TIT,Ex02 - embedded basement 10 x 10 x 5 m, FI-EVBN interaction set
+TIT,Ex02 - embedded basement 32 x 32 x 16 ft, FI-EVBN interaction set
 * set the interaction flag again on the interior nodes of the top level (k = 5, z = 0)
 VAR,TFIRST,132,137,142
 VAR,TLAST,134,139,144

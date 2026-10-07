@@ -3,33 +3,34 @@
  * soil cases and their envelope.
  * Numbers: sassi/ui/lessons/06_seismic_input.md; curves: d06.js (the lesson's run, python -m sassi.ui.video_data);
  * the library Sand curves are SV.K.PH.SAND (figures.js).
- * Soil columns move with the exact 1-D wave solution of the lesson's site (PH.columnWaves / columnU): 10 m sand,
- * 12 m clay, rock (Vs 1200 m/s, 1 %), with the strain-compatible sublayers of FILE88 (best estimate, lower and
- * upper bound) or the low-strain table of the lesson.  The drawn motion is the steady state at the frequency
- * named on screen, scaled so that the surface acceleration amplitude is that case's surface PGA (0.544 / 0.605 /
- * 0.690 g, the SOIL listings): u0 = PGA g / (2 pi f)^2; one displacement factor per scene, stated on screen. */
+ * Soil columns move with the exact 1-D wave solution of the lesson's site (PH.columnWaves / columnU), in ft, kcf,
+ * ft/s and g = 32.2 ft/s^2: 30 ft sand, 42 ft clay, rock (Vs 4,000 ft/s, 0.140 kcf, 1 %), with the
+ * strain-compatible sublayers of FILE88 (best estimate, lower and upper bound) or the low-strain table of the
+ * lesson.  The drawn motion is the steady state at the frequency named on screen, scaled so that the surface
+ * acceleration amplitude is that case's surface PGA (0.557 / 0.627 / 0.678 g, the SOIL listings):
+ * u0 = PGA g / (2 pi f)^2 (ft); one displacement factor per scene, stated on screen. */
 "use strict";
 
 (function () {
   const K = SV.K, C = K.C, D = SV.DATA["06"], PH = K.PH;
-  const TAU = 2 * Math.PI, G = 9.81;
+  const TAU = 2 * Math.PI, G = 32.2;                // ft/s^2
   const CLAY = "#8d7a63";
 
   // ---------------------------------------------------------------- data
   const TGT = D["data/rg160h_030g.rsi"].cols;          // [f, SA (g)]: the RG 1.60 target, 27 points
   const RSO = D["ex04/rg160h_eq.rso"].cols;            // [f, SA (g)]: 5 % spectrum of the EQUAKE record (rock)
   const REC = D["ex04/rg160h_eq.acc"];                 // the EQUAKE record (g), 20 s, peak 0.324 g
-  const SURF = D["ex04/ACC001.TH"];                    // SOIL surface motion (g), peak 0.605 g
+  const SURF = D["ex04/ACC001.TH"];                    // SOIL surface motion (g), peak 0.627 g
   const RS1 = D["ex04/RS001_01.RS"];                   // 5 % surface spectrum, best estimate
   const LB = D["ex04lb/RS001_01.RS"], UB = D["ex04ub/RS001_01.RS"], ENV = D["ex04/surface_envelope.rs"];
-  const F88 = D["ex04/FILE88"].cols;                   // FILE88: layer thick gamma_eff_pct G Vs beta_s Vp beta_p
+  const F88 = D["ex04/FILE88"].cols;                   // FILE88: layer thick(ft) gamma_eff_pct G(ksf) Vs(ft/s) beta_s Vp beta_p
 
   /** The largest y and where it is. */
   const argmax = (xs, ys) => { let i = 0; ys.forEach((y, j) => { if (y > ys[i]) i = j; }); return {x: xs[i], y: ys[i], i}; };
   const PK_TGT = argmax(TGT[0], TGT[1]);               // 2.5 Hz: the corner of the RG 1.60 spectrum
   const PK_ROCK = argmax(RSO[0], RSO[1]);              // 2.57 Hz, 1.005 g
-  const PK_BE = argmax(RS1.f, RS1.sa);                 // 1.86 Hz, 2.24 g
-  const PK_UB = argmax(UB.f, UB.sa);                   // 2.57 Hz, 3.14 g
+  const PK_BE = argmax(RS1.f, RS1.sa);                 // 2.04 Hz, 2.64 g
+  const PK_UB = argmax(UB.f, UB.sa);                   // 2.88 Hz, 3.31 g
 
   /** Log-log interpolation of (X, Y) at x. */
   function llInterp(X, Y, x) {
@@ -74,35 +75,36 @@
   }
 
   // ---------------------------------------------------------------- the site and its 1-D wave solution
-  const ROCK = {vs: 1200, w: 22, beta: 0.01};          // L 3, the half-space (linear)
-  /** The soil report (low strain): L 1 sand and L 2 clay of the lesson, 1 % damping. */
-  const LOWCOL = {g: G, layers: [{h: 10, vs: 200, w: 19, beta: 0.01}, {h: 12, vs: 300, w: 18.5, beta: 0.01}], hs: ROCK};
-  /** A strain-compatible column from FILE88 (22 sublayers of 1 m; unit weight from G and Vs). */
+  const ROCK = {vs: 4000, w: 0.140, beta: 0.01};       // L 3, the half-space (linear): ft/s, kcf
+  /** The soil report (low strain): L 1 sand and L 2 clay of the lesson (ft, ft/s, kcf), 1 % damping. */
+  const LOWCOL = {g: G, layers: [{h: 30, vs: 650, w: 0.120, beta: 0.01}, {h: 42, vs: 1000, w: 0.120, beta: 0.01}], hs: ROCK};
+  /** A strain-compatible column from FILE88 (22 sublayers: 10 of 3 ft, 12 of 3.5 ft; unit weight in kcf from
+   *  G (ksf) and Vs (ft/s)). */
   const f88col = (F) => ({g: G, hs: ROCK, layers: F[0].map((_, i) => ({h: F[1][i], vs: F[4][i], w: (F[3][i] * G) / (F[4][i] * F[4][i]), beta: F[5][i]}))});
   const COL = {be: f88col(F88), lb: f88col(D["ex04lb/FILE88"].cols), ub: f88col(D["ex04ub/FILE88"].cols)};
   /** Site frequencies (peaks of the SOIL surface / base amplification) and surface PGAs: the lesson's table. */
-  const CASE = {lb: {f: 1.37, pga: 0.544}, be: {f: 1.83, pga: SURF.peak}, ub: {f: 2.56, pga: 0.690}};
-  const F_LOW = 3.10;                                  // the low-strain amplification peak (lesson: 68 at 3.10 Hz)
+  const CASE = {lb: {f: 1.46, pga: 0.557}, be: {f: 1.97, pga: SURF.peak}, ub: {f: 2.83, pga: 0.678}};
+  const F_LOW = 3.22;                                  // the low-strain amplification peak (lesson: 69 at 3.22 Hz)
   const SLOW = 3;                                      // every soil motion is slowed down 3 x
-  /** Displacement (px) at depth d px of a column drawn at pxm px/m, at scene time t: the steady state at f,
-   *  surface amplitude pga g / (2 pi f)^2 times the scene factor X, slowed down SLOW x. */
-  function motion(col, f, pga, pxm, X, zmax) {
+  /** Displacement (px) at depth d px of a column drawn at pxf px/ft (zmax ft deep), at scene time t: the steady
+   *  state at f, surface amplitude pga g / (2 pi f)^2 (ft) times the scene factor X, slowed down SLOW x. */
+  function motion(col, f, pga, pxf, X, zmax) {
     const wv = PH.columnWaves(col, f), U = [];
-    for (let i = 0; i <= Math.ceil(zmax * 10); i++) U.push(PH.columnU(wv, col, i / 10));
-    const amp = X * pxm * (pga * G) / ((TAU * f) * (TAU * f));
+    for (let i = 0; i <= Math.ceil(zmax * 5); i++) U.push(PH.columnU(wv, col, i / 5));
+    const amp = X * pxf * (pga * G) / ((TAU * f) * (TAU * f));
     return (d, t) => {
-      const u = U[Math.max(0, Math.min(U.length - 1, Math.round((d / pxm) * 10)))], ph = (TAU * f * t) / SLOW;
+      const u = U[Math.max(0, Math.min(U.length - 1, Math.round((d / pxf) * 5)))], ph = (TAU * f * t) / SLOW;
       return amp * (u[0] * Math.cos(ph) - u[1] * Math.sin(ph));       // Re[U e^{i w t}]
     };
   }
 
-  /** The lesson's column: 10 m sand, 12 m clay, rock; pxm px per metre; names: labels on the right. */
+  /** The lesson's column: 30 ft sand, 42 ft clay, rock; pxf px per foot; names: labels on the right (Vs in ft/s). */
   function column(g, o) {
     const n = o.names;
     return K.soil(g, {x: o.x, y: o.y, w: o.w, hidden: o.hidden,
-      layers: [{h: 10 * o.pxm, kind: "sand", name: n ? "Sand" : "", vs: n ? 200 : null},
-        {h: 12 * o.pxm, kind: "gravel", color: CLAY, name: n ? "Clay" : "", vs: n ? 300 : null}],
-      hs: {h: o.hs || 100, kind: "rock", name: n ? "Rock" : "", vs: n ? 1200 : null},
+      layers: [{h: 30 * o.pxf, kind: "sand", name: n ? "Sand" : "", vs: n ? 650 : null},
+        {h: 42 * o.pxf, kind: "gravel", color: CLAY, name: n ? "Clay" : "", vs: n ? 1000 : null}],
+      hs: {h: o.hs || 100, kind: "rock", name: n ? "Rock" : "", vs: n ? 4000 : null},
       labels: n ? "right" : false, labelSize: 32});
   }
   /** A small muted note (the scale of a picture). */
@@ -123,12 +125,12 @@
         xlabel: "frequency (Hz)", ylabel: "SA (g)", ylabelOffset: 80});
       s.tgt = s.p.line(TGT[0], TGT[1], {color: C.ref, width: 6, draw: true});
       s.l2 = K.heading(s.root, "Soil report", {x: 1150, y: 120, size: "h3"});
-      const pxm = 17, top = 200;
-      s.soil = column(g, {x: 1150, y: top, w: 300, pxm, hs: 90, names: true, hidden: true});
+      const pxf = 5.2, top = 200;                       // 72 ft of soil, 374 px
+      s.soil = column(g, {x: 1150, y: top, w: 300, pxf, hs: 90, names: true, hidden: true});
       s.dims = K.g(g, {hidden: true});
-      K.dim(s.dims, 1120, top, 1120, top + 10 * pxm, "10 m", {side: "left"});
-      K.dim(s.dims, 1120, top + 10 * pxm, 1120, top + 22 * pxm, "12 m", {side: "left"});
-      s.mv = motion(COL.be, CASE.be.f, CASE.be.pga, pxm, 25, 22 + 90 / pxm);
+      K.dim(s.dims, 1120, top, 1120, top + 30 * pxf, "30 ft", {side: "left"});
+      K.dim(s.dims, 1120, top + 30 * pxf, 1120, top + 72 * pxf, "42 ft", {side: "left"});
+      s.mv = motion(COL.be, CASE.be.f, CASE.be.pga, pxf, 25, 72 + 90 / pxf);
       s.note = note(g, 1150, 702, `this quake: 1-D waves at ${CASE.be.f} Hz\ndisplacements × 25 · slowed ${SLOW} ×`);
       s.q = K.h("div", {x: 0, y: 800, w: 1920, align: "center", html: "Straight into SASSI?", size: 76, in: "pop", style: {fontWeight: "800"}}, s.root);
       s.ar1 = K.arrow(g, 550, 712, 550, 805, {color: C.wave, width: 6, head: 20, hidden: true});
@@ -232,7 +234,7 @@
   });
 
   // ---------------------------------------------------------------- 3. shaking softens soil
-  // the largest effective strain of the sand in this earthquake (FILE88: 0.51 % at 9.5 m)
+  // the largest effective strain of the sand in this earthquake (FILE88: 0.49 % at 28.5 ft)
   const SAND_ROWS = F88[0].map((_, i) => i).filter((i) => i < 10);
   const GAM_MAX = Math.max(...SAND_ROWS.map((i) => F88[2][i]));
   scenes.push({
@@ -316,16 +318,16 @@
     build(s) {
       const g = K.g(s.svg);
       s.head = K.heading(s.root, "Guess, check, repeat: SOIL", {x: 120, y: 70, size: "h2"});
-      const pxm = 24, top = 250, X = 40;
-      s.soil = column(g, {x: 150, y: top, w: 280, pxm, hs: 100, hidden: true});
+      const pxf = 22 * 24 / 72, top = 250, X = 40;      // 72 ft of soil, 528 px
+      s.soil = column(g, {x: 150, y: top, w: 280, pxf, hs: 100, hidden: true});
       s.labs = K.g(g, {hidden: true});
-      [["sand", 5], ["clay", 16], ["rock", 22 + 50 / pxm]].forEach(([t, z]) => K.text(s.labs, 500, top + z * pxm + 10, t, {cls: "t-label", size: 32}));
+      [["sand", 15], ["clay", 51], ["rock", 72 + 50 / pxf]].forEach(([t, z]) => K.text(s.labs, 500, top + z * pxf + 10, t, {cls: "t-label", size: 32}));
       s.inp = K.g(g, {hidden: true});
-      K.arrow(s.inp, 290, 990, 290, top + 22 * pxm + 100 + 12, {color: C.wave, width: 6, head: 20});
+      K.arrow(s.inp, 290, 990, 290, top + 72 * pxf + 100 + 12, {color: C.wave, width: 6, head: 20});
       K.text(s.inp, 322, 962, "the record, on rock", {cls: "t-label", size: 30, color: "var(--wave)"});
       // the column's motion: soil-report stiffness (round 1), then the converged soil
-      s.mLow = motion(LOWCOL, F_LOW, CASE.be.pga, pxm, X, 22 + 100 / pxm);
-      s.mSc = motion(COL.be, CASE.be.f, CASE.be.pga, pxm, X, 22 + 100 / pxm);
+      s.mLow = motion(LOWCOL, F_LOW, CASE.be.pga, pxf, X, 72 + 100 / pxf);
+      s.mSc = motion(COL.be, CASE.be.f, CASE.be.pga, pxf, X, 72 + 100 / pxf);
       s.nf = note(g, 150, 196, "", {color: "var(--ink2)", size: 26});
       s.nx = note(g, 150, 230, `1-D waves · displacements × ${X} · slowed ${SLOW} ×`);
       // chicken and egg
@@ -350,15 +352,15 @@
       s.iter = K.h("div", {x: cx - 150, y: cy - 28, w: 300, align: "center", html: "round <b>1</b>", size: 40, in: "fade"}, s.root);
       s.eqlin = pillC(s.root, "the equivalent-linear method", cx, 880, 560, "var(--ink2)", 34);
       // the result: the strain-compatible profile, on the column's depth scale
-      s.pv = K.plot(s.svg, {x: 760, y: top, w: 560, h: 22 * pxm, xr: [0, 350], yr: [22, 0], xticks: [0, 100, 200, 300], yticks: [0, 5, 10, 15, 20],
-        xlabel: "shear-wave speed Vs (m/s)", ylabel: "depth (m)", ylabelOffset: 66});
+      s.pv = K.plot(s.svg, {x: 760, y: top, w: 560, h: 72 * pxf, xr: [0, 1150], yr: [72, 0], xticks: [0, 250, 500, 750, 1000], yticks: [0, 15, 30, 45, 60],
+        xlabel: "shear-wave speed Vs (ft/s)", ylabel: "depth (ft)", ylabelOffset: 66});
       const PZ = [], PV = [];
       let z = 0;
       F88[0].forEach((_, i) => { PZ.push(z, z + F88[1][i]); PV.push(F88[4][i], F88[4][i]); z += F88[1][i]; });
-      s.v0 = s.pv.line([200, 200, 300, 300], [0, 10, 10, 22], {color: C.ref, width: 6, draw: true});
+      s.v0 = s.pv.line([650, 650, 1000, 1000], [0, 30, 30, 72], {color: C.ref, width: 6, draw: true});
       s.v1 = s.pv.line(PV, PZ, {color: C.ssi, width: 7, draw: true});
-      s.l200 = s.pv.text(200, 2.5, "200 m/s", {cls: "t-label", size: 30, color: "var(--ref)", dx: 14, hidden: true});
-      s.leg = s.pv.legend([{label: "soil report", color: C.ref}, {label: "this earthquake", color: C.ssi}], {x: 785, y: top + 22 * pxm - 68, size: 28, hidden: true});
+      s.l650 = s.pv.text(650, 7.5, "650 ft/s", {cls: "t-label", size: 30, color: "var(--ref)", dx: 14, hidden: true});
+      s.leg = s.pv.legend([{label: "soil report", color: C.ref}, {label: "this earthquake", color: C.ssi}], {x: 785, y: top + 72 * pxf - 68, size: 28, hidden: true});
       // the softest sand sublayer, from FILE88
       let im = 0;
       SAND_ROWS.forEach((i) => { if (F88[4][i] < F88[4][im]) im = i; });
@@ -368,8 +370,8 @@
       const ax = s.pv.X(vMin), ay = s.pv.Y(zMid);
       K.circle(s.a74, ax, ay, 11, {fill: C.ssi, stroke: "#0a111d", "stroke-width": 3});
       K.line(s.a74, ax - 4, ay + 14, ax - 24, ay + 52, {stroke: C.ssi, "stroke-width": 2.5});
-      K.text(s.a74, ax - 60, ay + 84, `${s.vMin} m/s at ${zMid} m`, {cls: "t-label", size: 32, color: "var(--ssi)", weight: 800});
-      s.st = K.stat(s.root, {x: 1390, y: 290, w: 440, value: `200 → ${s.vMin}`, label: `metres per second,<br>sand at ${zMid} m deep`, color: "var(--ssi)", vsize: 84});
+      K.text(s.a74, ax - 60, ay + 84, `${s.vMin} ft/s at ${zMid} ft`, {cls: "t-label", size: 32, color: "var(--ssi)", weight: 800});
+      s.st = K.stat(s.root, {x: 1390, y: 290, w: 440, value: `650 → ${s.vMin}`, label: `feet per second,<br>sand at ${zMid} ft deep`, color: "var(--ssi)", vsize: 84});
       s.card = K.card(s.root, {x: 1400, y: 560, w: 420, title: "Strain-compatible", size: 32, body: "the soil as this earthquake shakes it"});
       s.A = 0; s.ph = 0;
     },
@@ -395,9 +397,9 @@
       {say: "[f]Then it shakes again, with the softer soil. [g]After eight rounds here, the answers barely change.",
         f(k) { k.show([k.s.arrs[2].g, k.s.tok]); k.hide(k.s.tag); k.show(k.s.iter); k.tween(k.s, {ph: 8}, 2800, {ease: "linear"}); },
         g(k) { k.pulse(k.s.iter, {amp: 0.08}); k.show(k.s.eqlin, {delay: 400}); }},
-      {say: "[p]The result? The soil report gave the sand a shear-wave speed of 200 metres per second.",
-        p(k) { k.hide([k.s.ring, k.s.n, k.s.arrs.map((a) => a.g), k.s.tok, k.s.iter, k.s.eqlin]); k.show(k.s.pv.g, {delay: 200}); k.draw(k.s.v0, 1000, {delay: 300}); k.show(k.s.l200, {delay: 400}); }},
-      {say: "[q]In this earthquake, at 9.5 metres deep, it drops to just 74.",
+      {say: "[p]The result? The soil report gave the sand a shear-wave speed of 650 feet per second.",
+        p(k) { k.hide([k.s.ring, k.s.n, k.s.arrs.map((a) => a.g), k.s.tok, k.s.iter, k.s.eqlin]); k.show(k.s.pv.g, {delay: 200}); k.draw(k.s.v0, 1000, {delay: 300}); k.show(k.s.l650, {delay: 400}); }},
+      {say: "[q]In this earthquake, at 28.5 feet deep, it drops to just 242.",
         q(k) { k.draw(k.s.v1, 1000); k.show(k.s.leg); k.show([k.s.a74, k.s.st.el], {delay: 400}); }},
       {say: "[c]That's the strain-compatible soil: the soil as your earthquake really shakes it.", c(k) { k.show(k.s.card); }},
     ],
@@ -442,7 +444,7 @@
       s.cur = K.line(g, TX, 200, TX, 756, {stroke: "rgba(238,243,249,.35)", "stroke-width": 2});
       s.C = 0;
       // the spectra
-      s.p = K.plot(s.svg, {x: 1200, y: 200, w: 600, h: 460, xr: [0.1, 100], xlog: true, yr: [0, 2.5], xticks: [0.1, 1, 10, 100], yticks: [0, 1, 2],
+      s.p = K.plot(s.svg, {x: 1200, y: 200, w: 600, h: 460, xr: [0.1, 100], xlog: true, yr: [0, 3], xticks: [0.1, 1, 10, 100], yticks: [0, 1, 2, 3],
         xlabel: "frequency (Hz)", ylabel: "SA (g), 5 %", ylabelOffset: 70});
       s.r0 = s.p.line(RSO[0], RSO[1], {color: C.wave, width: 5, draw: true});
       s.r1 = s.p.line(RS1.f, RS1.sa, {color: C.ssi, width: 6, draw: true});
@@ -463,13 +465,13 @@
       s.cur.style.opacity = String(s.C);
     },
     beats: [
-      {say: "[r]The rock peaks at 0.324 g. [s]The surface peaks at 0.605 g: nearly double.",
+      {say: "[r]The rock peaks at 0.324 g. [s]The surface peaks at 0.627 g: nearly double.",
         go(k) { k.show(k.s.head); },
         r(k) { k.show(k.s.hr); k.draw(k.s.tr, 900); k.show(k.s.vr, {delay: 300}); },
         s(k) { k.show([k.s.hs, k.s.sc]); k.draw(k.s.ts, 900); k.show([k.s.vs, k.s.x2], {delay: 300}); k.tween(k.s, {C: 1}, 600, {delay: 400}); }},
       {say: "[p]Now the spectra. [t]On rock, the peak sits at about 2.5 hertz.",
         p(k) { k.show(k.s.p.g); k.draw(k.s.r0, 1000); k.show(k.s.l0); }, t(k) { k.show(k.s.m0); }},
-      {say: "[u]At the surface, it moves down to 1.86 hertz, and it's much taller.",
+      {say: "[u]At the surface, it moves down to 2.04 hertz, and it's much taller.",
         u(k) { k.draw(k.s.r1, 1000); k.show(k.s.l1); k.show(k.s.m1, {delay: 400}); }},
       {say: "[w]That's the shaking your building feels. Skip SOIL, and your floor spectra, the ISRS, miss both changes.",
         w(k) { k.show(k.s.warn); }},
@@ -492,13 +494,13 @@
       s.code = K.code(s.root, ["SITEX,1", "RUNSITE"], {x: 1010, y: 410, w: 420, size: 40});
       s.expl = K.h("div", {x: 1010, y: 650, w: 820, html: "→ use SOIL's layers, not the report's", size: 34, in: "left", style: {color: "var(--ssi)", fontWeight: "650"}}, s.root);
       // the trap: the SSI motion is defined at the ground surface here
-      const pxm = 10, X = 60;
+      const pxf = 22 * 10 / 72, X = 60;                 // 72 ft of soil, 220 px
       s.mc = K.g(g, {hidden: true});
-      s.soil = column(s.mc, {x: 180, y: 470, w: 220, pxm, hs: 60});
+      s.soil = column(s.mc, {x: 180, y: 470, w: 220, pxf, hs: 60});
       s.cp = K.circle(s.mc, 290, 470, 13, {fill: C.wave, stroke: "#0a111d", "stroke-width": 3});
       K.text(s.mc, 450, 482, "SSI motion defined here", {cls: "t-label", size: 32, color: "var(--wave)", weight: 750});
       K.text(s.mc, 180, 790, `1-D waves, ${CASE.be.f} Hz\ndisplacements × ${X} · slowed ${SLOW} ×`, {cls: "t-label", size: 24, color: "var(--muted)"});
-      s.mv = motion(COL.be, CASE.be.f, CASE.be.pga, pxm, X, 22 + 60 / pxm);
+      s.mv = motion(COL.be, CASE.be.f, CASE.be.pga, pxf, X, 72 + 60 / pxf);
       s.ok = K.h("div", {cls: "sv-pill", html: `✓ SOIL's surface motion · ${SURF.peak.toFixed(3)} g`, x: 450, y: 560, size: 30, color: "var(--good)", in: "pop"}, s.root);
       s.bad = K.h("div", {cls: "sv-pill", html: `<s>the rock record · ${REC.peak.toFixed(3)} g</s>`, x: 450, y: 650, size: 30, color: "var(--bad)", in: "pop"}, s.root);
       s.A = 0;
@@ -517,7 +519,7 @@
       {say: "[k]{SITEX,1|Site X one} means: use SOIL's softened layers, not the soil report's.", k(k) { k.show(k.s.expl); }},
       {say: "[t]One trap: in this example, the SSI motion is defined at the ground surface.",
         t(k) { k.show(k.s.mc); k.tween(k.s, {A: 1}, 800); }},
-      {say: "[x]So drive the SSI run with SOIL's surface motion, 0.605 g, [y]not the 0.324 g rock record.",
+      {say: "[x]So drive the SSI run with SOIL's surface motion, 0.627 g, [y]not the 0.324 g rock record.",
         x(k) { k.show(k.s.ok); }, y(k) { k.show(k.s.bad); }},
     ],
   });
@@ -529,15 +531,15 @@
       const g = K.g(s.svg);
       s.head = K.heading(s.root, "Nobody knows the soil exactly", {x: 120, y: 70, size: "h2"});
       // three soil cases: each column moves with its own strain-compatible solution at its own site frequency
-      const pxm = 14, X = 30, hs = 60;
+      const pxf = 22 * 14 / 72, X = 30, hs = 60;       // 72 ft of soil, 308 px
       s.cases = [["softer", C.violet, "lb"], ["best estimate", C.ssi, "be"], ["stiffer", C.wave, "ub"]].map(([lab, col, key], i) => {
         const x = 160 + i * 290, cs = CASE[key];
         const grp = K.g(g, {hidden: true});
         K.rect(grp, x - 40, 270, 250, 420, {rx: 16, fill: "none", stroke: col, "stroke-width": 3});
-        const so = column(grp, {x, y: 300, w: 170, pxm, hs});
+        const so = column(grp, {x, y: 300, w: 170, pxf, hs});
         K.text(grp, x + 85, 740, lab, {cls: "t-label", anchor: "middle", size: 32, color: col, weight: 750});
         const fl = K.text(grp, x + 85, 784, `${cs.f.toFixed(2)} Hz`, {cls: "t-label", anchor: "middle", size: 30, color: col});
-        return {g: grp, so, fl, mv: motion(COL[key], cs.f, cs.pga, pxm, X, 22 + hs / pxm)};
+        return {g: grp, so, fl, mv: motion(COL[key], cs.f, cs.pga, pxf, X, 72 + hs / pxf)};
       });
       s.note = note(g, 120, 850, `each at its site frequency: 1-D waves\ndisplacements × ${X} · slowed ${SLOW} ×`);
       // the surface spectra of the three SOIL runs, and their envelope (BROADEN, no broadening)
@@ -568,7 +570,7 @@
         b(k) { k.show(k.s.cases[0].g); }, c(k) { k.show(k.s.cases[2].g); k.show(k.s.note, {delay: 400}); }},
       {say: "[c]Each case gets its own SOIL run, and its own surface spectrum.",
         c(k) { k.show(k.s.p.g); k.show(k.s.leg, {delay: 150}); k.draw(k.s.lb, 900); k.draw(k.s.be, 900, {delay: 200}); k.draw(k.s.ub, 900, {delay: 400}); }},
-      {say: "[u]The stiffer soil's natural frequency lands on the input's 2.5 hertz peak, [p]so its spectrum peaks 40 percent higher.",
+      {say: "[u]The stiffer soil's natural frequency lands just above the input's 2.5 hertz peak, [p]so its spectrum peaks 25 percent higher.",
         u(k) { k.pulse([k.s.cases[2].g, k.s.cases[2].fl], {amp: 0.04}); k.show(k.s.v25); }, p(k) { k.show(k.s.pk); }},
       {say: "[e]So you keep the envelope: the highest of the three, at every frequency.",
         e(k) { k.draw(k.s.env, 1000); k.show(k.s.envLeg); }},
@@ -586,9 +588,9 @@
         {t: "Bracket the soil, keep the envelope", sub: "softer, best estimate, stiffer"},
       ], {x: 120, y: 240, w: 1000, num: true, size: 40});
       s.q = K.card(s.root, {x: 1180, y: 240, w: 640, kind: "check", title: "Check yourself", size: 34,
-        body: "The soil report says 200 m/s. Should SITE use it for this earthquake?"});
+        body: "The soil report says 650 ft/s. Should SITE use it for this earthquake?"});
       s.a = K.card(s.root, {x: 1180, y: 560, w: 640, title: "Answer", size: 34,
-        body: "No: that's for gentle shaking. Run SOIL first: here the sand drops to 74 m/s."});
+        body: "No: that's for gentle shaking. Run SOIL first: here the sand drops to 242 ft/s."});
       s.next = K.pill(s.root, "Next · Lesson 7: three earthquake directions and design ISRS →", {x: 120, y: 900, size: 30, color: "var(--wave)"});
     },
     beats: [
@@ -596,9 +598,9 @@
         go(k) { k.show(k.s.head); }, a(k) { k.show(k.s.list.items[0]); }},
       {say: "[a]Two: SOIL finds how soft the soil gets in that earthquake. Guess, check, repeat.", a(k) { k.show(k.s.list.items[1]); }},
       {say: "[a]Three: run softer, best and stiffer soil, and keep the envelope.", a(k) { k.show(k.s.list.items[2]); }},
-      {say: "[q]Check yourself. The soil report says 200 metres per second. Should SITE use that for this earthquake?",
+      {say: "[q]Check yourself. The soil report says 650 feet per second. Should SITE use that for this earthquake?",
         q(k) { k.show(k.s.q); }, gap: 1500},
-      {say: "[a]No. That's the gentle-shaking value. Run SOIL first: here the sand drops to 74, and the motion changes.",
+      {say: "[a]No. That's the gentle-shaking value. Run SOIL first: here the sand drops to 242, and the motion changes.",
         a(k) { k.show(k.s.a); }},
       {say: "[n]Next: earthquakes shake in three directions at once, and you'll turn the results into design floor spectra.",
         n(k) { k.show(k.s.next); }},

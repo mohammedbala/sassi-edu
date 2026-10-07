@@ -4,17 +4,18 @@
  * until nothing changes), for the soil next to a structure (NLSSIITER) and for cracking walls (Option NON);
  * the result shifts the frequencies and changes the spectra.
  *
- * Accuracy.  Example 6 is drawn to scale in section: the 0.6 m wall (a shell in the plane x = 0, 2 m high,
- * its top at grade) with the 150 t deck lumped on its top, the 4 m x 2 m backfill of 2 x 2 elements of
- * 2 m x 1 m, in 10 m of sand (cut with a fade).  Example 7 is the 12 m box of two 4 m storeys with 0.3 m
- * walls on its 1.5 m mat over 10 m of soil (cut).  The buildings sway with the computed steady state of the
- * lesson (HARMFRAME at the peaks of the roof transfer function): uncracked 8.0 Hz with storey drifts 2.15
- * and 1.86, cracked 7.0 Hz with 2.26 and 1.31 per unit control motion (storeys taken in phase); ground
- * +-1 mm, displacements x 250, slowed down 16 times, relative to the mat.  The soil loop and the soil
- * element are the hyperbolic Masing model of the lesson figure (SV.K.PH: G_max of the 250 m/s sand,
- * reference strain of the library Sand curve); the iteration path is the mean G/G_max of the 8 backfill
- * elements per pass (NLSOIL_CONVERGENCE.TXT) on the library Sand curve, from the start GFAC = 0.4 x the
- * free-field G.  Numbers: sassi/ui/lessons/09_nonlinear.md; curves: d09.js (python -m sassi.ui.video_data). */
+ * Accuracy (US customary units: ft, kip, s).  Example 6 is drawn to scale in section: the 2 ft wall (a
+ * shell in the plane x = 0, 6.5 ft high, its top at grade) with the 330 kip deck lumped on its top, the
+ * 13 ft x 6.5 ft backfill of 2 x 2 elements of 6.5 ft x 3.25 ft, in 32.5 ft of sand (cut with a fade).
+ * Example 7 is the 40 ft box of two 13 ft storeys with 1 ft walls on its 5 ft mat over 32.5 ft of soil
+ * (cut).  The buildings sway with the computed steady state of the lesson (HARMFRAME at the peaks of the
+ * roof transfer function): uncracked 8.0 Hz with storey drifts 2.10 and 1.79, cracked 7.5 Hz with 2.47 and
+ * 1.48 per unit control motion (storeys taken in phase); ground +-0.04 in, displacements x 250, slowed
+ * down 16 times, relative to the mat.  The soil loop and the soil element are the hyperbolic Masing model
+ * of the lesson figure (SV.K.PH: G_max of the 800 ft/s, 0.120 kcf sand, reference strain of the library
+ * Sand curve); the iteration path is the mean G/G_max of the 8 backfill elements per pass
+ * (NLSOIL_CONVERGENCE.TXT) on the library Sand curve, from the start GFAC = 0.4 x the free-field G.
+ * Numbers: sassi/ui/lessons/09_nonlinear.md; curves: d09.js (python -m sassi.ui.video_data). */
 "use strict";
 
 (function () {
@@ -46,20 +47,20 @@
   }
 
   // ---------------------------------------------------------------- example 7: the computed sway
-  const HARM = {el: {f: 8.0, d: [2.15, 1.86]}, cr: {f: 7.0, d: [2.26, 1.31]}};   // lesson 9, part 4
-  const UG = 0.001, EXAG = 250, SLOW = 16;
-  const HLAB = "example 7, computed: ground ±1 mm, displacements × 250, slowed down 16 ×";
-  /** The box of example 7 to scale (S px per metre) on the soil surface ySoil: 12 m, two 4 m storeys, 1.5 m mat. */
+  const HARM = {el: {f: 8.0, d: [2.10, 1.79]}, cr: {f: 7.5, d: [2.47, 1.48]}};   // lesson 9, part 4
+  const UG = 0.04 / 12, EXAG = 250, SLOW = 16;                                   // ground amplitude 0.04 in (ft)
+  const HLAB = "example 7, computed: ground ±0.04 in, displacements × 250, slowed down 16 ×";
+  /** The box of example 7 to scale (S px per foot) on the soil surface ySoil: 40 ft, two 13 ft storeys, 5 ft mat. */
   function box(g, x, ySoil, S, o) {
-    const b = K.building(g, Object.assign({x, y: ySoil - 1.5 * S, w: 12 * S, storeys: 2, storeyH: 4 * S, windows: false, matH: 1.5 * S}, o));
-    return {b, S, x, sh: 4 * S, w: 12 * S, mh: 1.5 * S};
+    const b = K.building(g, Object.assign({x, y: ySoil - 5 * S, w: 40 * S, storeys: 2, storeyH: 13 * S, windows: false, matH: 5 * S}, o));
+    return {b, S, x, sh: 13 * S, w: 40 * S, mh: 5 * S};
   }
   /** Sway the box: phase ph, crack state cr (0 uncracked ... 1 cracked): storey drifts of the lesson. */
   function sway(bx, ph, cr) {
     const d1 = HARM.el.d[0] + (HARM.cr.d[0] - HARM.el.d[0]) * cr, d2 = HARM.el.d[1] + (HARM.cr.d[1] - HARM.el.d[1]) * cr;
     const k = UG * EXAG * bx.S * Math.cos(ph), sh = bx.sh;
     bx.b.set({drift: (z) => (z <= 0 ? 0 : z <= sh ? k * d1 * z / sh : k * (d1 + d2 * Math.min(1, (z - sh) / sh)))});
-    // the mat is 12 m wide like the box (the kit draws an overhang)
+    // the mat is 40 ft wide like the box (the kit draws an overhang)
     const m = [bx.b.T(-bx.w / 2, 0), bx.b.T(bx.w / 2, 0), bx.b.T(bx.w / 2, -bx.mh), bx.b.T(-bx.w / 2, -bx.mh)];
     bx.b.mat.setAttribute("d", "M" + m.map((q) => q.join(",")).join("L") + "Z");
   }
@@ -67,24 +68,24 @@
   const advance = (s, dt) => { if (s.run) s.ph += TAU * (HARM.el.f + (HARM.cr.f - HARM.el.f) * s.Cr) * dt / SLOW; };
 
   // ---------------------------------------------------------------- example 6 in section (wall, deck, backfill)
-  /** The wall of example 6 in section: x = 0 (the wall plane) at sx, ground at sy, m px per metre. */
+  /** The wall of example 6 in section: x = 0 (the wall plane) at sx, ground at sy, m px per foot. */
   function section(g, sx, sy, m, o) {
     const r = {};
-    r.soil = K.soil(g, {x: sx - 2.2 * m, y: sy, w: 8 * m, layers: [], hs: {h: o.depth * m, kind: "sand"}, labels: false});
+    r.soil = K.soil(g, {x: sx - 7.2 * m, y: sy, w: 26 * m, layers: [], hs: {h: o.depth * m, kind: "sand"}, labels: false});
     r.cells = [];
-    for (let j = 0; j < 2; j++) for (let i = 0; i < 2; i++) {
-      r.cells.push(K.rect(g, sx + i * 2 * m, sy + j * m, 2 * m, m, {fill: "rgba(232,214,170,.55)", stroke: "rgba(255,240,215,.75)", "stroke-width": 2}));
+    for (let j = 0; j < 2; j++) for (let i = 0; i < 2; i++) {        // 2 x 2 elements of 6.5 ft x 3.25 ft
+      r.cells.push(K.rect(g, sx + i * 6.5 * m, sy + j * 3.25 * m, 6.5 * m, 3.25 * m, {fill: "rgba(232,214,170,.55)", stroke: "rgba(255,240,215,.75)", "stroke-width": 2}));
     }
-    r.wall = K.rect(g, sx - 0.3 * m, sy, 0.6 * m, 2 * m, {fill: C.concreteFill, stroke: C.concrete, "stroke-width": 3});
-    r.deck = K.rect(g, sx - 0.7 * m, sy - 0.45 * m, 1.4 * m, 0.45 * m, {fill: "#3b4a5e", stroke: C.concrete, "stroke-width": 3, rx: 3});
+    r.wall = K.rect(g, sx - 1 * m, sy, 2 * m, 6.5 * m, {fill: C.concreteFill, stroke: C.concrete, "stroke-width": 3});
+    r.deck = K.rect(g, sx - 2.3 * m, sy - 1.5 * m, 4.6 * m, 1.5 * m, {fill: "#3b4a5e", stroke: C.concrete, "stroke-width": 3, rx: 3});
     if (o.labels) {
       r.labs = K.g(g, {hidden: true});
-      K.text(r.labs, sx, sy - 0.62 * m, "deck: 150 t", {cls: "t-label", anchor: "middle", size: 28});
-      K.text(r.labs, sx + 2 * m, sy + 2.55 * m, "loose backfill", {cls: "t-label", anchor: "middle", color: "var(--ink)", size: 30});
-      K.text(r.labs, sx - 0.5 * m, sy + 1.1 * m, "wall", {cls: "t-label", anchor: "end", size: 28});
-      K.text(r.labs, sx + 5.7 * m, sy + 3.3 * m, "native sand, 10 m", {cls: "t-label", anchor: "end", size: 28});
-      K.dim(r.labs, sx, sy - 0.95 * m, sx + 4 * m, sy - 0.95 * m, "4 m", {labelColor: "var(--ink2)"});
-      K.dim(r.labs, sx + 4.25 * m, sy, sx + 4.25 * m, sy + 2 * m, "2 m", {labelColor: "var(--ink2)"});
+      K.text(r.labs, sx, sy - 2 * m, "deck: 330 kips", {cls: "t-label", anchor: "middle", size: 28});
+      K.text(r.labs, sx + 6.5 * m, sy + 8.4 * m, "loose backfill", {cls: "t-label", anchor: "middle", color: "var(--ink)", size: 30});
+      K.text(r.labs, sx - 1.6 * m, sy + 3.6 * m, "wall", {cls: "t-label", anchor: "end", size: 28});
+      K.text(r.labs, sx + 18.7 * m, sy + 10.8 * m, "native sand, 32.5 ft", {cls: "t-label", anchor: "end", size: 28});
+      K.dim(r.labs, sx, sy - 3.1 * m, sx + 13 * m, sy - 3.1 * m, "13 ft", {labelColor: "var(--ink2)"});
+      K.dim(r.labs, sx + 13.8 * m, sy, sx + 13.8 * m, sy + 6.5 * m, "6.5 ft", {labelColor: "var(--ink2)"});
     }
     return r;
   }
@@ -97,7 +98,7 @@
     id: "hook", title: "A linear method, a nonlinear earthquake",
     build(s) {
       const g = K.g(s.svg);
-      const S = 30, X = 470, YS = 700;
+      const S = 9, X = 470, YS = 700;                                // px per foot
       K.soil(g, {x: 110, y: YS, w: 720, layers: [], hs: {h: 990 - YS, kind: "gravel"}, labels: false});
       s.zone = K.path(g, `M${X - 230},${YS} Q${X},${YS + 250} ${X + 230},${YS} Z`, {fill: "rgba(255,111,165,.24)", stroke: C.dash, "stroke-width": 3, "stroke-dasharray": "10 8", hidden: true});
       s.zoneT = K.text(g, X, YS + 90, "softened soil (illustration)", {cls: "t-label", anchor: "middle", color: "var(--ink)", size: 26, hidden: true});
@@ -106,7 +107,7 @@
       s.cracks = [crack(-140, 14, 5, 14, 18), crack(-40, 22, 5, 16, 18), crack(60, 10, 5, 12, 19), crack(150, 30, 4, -14, 18)]
         .map((pts) => ({pts, el: K.path(s.crk, "", {stroke: C.bad, "stroke-width": 4, fill: "none", "stroke-linejoin": "round"})}));
       s.lab = K.text(g, 110, 150, HLAB, {cls: "t-small"});
-      s.fT = K.text(g, X, YS - 1.5 * S - 8 * S - 40, "sway: 8.0 Hz", {cls: "t-label", anchor: "middle", color: "var(--ink)", size: 30});
+      s.fT = K.text(g, X, YS - 5 * S - 26 * S - 40, "sway: 8.0 Hz", {cls: "t-label", anchor: "middle", color: "var(--ink)", size: 30});
       s.head = K.heading(s.root, "SASSI is linear. Earthquakes aren't.", {x: 960, y: 140, w: 860, size: "h2"});
       s.lin = K.pill(s.root, "double the shaking → double the response", {x: 960, y: 290, color: "var(--ref)", size: 32});
       s.i1 = item(s.root, 960, 410, 860, "var(--dash)", "<b>Soil softens</b> in strong shaking");
@@ -144,9 +145,9 @@
   });
 
   // ---------------------------------------------------------------- 2. equivalent linear
-  const rho = 19 / 9.81, G0 = rho * 250 * 250, GR = PH.sandRefStrain();        // the lesson figure's sand (kPa, strain in %)
+  const rho = 0.120 / 32.2, G0 = rho * 800 * 800, GR = PH.sandRefStrain();     // the lesson figure's sand (ksf, strain in %)
   const BK = PH.hyperbolic(G0 / 100, GR);
-  const ES = 240, EXS = 150;                     // the soil element: 1 m drawn 240 px, strain x 150
+  const ES = 240, EXS = 150, TPX = 110;          // the soil element drawn 240 px, strain x 150; stress arrow 110 px per ksf
   scenes.push({
     id: "eqlin", title: "Soft when shaken hard",
     build(s) {
@@ -154,16 +155,16 @@
       K.defs();
       s.head = K.heading(s.root, "Soil softens as it shakes harder", {x: 110, y: 70, size: "h2"});
       // the loop
-      s.p = K.plot(s.svg, {x: 230, y: 200, w: 640, h: 560, xr: [-0.2, 0.2], yr: [-60, 60], xticks: [-0.2, -0.1, 0, 0.1, 0.2], yticks: [-60, -30, 0, 30, 60],
-        xlabel: "strain (%)", ylabel: "stress (kPa)", ylabelOffset: 84});
+      s.p = K.plot(s.svg, {x: 230, y: 200, w: 640, h: 560, xr: [-0.2, 0.2], yr: [-1.2, 1.2], xticks: [-0.2, -0.1, 0, 0.1, 0.2], yticks: [-1.2, -0.6, 0, 0.6, 1.2],
+        xlabel: "strain (%)", ylabel: "stress (ksf)", ylabelOffset: 84});
       s.loopF = K.path(s.p.data, "", {fill: "rgba(255,111,165,.30)", hidden: true});
       s.loop = K.path(s.p.data, "", {stroke: C.ssi, "stroke-width": 6, fill: "none"});
       s.sec = K.path(s.p.data, "", {stroke: C.spring, "stroke-width": 5, "stroke-dasharray": "14 9", fill: "none", hidden: true});
       s.dot = K.circle(s.p.data, 0, 0, 11, {fill: C.ssi, stroke: "#0a111d", "stroke-width": 3});
       s.lab1 = K.label(s.root, "<span style='color:var(--spring)'>average slope = stiffness</span>", {x: 250, y: 214, size: 30, in: "fade"});
       s.lab2 = K.label(s.root, "<span style='color:var(--dash)'>loop area = damping</span>", {x: 250, y: 258, size: 30, in: "fade"});
-      s.src = K.text(s.p.g, 230, 900, "hyperbolic sand model of the lesson figure (Vs 250 m/s)", {cls: "t-small"});
-      // the real object: a 1 m soil element of that sand in cyclic simple shear (the same model)
+      s.src = K.text(s.p.g, 230, 900, "hyperbolic sand model of the lesson figure (Vs 800 ft/s)", {cls: "t-small"});
+      // the real object: a soil element of that sand in cyclic simple shear (the same model)
       const EX0 = 1330, EY0 = 600;
       s.EX0 = EX0; s.EY0 = EY0;
       s.el = K.g(g, {hidden: true});
@@ -201,7 +202,7 @@
       // the element: base fixed, top displaced by the strain; the stress on its top face
       const dx = x / 100 * ES * EXS, x0 = s.EX0, y0 = s.EY0, e = `M${x0},${y0}L${x0 + ES},${y0}L${x0 + ES + dx},${y0 - ES}L${x0 + dx},${y0 - ES}Z`;
       s.elem.setAttribute("d", e); s.elT.setAttribute("d", e);
-      const L = F * 2.2, cx = x0 + ES / 2 + dx;
+      const L = F * TPX, cx = x0 + ES / 2 + dx;
       s.tau.update(cx - L / 2, y0 - ES - 34, cx + L / 2, y0 - ES - 34);
       s.tau.g.style.opacity = String(Math.min(1, Math.abs(L) / 24));
       // the block on its spring and damper, with the same displacement
@@ -228,13 +229,13 @@
   // ---------------------------------------------------------------- 3. the iteration
   // The path of example 6's backfill on the library Sand curve: mean G/G_max of the 8 elements per pass
   // (NLSOIL_CONVERGENCE.TXT), each at the strain where the curve gives it; the start is GFAC = 0.4 x the
-  // free-field G of layers L 11 and L 12 (Vs 245 and 230 m/s, 19 kN/m3) over the backfill's G_max (FILE74).
+  // free-field G of layers L 11 and L 12 (Vs 781 and 730 ft/s, 0.120 kcf) over the backfill's G_max (FILE74, ksf).
   const F74 = D["ex06/FILE74"].cols;
   const NLC = D["ex06/NLSOIL_CONVERGENCE.TXT"].cols;
   const SANDLG = PH.SAND.g.map(Math.log10);
   const sandG = (g) => lerp(SANDLG, PH.SAND.G, Math.log10(g));
   const sandInv = (r) => Math.pow(10, lerp(PH.SAND.G.slice().reverse(), SANDLG.slice().reverse(), r));
-  const R_START = 0.4 * (19 / 9.81) * (245 * 245 + 230 * 230) / 2 / F74[6][0];
+  const R_START = 0.4 * (0.120 / 32.2) * (781 * 781 + 730 * 730) / 2 / F74[6][0];
   scenes.push({
     id: "iterate", title: "Guess, run, check, repeat",
     build(s) {
@@ -278,7 +279,7 @@
       s.conv = K.g(s.q.g, {hidden: true});
       const last = rs.length - 1;
       K.circle(s.conv, s.q.X(gm[last]), s.q.Y(rs[last]), 11, {fill: C.good, stroke: "#0a111d", "stroke-width": 3});
-      K.text(s.conv, s.q.X(gm[last]) + 16, s.q.Y(rs[last]) - 22, `converged: ${rs[last].toFixed(2)}`, {cls: "t-label", color: "var(--good)", size: 26});
+      K.text(s.conv, s.q.X(gm[last]) - 20, s.q.Y(rs[last]) + 42, `converged: ${rs[last].toFixed(2)}`, {cls: "t-label", anchor: "end", color: "var(--good)", size: 26});
       s.qT = K.text(s.q.g, 1200, 214, "example 6's backfill, mean of its 8 elements", {cls: "t-small"});
       s.C = 0; s.ang = 0;
     },
@@ -308,18 +309,18 @@
     build(s) {
       const g = K.g(s.svg);
       s.head = K.heading(s.root, "The soil next to the wall", {x: 110, y: 70, size: "h2"});
-      s.S = section(g, 380, 430, 95, {labels: true, depth: 4.3});
+      s.S = section(g, 380, 430, 95 * 4 / 13, {labels: true, depth: 14});          // 13 ft drawn 380 px
       s.code = K.code(s.root, ["PINGRP,3,1,0.4,1.0,Sand", "NLSSIITER,NLRUN+NLX+NLY+NLZ+NLCOMB,8"], {x: 1010, y: 170, w: 800, size: 28});
       s.cl = [K.label(s.root, "← the backfill: nonlinear sand", {x: 1010, y: 344, size: 28, color: "var(--muted)", in: "fade"}),
         K.label(s.root, "← the loop, up to 8 passes", {x: 1010, y: 388, size: 28, color: "var(--muted)", in: "fade"})];
       const ch = NLC[2].map(Math.abs);
-      s.p = K.plot(s.svg, {x: 1150, y: 500, w: 640, h: 250, xr: [-0.6, 6.6], yr: [0, 70], xticks: [0, 1, 2, 3, 4, 5, 6], yticks: [0, 20, 40, 60],
+      s.p = K.plot(s.svg, {x: 1150, y: 500, w: 640, h: 250, xr: [-0.6, ch.length - 0.4], yr: [0, 80], xticks: ch.map((v, i) => i), yticks: [0, 20, 40, 60, 80],
         xlabel: "pass", ylabel: "largest change of G (%)", ylabelOffset: 70});
-      s.bars = ch.map((v, i) => K.rect(s.p.data, s.p.X(i) - 30, s.p.Y(v), 60, s.p.Y(0) - s.p.Y(v),
+      s.bars = ch.map((v, i) => K.rect(s.p.data, s.p.X(i) - 36, s.p.Y(v), 72, s.p.Y(0) - s.p.Y(v),
         {fill: i === ch.length - 1 ? C.good : C.ssi, rx: 4, hidden: true, in: "fade"}));
       s.bl = K.g(s.p.g, {hidden: true});
       const last = ch.length - 1;
-      K.text(s.bl, s.p.X(0) + 42, s.p.Y(ch[0]) + 26, `${Math.round(ch[0])} %`, {cls: "t-label", color: "var(--ink)", size: 28});
+      K.text(s.bl, s.p.X(0) + 48, s.p.Y(ch[0]) + 26, `${Math.round(ch[0])} %`, {cls: "t-label", color: "var(--ink)", size: 28});
       K.text(s.bl, s.p.X(last), s.p.Y(Math.max(ch[last], 2)) - 16, `${ch[last].toFixed(1)} %`, {cls: "t-label", anchor: "middle", color: "var(--good)", size: 28});
       s.done = s.p.hline(2, {color: C.good, hidden: true});
       s.soft = K.pill(s.root, "a fifth to a quarter as stiff as the native soil", {x: 110, y: 900, color: "var(--ssi)", size: 32});
@@ -331,12 +332,12 @@
     beats: [
       {say: "SOIL handles the free field. But right next to a building, the soil can strain much more.",
         go(k) { k.show(k.s.head); }},
-      {say: "[e]Take example 6: a wall carrying a 150-tonne bridge deck, with loose backfill behind it.",
+      {say: "[e]Take example 6: a wall carrying a 330-kip bridge deck, with loose backfill behind it.",
         e(k) { k.show(k.s.S.labs); k.pulse(k.s.S.cells, {amp: 0.04}); }},
       {say: "[c]In SASSI, one line marks the backfill as nonlinear sand, [n]and NLSSIITER runs the loop for it.",
         c(k) { k.show(k.s.code.el); k.type(k.s.code.lines[0], {cps: 30}); k.show(k.s.cl[0], {delay: 400}); },
         n(k) { k.type(k.s.code.lines[1], {cps: 40}); k.show(k.s.cl[1], {delay: 400}); }},
-      {say: "[p]It settles in 6 passes: each change is smaller than the last, down to 1.5 percent.",
+      {say: "[p]It settles in 4 passes: the changes shrink, with one overshoot on the way, down to 0.7 percent.",
         p(k) { k.show(k.s.p.g); k.show(k.s.bars, {stagger: 150, delay: 200}); k.show([k.s.bl, k.s.done], {delay: 400}); k.tween(k.s, {G: 1}, 1000); }},
       {say: "[s]The backfill ends up a fifth to a quarter as stiff as the native soil around it.",
         s(k) { k.show(k.s.soft); }},
@@ -349,13 +350,13 @@
     build(s) {
       const g = K.g(s.svg);
       s.head = K.heading(s.root, "What the wall feels", {x: 110, y: 70, size: "h2"});
-      const SX = 320, SY = 300, M = 70;
-      s.S = section(g, SX, SY, M, {depth: 4});
+      const SX = 320, SY = 300, M = 70 * 4 / 13;                                     // px per foot: 13 ft drawn 280 px
+      s.S = section(g, SX, SY, M, {depth: 13});
       s.S.cells.forEach((c, i) => c.setAttribute("fill", tint(GRATIO(CELLS[i]), 1)));
       s.n22 = K.circle(g, SX, SY, 13, {fill: C.ssi, stroke: "#0a111d", "stroke-width": 3, hidden: true});
-      s.n24 = K.circle(g, SX + 4 * M, SY, 13, {fill: C.wave, stroke: "#0a111d", "stroke-width": 3, hidden: true});
+      s.n24 = K.circle(g, SX + 13 * M, SY, 13, {fill: C.wave, stroke: "#0a111d", "stroke-width": 3, hidden: true});   // x = 13 ft
       s.st = [
-        K.stat(s.root, {x: 110, y: 630, w: 400, value: "0.75", unit: "g", label: "wall top, with the deck", color: "var(--ssi)", vsize: 110}),
+        K.stat(s.root, {x: 110, y: 630, w: 400, value: "0.77", unit: "g", label: "wall top, with the deck", color: "var(--ssi)", vsize: 110}),
         K.stat(s.root, {x: 520, y: 630, w: 400, value: "0.58", unit: "g", label: "behind it: the free field", color: "var(--wave)", vsize: 110}),
       ];
       const ff = D["ex06/RS001_01.RS"], n22 = D["ex06/00022TR_X01.RS"];
@@ -368,7 +369,7 @@
         body: "You'd miss almost a quarter of its acceleration."});
     },
     beats: [
-      {say: "What does this change for the design? [t]The wall top, carrying the deck, now reaches 0.75 g.",
+      {say: "What does this change for the design? [t]The wall top, carrying the deck, now reaches 0.77 g.",
         go(k) { k.show(k.s.head); }, t(k) { k.show([k.s.n22, k.s.st[0].el]); }},
       {say: "[f]Behind the backfill, the ground stays at the free-field 0.58 g.",
         f(k) { k.show([k.s.n24, k.s.st[1].el]); }},
@@ -380,19 +381,19 @@
   });
 
   // ---------------------------------------------------------------- 6. walls that crack: Option NON
-  const CRV = D["ex07/Panel0001.crv"].cols;                    // backbone of panel 1: strain, ..., force (kN)
+  const CRV = D["ex07/Panel0001.crv"].cols;                    // backbone of panel 1: strain, ..., G A_W (kips), force (kips)
   const EQL = D["ex07/Panel_EQL_Matl_Prop.txt"].cols;          // converged panels: E/E_el (col 5), x_eq (col 10)
   scenes.push({
     id: "walls", title: "Walls that crack: Option NON",
     build(s) {
       const g = K.g(s.svg);
       s.head = K.heading(s.root, "Walls that crack: Option NON", {x: 110, y: 70, size: "h2"});
-      s.facts = K.label(s.root, "12 m box · two 4 m storeys · 0.3 m walls · shaken at 0.6 g", {x: 130, y: 172, size: 30, in: "fade"});
+      s.facts = K.label(s.root, "40 ft box · two 13 ft storeys · 1 ft walls · shaken at 0.6 g", {x: 130, y: 172, size: 30, in: "fade"});
       s.lab = K.text(g, 130, 248, HLAB, {cls: "t-small"});
-      const S = 40, X = 500, YS = 820;
+      const S = 12, X = 500, YS = 820;                             // px per foot
       K.soil(g, {x: 130, y: YS, w: 740, layers: [], hs: {h: 990 - YS, kind: "gravel"}, labels: false});
       s.bx = box(g, X, YS, S);
-      const tw = 0.3 * S;                                          // the end walls, edge-on: 0.3 m
+      const tw = 1 * S;                                            // the end walls, edge-on: 1 ft
       s.ends = [K.path(g, "", {fill: C.concrete, "fill-opacity": 0.55}), K.path(g, "", {fill: C.concrete, "fill-opacity": 0.55})];
       s.tw = tw;
       s.pan = K.g(g, {hidden: true});
@@ -404,12 +405,12 @@
       s.cracks = [crack(-200, 12, 5, 16, 18), crack(-80, 16, 5, 18, 18), crack(40, 10, 5, 14, 19), crack(170, 18, 5, -16, 18)]
         .map((pts) => ({pts, el: K.path(s.crk, "", {stroke: C.bad, "stroke-width": 5, fill: "none", "stroke-linejoin": "round"})}));
       // the backbone of panel 1 (Panel0001.crv: strain, force)
-      const xs = CRV[0].map((x) => 100 * x), F = CRV[4].map((v) => v / 1000), kel = CRV[3][0];
-      s.p = K.plot(s.svg, {x: 1150, y: 200, w: 660, h: 330, xr: [5e-4, 3], xlog: true, yr: [0, 14], xticks: [0.001, 0.01, 0.1, 1], yticks: [0, 4, 8, 12],
-        xfmt: (v) => String(v), xlabel: "wall shear strain (%)", ylabel: "wall shear force (MN)", ylabelOffset: 62});
-      const xUn = 100 * 11500 / kel, el = K.logspace(5e-4, xUn, 60);      // the uncracked slope G A_W, up to 11.5 MN
-      s.lel = s.p.line(el, el.map((x) => kel * x / 100 / 1000), {color: C.ref, width: 3, draw: true});
-      s.lelT = s.p.text(xUn, 11.5, "uncracked", {cls: "t-label", anchor: "end", color: "var(--ref)", size: 28, dx: -14, hidden: true});
+      const xs = CRV[0].map((x) => 100 * x), F = CRV[4], kel = CRV[3][0];
+      s.p = K.plot(s.svg, {x: 1150, y: 200, w: 660, h: 330, xr: [5e-4, 3], xlog: true, yr: [0, 3200], xticks: [0.001, 0.01, 0.1, 1], yticks: [0, 1000, 2000, 3000],
+        xfmt: (v) => String(v), xlabel: "wall shear strain (%)", ylabel: "wall shear force (kips)", ylabelOffset: 100});
+      const xUn = 100 * 2600 / kel, el = K.logspace(5e-4, xUn, 60);       // the uncracked slope G A_W, up to 2,600 kips
+      s.lel = s.p.line(el, el.map((x) => kel * x / 100), {color: C.ref, width: 3, draw: true});
+      s.lelT = s.p.text(xUn, 2600, "uncracked", {cls: "t-label", anchor: "end", color: "var(--ref)", size: 28, dx: -14, hidden: true});
       s.lbb = s.p.line(xs, F, {color: C.ssi, width: 7, draw: true});
       let ic = 0;                                                     // cracking: the last point on the elastic slope
       while (ic + 1 < CRV[0].length && CRV[4][ic + 1] / CRV[0][ic + 1] >= 0.99 * kel) ic++;
@@ -444,7 +445,7 @@
         p(k) { k.show(k.s.pan); }},
       {say: "[c]Each panel follows a backbone curve: force against deformation, steep until it cracks, then much flatter.",
         c(k) { k.show(k.s.p.g); k.draw(k.s.lel, 800); k.show(k.s.lelT, {delay: 300}); k.draw(k.s.lbb, 1000, {delay: 300}); k.show(k.s.crP, {delay: 400}); }},
-      {say: "[r]After 7 passes, the ground-floor walls keep only 0.35 of their uncracked stiffness. [u]The upper walls never crack.",
+      {say: "[r]After 7 passes, the ground-floor walls keep only 0.37 of their uncracked stiffness. [u]The upper walls never crack.",
         r(k) { k.show([k.s.st.el, k.s.crk, k.s.cvP]); k.tween(k.s, {Cr: 1}, 1000); }, u(k) { k.show(k.s.up); }},
     ],
   });
@@ -468,15 +469,15 @@
       K.circle(s.pk1, s.q.X(r1.f), s.q.Y(r1.sa), 11, {fill: C.ssi, stroke: "#0a111d", "stroke-width": 3});
       K.text(s.pk1, s.q.X(r1.f) - 20, s.q.Y(r1.sa) + 6, `${r1.f.toFixed(2)} Hz`, {cls: "t-label", anchor: "end", color: "var(--ssi)", size: 30});
       const ya = s.q.Y(Math.max(r0.sa, r1.sa)) - 26;
-      s.shift = K.arrow(s.q.g, s.q.X(r0.f) - 6, ya, s.q.X(r1.f) + 6, ya, {color: C.ssi, width: 5, head: 18, hidden: true});
+      s.shift = K.arrow(s.q.g, s.q.X(r0.f) + 4, ya, s.q.X(r1.f) - 4, ya, {color: C.ssi, width: 5, head: 14, hidden: true});
       // two buildings: uncracked and cracked, the computed sway at the same scale
       s.bl = K.g(g, {hidden: true});
-      const S = 15, YS = 600;
+      const S = 4.5, YS = 600;                                     // px per foot
       K.line(s.bl, 1290, YS, 1810, YS, {stroke: C.gravel, "stroke-width": 5});
       s.b1 = box(s.bl, 1420, YS, S, {color: "var(--ref)"});
       s.b2 = box(s.bl, 1680, YS, S);
       s.b2.b.polys[0].style.fill = "rgba(255,181,71,.3)";
-      const yt = YS - 1.5 * S - 8 * S - 30;
+      const yt = YS - 5 * S - 26 * S - 30;
       K.text(s.bl, 1420, yt, "uncracked", {cls: "t-label", anchor: "middle", color: "var(--ref)", size: 30});
       K.text(s.bl, 1680, yt, "cracked", {cls: "t-label", anchor: "middle", color: "var(--ssi)", size: 30});
       K.text(s.bl, 1420, YS + 50, `faster: ${HARM.el.f.toFixed(1)} Hz`, {cls: "t-label", anchor: "middle", size: 28});
@@ -485,7 +486,7 @@
       s.warn = K.card(s.root, {x: 240, y: 790, w: 900, kind: "warn", title: "One linear run", size: 32,
         body: "keeps uncracked walls, though its own strains say they cracked."});
       s.cap = K.card(s.root, {x: 1240, y: 300, w: 570, kind: "warn", title: "One caution: damping", size: 32,
-        body: "Cracked walls came out at <b>16.7 %</b>. ASCE 4 accepts <b>7 %</b>: cap it."});
+        body: "Cracked walls came out at <b>16.5 %</b>. ASCE 4 accepts <b>7 %</b>: cap it."});
       s.run = 0; s.ph1 = 0; s.ph2 = 0;
     },
     tick(s, t, dt) {
@@ -496,12 +497,12 @@
     beats: [
       {say: "Why should you care? A softer building sways more slowly, [b]so its floor spectra shift.",
         go(k) { k.show(k.s.head); }, b(k) { k.show(k.s.bl); k.s.run = 1; }},
-      {say: "[u]Uncracked, the roof spectrum peaks at 7.94 hertz. [c]Cracked, it peaks at 6.76 hertz, and a little lower.",
+      {say: "[u]Uncracked, the roof spectrum peaks at 7.94 hertz. [c]Cracked, it peaks at 6.92 hertz, and a little lower.",
         u(k) { k.show([k.s.q.g, k.s.leg]); k.draw(k.s.le, 1000); k.show(k.s.pk0, {delay: 400}); },
         c(k) { k.draw(k.s.lc, 1000); k.show([k.s.pk1, k.s.shift], {delay: 400}); }},
       {say: "[l]A single linear run would keep uncracked walls, even though its own strains say they have cracked.",
         l(k) { k.show(k.s.warn); }},
-      {say: "[c]One caution: the cracked walls also came out with 16.7 percent damping. ASCE 4 accepts 7, so cap it.",
+      {say: "[c]One caution: the cracked walls also came out with 16.5 percent damping. ASCE 4 accepts 7, so cap it.",
         c(k) { k.hide(k.s.bl); k.show(k.s.cap, {delay: 300}); }},
     ],
   });
@@ -513,8 +514,8 @@
       s.head = K.heading(s.root, "Recap", {x: 110, y: 80, size: "h1"});
       s.list = K.bullets(s.root, [
         {t: "Linear SASSI, nonlinear effects: <b>iterate</b>", sub: "guess, run, check, repeat"},
-        {t: "<b>Soil next to a structure</b> may need it", sub: "wall top: 0.75 g, not the free-field 0.58 g"},
-        {t: "<b>Option NON</b> cracks the walls", sub: "roof peak: from 7.94 to 6.76 Hz"},
+        {t: "<b>Soil next to a structure</b> may need it", sub: "wall top: 0.77 g, not the free-field 0.58 g"},
+        {t: "<b>Option NON</b> cracks the walls", sub: "roof peak: from 7.94 to 6.92 Hz"},
       ], {x: 110, y: 230, w: 980, num: true, size: 42});
       s.q = K.card(s.root, {x: 1170, y: 230, w: 640, kind: "check", title: "Check yourself", size: 34,
         body: "Why does SASSI need several passes, not just one?"});
@@ -525,9 +526,9 @@
     beats: [
       {say: "Let's recap. [a]SASSI is linear, so it handles soft soil and cracked walls by iterating: guess, run, check, repeat.",
         go(k) { k.show(k.s.head); }, a(k) { k.show(k.s.list.items[0]); }},
-      {say: "[a]Soil next to a structure may need its own loop: here the wall top reached 0.75 g, not 0.58.",
+      {say: "[a]Soil next to a structure may need its own loop: here the wall top reached 0.77 g, not 0.58.",
         a(k) { k.show(k.s.list.items[1]); }},
-      {say: "[a]Option NON cracks the walls panel by panel: the roof spectrum peak moved from 7.94 to 6.76 hertz.",
+      {say: "[a]Option NON cracks the walls panel by panel: the roof spectrum peak moved from 7.94 to 6.92 hertz.",
         a(k) { k.show(k.s.list.items[2]); }},
       {say: "[q]Check yourself. Why does SASSI need several passes, and not just one?",
         q(k) { k.show(k.s.q); }, gap: 1500},

@@ -39,8 +39,8 @@ In SASSI-EDU:
 ```
 * name and directory of the SASSI-EDU model
 MDL,bldg,C:/work/bldg
-* <model> blank = active model; gravity in model units
-CONVERT,ANSYS,,mybuilding.cdb,9.81
+* <model> blank = active model; gravity in model units (32.2 for a model in kip, ft, s)
+CONVERT,ANSYS,,mybuilding.cdb,32.2
 * restrain rotations that no element stiffens
 FIXROT
 * then ETYPE / ETYPEGEN, INT / INTGEN for the SSI model
@@ -59,7 +59,7 @@ CONVERT,ANSYS,<model>,<filename>,<gravity>,[<prefile>],[<damp>]
 |---|---|
 | `<model>` | destination model number; blank = the active model. The model is **replaced** by the converted one. Its MDL name and path are kept, and the active model does not change. |
 | `<filename>` | the `.cdb` file (CDWRITE). Plain APDL files with `N`, `EN`/`E`, `MP`, `R` … commands are read too (see §2.1). |
-| `<gravity>` | **required.** Gravity in the model's length/time units: 9.81 (m, s), 32.2 (ft, s), 386.4 (in, s). It turns the ANSYS density into the SASSI specific weight (`weight = DENS·g`) and becomes the model `GRAVITY`. |
+| `<gravity>` | **required.** Gravity in the model's length/time units: 32.2 (ft, s), 386.4 (in, s), 9.81 (m, s). It turns the ANSYS density into the SASSI specific weight (`weight = DENS·g`) and becomes the model `GRAVITY`. |
 | `[<prefile>]` | SASSI-EDU extension: also write the converted model as a `.pre` file (the dialog's "Output .pre File Name"). |
 | `[<damp>]` | SASSI-EDU extension: damping ratio for materials without `DMPR` (default 0, with a warning). |
 

@@ -19,8 +19,9 @@
 * model with the FILE88 properties) agrees with the final linear SHAKE transfer function of SOIL
 * (SSAF Fourier amplification file SAF001W_023W.TFU).
 *
-* Soil profile: 10 m of sand (Vs 200 m/s) on 12 m of clay (Vs 300 m/s) on rock (Vs 1200 m/s),
-* each soil layer modelled as 1 m sublayers (TOPL and SPRO list the same 22 sublayers).
+* Soil profile: 30 ft of sand (Vs 650 ft/s) on 42 ft of clay (Vs 1,000 ft/s) on rock
+* (Vs 4,000 ft/s), the sand modelled as 3 ft sublayers, the clay as 3.5 ft sublayers (TOPL and
+* SPRO list the same 22 sublayers).
 *
 * How to run (the working directory must be the examples directory, see examples/README.md):
 *     cd examples
@@ -28,16 +29,17 @@
 *   or from the repository root:  .venv/bin/sassi --cwd examples run ex04_site_response.pre
 * Results: examples/ex04/.   Run time: about 20 s (EQUAKE is the slow step).
 *
-* Units: m, kN, t, s.  Gravity 9.81 m/s2.  Histories and spectra in g.
+* Units: ft, kip, s.  Gravity 32.2 ft/s2.  Unit weights in kcf, Vs and Vp in ft/s.
+* Acceleration histories and spectra in g; EQUAKE writes velocity in in/s and displacement in in.
 * ======================================================================================
 MDL,ex04,ex04
 TIT,Ex04 - free-field chain EQUAKE - SOIL - SITE (sand and clay on rock)
 *
 * ---------------------------------------------------------------------- soil layers
 * L,<nm>,<thick>,<weight>,<Vp>,<Vs>,<pdamp>,<sdamp>   (low-strain properties)
-L,1,1.0,19.0,400,200,0.01,0.01
-L,2,1.0,18.5,900,300,0.01,0.01
-L,3,1.0,22.0,2400,1200,0.01,0.01
+L,1,3.0,0.120,1300,650,0.01,0.01
+L,2,3.5,0.120,3000,1000,0.01,0.01
+L,3,3.0,0.140,8000,4000,0.01,0.01
 TOPL,1,1,1,1,1,1,1,1,1,1
 TOPL,2,2,2,2,2,2,2,2,2,2
 TOPL,2,2
@@ -46,13 +48,14 @@ TOPL,2,2
 * dt 0.005 s, NFFT 8192 (40.96 s: the 20 s motion plus a quiet zone): df = 0.0244 Hz.
 * The SITE frequencies are multiples of 20 df = 0.488 Hz (plus 0.1 Hz) so that they coincide
 * with the SSAF frequency step of SOIL below.  Cut-off 13.7 Hz: the strain-softened sand at
-* 7-10 m depth (Vs about 75 m/s) passes Vs/(5 h) = 15 Hz with 1 m sublayers (G-05).
+* 21-30 ft depth (Vs 240-260 ft/s) passes Vs/(5 h) = 16-17 Hz with 3 ft sublayers (G-05).
 FREQ,1,4,20,40,60,80,100,120,140,160,180
 FREQ,1,200,240,280,320,360,400,440,480,520,560
 * SITE: half-space = L 3, control point at the top of TOPL layer 1 (the free surface)
 SITE,0,1,0,20,3,1,0,1,4096,1,0,0.005,8192,1
 WAVE,2,1,1,1,0
-HOUSE,9.81,0,0,2,0,0,0,0,0
+* HOUSE <gravity> 32.2 ft/s2: British units (EQUAKE takes its gravity from here)
+HOUSE,32.2,0,0,2,0,0,0,0,0
 *
 * ======================================================================================
 * 1. EQUAKE: spectrum-compatible motion
@@ -82,9 +85,9 @@ FOREACH,SANDL,SPRO,@SANDL[#],1,Sand
 FOREACH,CLAYL,SPRO,@CLAYL[#],2,Clay
 SPRO,23,3
 * SOIL,<nrval>,<grav>,<header>,<outcrop>,<save>,<iter>,<ratio>,<gravmult>,<cof>
-*   4000 values after 1 header line (the dt line of the EQUAKE file), outcrop input,
-*   save FILE88, 8 iterations, effective strain = 0.65 x maximum strain
-SOIL,4000,9.81,1,1,1,8,0.65,1,0
+*   4000 values after 1 header line (the dt line of the EQUAKE file), gravity 32.2 ft/s2,
+*   outcrop input, save FILE88, 8 iterations, effective strain = 0.65 x maximum strain
+SOIL,4000,32.2,1,1,1,8,0.65,1,0
 * SOILX,<indir>,<mult>,<max>,<cl>: horizontal input, factor 1, input at the top of sublayer 23
 SOILX,0,1,0,23
 THFILE,rg160h_eq.acc

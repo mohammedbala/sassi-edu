@@ -28,7 +28,7 @@ On a soil site neither assumption holds. Soil-structure interaction (SSI) has tw
 SASSI computes both in one analysis, in the **frequency domain**, by **substructuring**: the
 horizontally layered site is solved semi-analytically, the building is a finite-element model, and
 the two are joined at the *interaction nodes*. In this lesson you run a complete SASSI analysis of
-a four-storey stick on a 20 m × 20 m surface mat, look at its results, and then run the same stick
+a four-storey stick on a 64 ft × 64 ft surface mat, look at its results, and then run the same stick
 on a practically rigid site (the fixed-base reference) and on a massless foundation. The numbers
 you see in this lesson come from these runs.
 
@@ -54,12 +54,13 @@ History shows each one. This file holds 80 commands:
 
 * `MDL,ex01,ex01` names the model `ex01` and makes `ex01/` its directory and the working
   directory. Every module writes its files there.
-* `L` and `TOPL` define the site: 5 m of dense sand ($V_s = 300\,\text{m/s}$) over 12 m of gravel
-  ($V_s = 500\,\text{m/s}$) over weathered rock ($V_s = 1000\,\text{m/s}$).
+* `L` and `TOPL` define the site: 16 ft of dense sand ($V_s = 1000\,\text{ft/s}$) over 39 ft of
+  gravel ($V_s = 1650\,\text{ft/s}$) over weathered rock ($V_s = 3300\,\text{ft/s}$). The model is in
+  ft, kip and s: unit weights in kcf, moduli in ksf, the floor masses given as weights in kips.
 * `FREQ` and `SITE` define the 22 analysis frequencies between 0.1 and 20 Hz.
-* `N`, `E` and their generators build the structure: a 1.5 m SHELL mat (81 nodes, ten times
+* `N`, `E` and their generators build the structure: a 5 ft SHELL mat (81 nodes, ten times
   stiffer than concrete: stiff, but not rigid, as lesson 4 shows), a four-storey BEAMS stick with
-  1000 t per floor,
+  2,200 kips per floor (weights; HOUSE divides them by $g = 32.2\,\text{ft/s}^2$),
   and a rigid "spider" of beams that clamps the stick to the mat.
 * `INT,1,81,1,1` makes the 81 mat nodes **interaction nodes**: the nodes where the soil acts.
 * the module options (`POINT`, `HOUSE`, `ANALYS`, `MOTION`, `STRESS`, `RELD` ...), then `CHECK`,
@@ -180,7 +181,7 @@ HARMFRAME,FILE8,3.49,HARM_SSI
 ```action
 plot-spectrum: ex01/00085TR_X.TFU, ex01/00085TR_X.TFI, ex01/00041TR_X.TFI
 plot-spectrum: ex01/00085TR_X02.RS, ex01/00084TR_X02.RS, ex01/00041TR_X02.RS | log
-animate: ex01/HARM_SSI | deformed 0.2 front | SSI system at 3.49 Hz
+animate: ex01/HARM_SSI | deformed 0.6 front | SSI system at 3.49 Hz
 open-listing: MOTION
 explain: NOUT,1,1,1,0,0,1,1,41,82-85
 explain: HARMFRAME,FILE8,3.49,HARM_SSI
@@ -190,28 +191,29 @@ explain: HARMFRAME,FILE8,3.49,HARM_SSI
 `LFREQ` lists the 22 analysis frequencies (0.098 ... 19.995 Hz). The first plot shows the X
 transfer function of the roof (node 85): `.TFU` at the 22 computed frequencies and `.TFI`
 interpolated by MOTION at all 820 Fourier frequencies from 0 to 20 Hz, with the mat centre
-(node 41). The second plot shows the 5 % ISRS of the roof, the floor below it (node 84, 15 m) and
+(node 41). The second plot shows the 5 % ISRS of the roof, the floor below it (node 84, 48 ft) and
 the mat centre. From the results:
 
 * at 0.098 Hz every transfer function is 1.000: at low frequency the whole system moves with the
   ground (ANALYS checks this; the largest deviation is 0.10 %, at the roof);
-* the roof transfer function peaks at **3.49 Hz** with $\lvert H\rvert = \mathbf{13.1}$: the first
-  mode of the soil-structure system;
-* the mat centre is not 1: $\lvert H\rvert = 1.51$ at 3.49 Hz and 0.38 at 20 Hz. The foundation does
+* the roof transfer function peaks at **3.47 Hz** with $\lvert H\rvert = \mathbf{13.1}$ (the
+  interpolated `.TFI`; the computed frequency next to it, 3.49 Hz, has 13.0): the first mode of the
+  soil-structure system;
+* the mat centre is not 1: $\lvert H\rvert = 1.42$ at 3.49 Hz and 0.43 at 20 Hz. The foundation does
   not move with the free field;
 * above 20 Hz (the last analysis frequency) every transfer function is zero;
-* the roof ISRS (5 %) peaks at 8.2 g at 3.5 Hz; the peak accelerations (the zero-period
+* the roof ISRS (5 %) peaks at 8.0 g at 3.55 Hz; the peak accelerations (the zero-period
   accelerations of the ISRS; MOTION listing, "Maximum requested response") grow from 0.36 g at the
-  mat to 1.29 g at the roof, for a control motion with a peak of 0.324 g.
+  mat to 1.28 g at the roof, for a control motion with a peak of 0.324 g.
 
 `HARMFRAME,FILE8,3.49,HARM_SSI` turns the transfer functions of every node at 3.49 Hz into the
 steady-state motion under a harmonic control motion of unit amplitude, $u(t) = \operatorname{Re}\left[H\,e^{i\omega t}\right]$,
 sampled in 24 frames over one period (folder `ex01/HARM_SSI`; it prints the frequency it used, the
 computed one closest to the request). The **Animate** button stores the frames (`PROCFRAME`) and plays
-them on the model (`DEFORMPLOT`, displacements drawn 0.2 m per unit of control motion, the undeformed
-model in grey, seen from the front: `CNGVIEW`). You see the soil-structure mode: the roof swings 13.1 times the ground motion,
-87° (a quarter period) behind it; the mat slides 1.51 times the ground motion, 50° behind it, and
-rocks, its edges 10 m from the centre moving up and down by 1.59. The ground itself, which moves with
+them on the model (`DEFORMPLOT`, displacements drawn 0.6 ft per unit of control motion, the undeformed
+model in grey, seen from the front: `CNGVIEW`). You see the soil-structure mode: the roof swings 13.0 times the ground motion,
+94° (about a quarter period) behind it; the mat slides 1.42 times the ground motion, 54° behind it, and
+rocks, its edges 32 ft from the centre moving up and down by 1.58. The ground itself, which moves with
 amplitude 1 in phase with frame 1, is not drawn.
 
 ### Why it matters
@@ -253,7 +255,8 @@ record itself; in ANSYS that would be a separate transient analysis.
 ### Check yourself
 Why is every transfer function equal to 1 at 0.1 Hz, whatever the building?
 
-Answer: at very low frequency the wavelengths are kilometres long, inertia forces vanish and the
+Answer: at very low frequency the wavelengths are miles long (10,000 ft in the sand at 0.1 Hz),
+inertia forces vanish and the
 soil-structure system moves as a rigid body with the ground. A value far from 1 at the first
 frequency points to a modelling error (missing interaction nodes, a disconnected structure, a
 mechanism).
@@ -270,10 +273,10 @@ CPMODEL,2
 ACTM,2
 MDL,ex01fb,../ex01_fixed
 TIT,Ex01 - the same stick on a practically rigid site (fixed-base reference)
-* the same three layers with Vs = 10,000 m/s (Vp = 2 Vs as before); damping unchanged
-L,1,0.5,19.0,20000,10000,0.05,0.05
-L,2,1.0,20.0,20000,10000,0.04,0.04
-L,3,1.0,21.0,20000,10000,0.02,0.02
+* the same three layers with Vs = 33,000 ft/s (Vp = 2 Vs as before); damping unchanged
+L,1,1.6,0.120,66000,33000,0.05,0.05
+L,2,3.25,0.125,66000,33000,0.04,0.04
+L,3,3.25,0.130,66000,33000,0.02,0.02
 * SITE POINT HOUSE ANALYS MOTION only
 AOPT,0,0,0,1,1,1,0,0,1,0,1,0,0,0
 AFWRITE
@@ -290,8 +293,8 @@ HARMFRAME,FILE8,5.0,HARM_FB
 plot-spectrum: ex01/00085TR_X.TFI, ex01_fixed/00085TR_X.TFI
 plot-spectrum: ex01/00085TR_X02.RS, ex01_fixed/00085TR_X02.RS | log
 plot-spectrum: ex01/00041TR_X02.RS, ex01_fixed/00041TR_X02.RS | log
-animate: ex01_fixed/HARM_FB | deformed 0.2 front | Fixed base at 5.0 Hz
-animate: ex01/HARM_SSI | deformed 0.2 front | SSI system at 3.49 Hz
+animate: ex01_fixed/HARM_FB | deformed 0.6 front | Fixed base at 5.0 Hz
+animate: ex01/HARM_SSI | deformed 0.6 front | SSI system at 3.49 Hz
 ```
 
 ### What this does
@@ -305,33 +308,35 @@ The comparison (computed values, 5 % ISRS):
 
 | | Fixed base (rigid site) | SSI |
 |---|---|---|
-| first-mode peak of the roof transfer function | 13.4 at 5.0 Hz | 13.1 at 3.49 Hz |
-| roof ISRS peak, 5 % | 7.85 g at 4.9 Hz | 8.24 g at 3.5 Hz |
-| roof ISRS peak, 2 % | 13.3 g at 5.1 Hz | 15.7 g at 3.5 Hz |
-| roof peak acceleration (ZPA) | 1.18 g | 1.29 g |
+| first-mode peak of the roof transfer function | 13.4 at 4.93 Hz | 13.1 at 3.47 Hz |
+| roof ISRS peak, 5 % | 8.03 g at 4.9 Hz | 8.03 g at 3.55 Hz |
+| roof ISRS peak, 2 % | 13.4 g at 4.8 Hz | 15.4 g at 3.55 Hz |
+| roof peak acceleration (ZPA) | 1.18 g | 1.28 g |
 | mat ISRS peak, 5 % | 1.01 g at 2.6 Hz (the free field) | 1.39 g at 3.2 Hz |
-| mat peak acceleration (ZPA) | 0.324 g | 0.360 g |
+| mat peak acceleration (ZPA) | 0.324 g | 0.355 g |
 
 `HARMFRAME,FILE8,5.0,HARM_FB` writes the steady-state motion of the fixed-base model at 5.005 Hz,
-the computed frequency of its first-mode peak. Play the two animations one after the other (same
-scale, one tab each): on the rigid site the mat moves exactly with the ground (1.00, in phase, no
-rocking: its edges move vertically by 0.002) and the stick bends in its first mode, the roof at
-13.4, 92° behind the ground. On the soil the same stick sits on a mat that slides (1.51) and rocks
-(±1.59 at the edges), and the whole system vibrates at 3.49 Hz instead of 5.0 Hz.
+the computed frequency closest to its first-mode peak. Play the two animations one after the other
+(same scale, one tab each): on the rigid site the mat moves exactly with the ground (1.00, in phase,
+no rocking: its edges move vertically by 0.002) and the stick bends in its first mode, the roof at
+12.7, 107° behind the ground (5.005 Hz is just above the 4.97 Hz mode, so a little more than a quarter
+period). On the soil the same stick sits on a mat that slides (1.42) and rocks (±1.58 at the edges),
+and the whole system vibrates at 3.49 Hz instead of 5.0 Hz.
 
 ### Why it matters
 SSI lowered the frequency of the first mode by 30 %, from 5.0 Hz to 3.5 Hz. Every ISRS peak
 moved with it: equipment qualified to a fixed-base ISRS peak near 5 Hz would see its demand peak
-somewhere else. The peaks did **not** get lower here: the system damping stayed at about 5 %
+somewhere else. The peaks did **not** get lower here (the 5 % roof peak is the same, 8.03 g in both
+runs; the 2 % peak and the peak accelerations are higher): the system damping stayed at about 5 %
 (Technical basis below; lesson 4 explains why), the input is as strong at 3.5 Hz as at 5 Hz (the
-fixed-base mat ISRS, which is the free-field spectrum, has 0.92 g at both frequencies), and the
-foundation itself now shakes at 3.2-3.5 Hz. SSI is neither automatically beneficial nor
+fixed-base mat ISRS, which is the free-field spectrum, has 0.92 g at 3.5 Hz and 0.91 g at 5 Hz), and
+the foundation itself now shakes at 3.2-3.5 Hz. SSI is neither automatically beneficial nor
 automatically conservative to ignore; it has to be computed, and the uncertainty of the soil
 properties (lower, best and upper estimates) moves the SSI frequency further. This is why design
 ISRS are enveloped over soil cases and broadened.
 
 ### Technical basis
-The fixed-base peak at 5.0 Hz is the stick's first mode (5.05 Hz,
+The fixed-base peak at 4.93 Hz (interpolated) is the stick's first mode (4.97 Hz,
 [examples/README.md](examples/README.md#example-1-lumped-mass-stick-on-a-rigid-surface-mat)). For a
 single mode with hysteretic damping $\beta$ the transfer-function peak is
 $1/\bigl(2\beta\sqrt{1-\beta^2}\bigr) = 10.0$ for $\beta = 5\,\%$
@@ -347,15 +352,15 @@ in the structure. Lesson 4 takes this apart with the foundation springs and dash
 ```figure
 fixed-base-vs-ssi f=3.5
 The stick of this example reduced to its first mode, on a fixed base and on the springs and
-dashpots of its mat. The springs move the peak from 5.04 Hz to about 3.9 Hz (SASSI's full model
-gives 3.49 Hz because the real mat also bends; lesson 4) while the system damping stays near 5 %: on this layered site little energy
+dashpots of its mat. The springs move the peak from 4.98 Hz to about 3.9 Hz (SASSI's full model
+gives 3.47 Hz because the real mat also bends; lesson 4) while the system damping stays near 5 %: on this layered site little energy
 radiates at that frequency, so the wave fronts stay faint. Raise the soil velocities and the peak
 moves back towards the fixed-base one.
 ```
 
 ### In ANSYS terms
 This run is your usual fixed-base model: base nodes clamped, acceleration applied at the base,
-5 % material damping (`MP,DMPR`). Mode 1 at 5.05 Hz is what a modal analysis of the stick gives.
+5 % material damping (`MP,DMPR`). Mode 1 at 4.97 Hz is what a modal analysis of the stick gives.
 
 ### Try this
 Make another copy of model 0 (`ACTM,0`, `CPMODEL,4`, `ACTM,4`, `MDL,ex01stiff,../ex01_stiff`) with
@@ -365,8 +370,8 @@ transfer functions together. The SSI frequency moves towards the fixed-base valu
 stiffer (the interpolated roof peak moves from 3.5 Hz to about 4.1 Hz).
 
 ```sassi-show
-L,1,0.5,19.0,1200,600,0.05,0.05
-L,2,1.0,20.0,2000,1000,0.04,0.04
+L,1,1.6,0.120,4000,2000,0.05,0.05
+L,2,3.25,0.125,6600,3300,0.04,0.04
 ```
 
 ## Kinematic or inertial interaction? A massless foundation
@@ -383,7 +388,7 @@ MDL,ex01ml,../ex01_massless
 TIT,Ex01 - massless stick and mat (kinematic interaction only)
 * delete the floor masses and give the mat material zero weight
 MTDEL,82,85
-M,1,3.0E8,0.2,0.0,0.05,0.05,1
+M,1,5.76E6,0.2,0.0,0.05,0.05,1
 * same site and frequencies: reuse the free field and the point-load solutions of the first run
 FCOPY,../ex01/FILE1,FILE1
 FCOPY,../ex01/FILE3,FILE3
@@ -414,7 +419,7 @@ moves with the free field. The peak acceleration is 0.3235 g at all nodes; the c
 ### Why it matters
 For a surface foundation under vertically propagating waves, kinematic interaction is zero: the free
 field moves every point of the ground surface in phase, and a rigid massless mat follows it exactly.
-So everything you saw in the SSI run (mat $\lvert H\rvert = 1.51$ at 3.49 Hz, 0.38 at 20 Hz, mat ZPA
+So everything you saw in the SSI run (mat $\lvert H\rvert = 1.42$ at 3.49 Hz, 0.43 at 20 Hz, mat ZPA
 0.36 g instead of 0.324 g) is **inertial** interaction: the building and the mat push on the soil
 springs. For an **embedded** structure (lesson 5) the massless foundation no longer follows the free
 field (the free-field motion varies with depth), and the foundation input motion is reduced at

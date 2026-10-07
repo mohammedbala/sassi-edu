@@ -7,15 +7,16 @@
   const TAU = 2 * Math.PI;
   const DEG = Math.PI / 180;
 
-  /** Vibration of the example stick, total motion per unit ground motion (lesson 1 values):
-   *  fixed base: mat 1.00 in phase, roof 13.4 at -92 deg; SSI: mat 1.51 at -50 deg, roof 13.1 at -87 deg,
-   *  rocking +-1.59 at the mat edges.  px: pixels per unit of ground motion; period: visual period (s). */
+  /** Vibration of the example stick, total motion per unit ground motion (the lesson's runs, .TFU files):
+   *  fixed base at 5.005 Hz: mat 1.00 in phase, roof 12.7 at -107 deg; SSI at 3.49 Hz: mat 1.42 at -54 deg,
+   *  roof 13.0 at -94 deg, rocking +-1.58 at the mat edges (32 ft from the centre) at -98 deg.
+   *  px: pixels per unit of ground motion; period: visual period (s). */
   function vibrate(st, t, o) {
     const ph = TAU * t / o.period;
     const ug = Math.cos(ph) * o.px;
-    const mat = o.ssi ? 1.51 * Math.cos(ph - 50 * DEG) * o.px : ug;
-    const roof = (o.ssi ? 13.1 * Math.cos(ph - 87 * DEG) : 13.4 * Math.cos(ph - 92 * DEG)) * o.px;
-    const rock = o.ssi ? (1.59 * o.px / o.halfW) * Math.cos(ph - 87 * DEG) * (o.rockGain || 1) : 0;
+    const mat = o.ssi ? 1.42 * Math.cos(ph - 54 * DEG) * o.px : ug;
+    const roof = (o.ssi ? 13.0 * Math.cos(ph - 94 * DEG) : 12.7 * Math.cos(ph - 107 * DEG)) * o.px;
+    const rock = o.ssi ? (1.58 * o.px / o.halfW) * Math.cos(ph - 98 * DEG) * (o.rockGain || 1) : 0;
     const H = o.zs[o.zs.length - 1];
     const bendRoof = roof - mat - Math.sin(rock) * H;
     const shape = (z) => Math.sin((Math.PI / 2) * z / H);
@@ -24,12 +25,15 @@
   }
   const big = (root, text, o) => K.h("div", Object.assign({cls: "sv-h2", html: text}, o), root);
   const PH = K.PH, CX = PH.C;
-  /** Free field of the lesson-1 site (5 m sand, 12 m gravel, rock) at f: u(z, phase) per unit surface motion. */
+  /** Free field of the lesson-1 site (16 ft sand, 39 ft gravel, rock) at f: u(z ft, phase) per unit surface motion. */
   function freeField(f) {
     const wv = PH.columnWaves(PH.COLUMN, f), cache = new Map();
-    const U = (z) => { const k = Math.round(z * 4); if (!cache.has(k)) cache.set(k, PH.columnU(wv, PH.COLUMN, Math.max(0, Math.min(16.99, z)))); return cache.get(k); };
+    const U = (z) => { const k = Math.round(z * 4); if (!cache.has(k)) cache.set(k, PH.columnU(wv, PH.COLUMN, Math.max(0, Math.min(54.99, z)))); return cache.get(k); };
     return {U, at: (z, ph) => { const u = U(z); return u[0] * Math.cos(ph) - u[1] * Math.sin(ph); }};
   }
+  /** Two decimals of a spectral value stored with four digits: a final 5 (8.035, 1.395) is rounded down, as the
+   *  lesson reads the full-precision files (8.03 g, 1.39 g). */
+  const g2 = (v) => (v - 5e-5).toFixed(2);
   /** Largest value of a curve between f1 and f2: {f, v}. */
   function peak(xs, ys, f1, f2) {
     let b = {f: xs[0], v: -Infinity};
@@ -44,11 +48,11 @@
     id: "fixed-base", title: "The model you know",
     build(s) {
       const g = K.g(s.svg);
-      // to scale, 16 px per metre: 20 m mat 1.5 m thick, 5 m storeys, 5 m sand on 12 m gravel
+      // to scale, 5 px per ft: 64 ft mat 5 ft thick, 16 ft storeys, 16 ft sand on 39 ft gravel
       s.zs = [80, 160, 240, 320];
       s.ground = K.ground(g, 380, 644, 360, {hidden: true});
-      s.soil = K.soil(g, {x: 300, y: 644, w: 520, layers: [{h: 80, kind: "sand"}, {h: 192, kind: "gravel"}], hs: {h: 80, kind: "rock"}, labels: false, hidden: true});
-      s.stick = K.stick(g, {x: 560, y: 620, z: s.zs, matW: 320, matH: 24, r: 18, slabW: 110, hidden: true});
+      s.soil = K.soil(g, {x: 300, y: 644, w: 520, layers: [{h: 80, kind: "sand"}, {h: 195, kind: "gravel"}], hs: {h: 77, kind: "rock"}, labels: false, hidden: true});
+      s.stick = K.stick(g, {x: 560, y: 619, z: s.zs, matW: 320, matH: 25, r: 18, slabW: 110, hidden: true});
       s.ff = freeField(3.49);
       s.note = K.text(g, 560, 1005, "computed motion per unit ground motion · slowed down 10×", {cls: "t-small", anchor: "middle", hidden: true});
       s.acc = K.signal(g, {x: 330, y: 700, w: 460, h: 80, fn: (u) => {
@@ -65,7 +69,7 @@
     tick(s, t) {
       const ssi = s.ssi > 0, period = ssi ? 10 / 3.49 : 10 / 5.0;           // slowed down 10 times
       vibrate(s.stick, t, {period, px: 3.4, halfW: 160, zs: s.zs, amp: s.A, ssi});
-      if (ssi) { const ph = TAU * t / period; s.soil.shear((d) => 3.4 * s.A * s.ff.at(d / 16, ph)); }
+      if (ssi) { const ph = TAU * t / period; s.soil.shear((d) => 3.4 * s.A * s.ff.at(d / 5, ph)); }
     },
     beats: [
       {say: "Picture the seismic model you already know: a building clamped to perfectly rigid ground.",
@@ -96,7 +100,7 @@
     build(s) {
       const g = K.g(s.svg);
       s.head = K.heading(s.root, "The soil acts like a <span style='color:var(--spring)'>suspension</span>", {x: 120, y: 90, size: "h2"});
-      s.zs = [95, 190, 285, 380];                      // 19 px per metre, like the 20 m mat (380 px)
+      s.zs = [95, 190, 285, 380];                      // 5.94 px per ft: 16 ft storeys, like the 64 ft mat (380 px)
       s.soil = K.soil(g, {x: 150, y: 726, w: 960, layers: [{h: 250, kind: "gravel"}], labels: false});
       s.stick = K.stick(g, {x: 630, y: 700, z: s.zs, matW: 380, matH: 28, r: 22, slabW: 140});
       s.sp = K.g(g, {hidden: true});
@@ -151,22 +155,23 @@
   });
 
   // ---------------------------------------------------------------- 3. a stiff foundation averages
+  const KS = 9.25;                                     // px per ft
   scenes.push({
     id: "kinematic", title: "A stiff foundation averages",
     build(s) {
       const g = K.g(s.svg);
       s.head = K.heading(s.root, "A second effect: <span style='color:var(--kin)'>averaging</span>", {x: 120, y: 90, size: "h2"});
-      // to scale, 30 px per metre: the lesson-1 site (5 m sand on 12 m gravel); its free field at 12 Hz
-      s.ksoil = K.soil(g, {x: 150, y: 420, w: 960, layers: [{h: 150, kind: "sand"}, {h: 360, kind: "gravel"}], labels: false});
-      s.block = K.rect(g, 490, 400, 300, 170, {fill: "rgba(95,225,208,.22)", stroke: C.kin, "stroke-width": 6, rx: 3, hidden: true});
+      // to scale, 9.25 px per ft: the lesson-1 site (16 ft sand on 39 ft gravel); its free field at 12 Hz
+      s.ksoil = K.soil(g, {x: 150, y: 420, w: 960, layers: [{h: 16 * KS, kind: "sand"}, {h: 39 * KS, kind: "gravel"}], labels: false});
+      s.block = K.rect(g, 640 - 16 * KS, 400, 32 * KS, 20 + 16 * KS, {fill: "rgba(95,225,208,.22)", stroke: C.kin, "stroke-width": 6, rx: 3, hidden: true});
       s.ff = K.path(g, "", {stroke: C.wave, "stroke-width": 6, fill: "none"});
       s.ffLab = K.text(g, 300, 400, "the ground", {cls: "t-label", anchor: "middle", color: "var(--wave)"});
-      s.blLab = K.text(g, 640, 385, "stiff box, 10 m wide, 5 m deep", {cls: "t-label", anchor: "middle", color: "var(--kin)", hidden: true});
+      s.blLab = K.text(g, 640, 385, "stiff box, 32 ft wide, 16 ft deep", {cls: "t-label", anchor: "middle", color: "var(--kin)", hidden: true});
       s.kNote = K.text(g, 630, 990, "free field at 12 Hz, computed for this site · box: average over its depth (simplified)", {cls: "t-small", anchor: "middle"});
       s.kf = freeField(12);
-      // the box takes the average of the free field over its 5 m depth (complex mean)
+      // the box takes the average of the free field over its 16 ft depth (complex mean)
       let re = 0, im = 0, n = 0;
-      for (let z = 0; z <= 5; z += 0.25) { const u = s.kf.U(z); re += u[0]; im += u[1]; n++; }
+      for (let z = 0; z <= 16.001; z += 0.8) { const u = s.kf.U(z); re += u[0]; im += u[1]; n++; }
       s.kavg = [re / n, im / n];
       s.c1 = K.para(s.root, "Waves make the ground move <b>differently at each depth</b>.", {x: 1200, y: 300, w: 620, size: 36});
       s.c2 = K.para(s.root, "A stiff foundation <b style='color:var(--kin)'>can't follow every wiggle</b>: it averages them.", {x: 1200, y: 480, w: 620, size: 36});
@@ -177,9 +182,9 @@
     tick(s, t) {
       const ph = TAU * t / 2.4, A = 40 * s.W;                                  // 12 Hz slowed down about 30 times
       const pts = [];
-      for (let d = 0; d <= 510; d += 10) pts.push([300 + A * s.kf.at(d / 30, ph), 420 + d]);
+      for (let d = 0; d <= 55 * KS; d += 10) pts.push([300 + A * s.kf.at(d / KS, ph), 420 + d]);
       s.ff.setAttribute("d", K.d(pts, true));
-      s.ksoil.shear((d) => A * s.kf.at(d / 30, ph));
+      s.ksoil.shear((d) => A * s.kf.at(d / KS, ph));
       const ub = A * (s.kavg[0] * Math.cos(ph) - s.kavg[1] * Math.sin(ph));
       s.block.setAttribute("transform", `translate(${ub} 0)`);
     },
@@ -271,23 +276,26 @@
     build(s) {
       const g = K.g(s.svg);
       s.head = K.heading(s.root, "Our example", {x: 120, y: 80, size: "h2"});
-      s.soil = K.soil(g, {x: 120, y: 626, w: 760, layers: [
-        {h: 100, kind: "sand", name: "Sand, 5 m"}, {h: 200, kind: "gravel", name: "Gravel, 12 m"}],
-        hs: {h: 140, kind: "rock", name: "Rock"}, labels: "right", labelSize: 32});
+      // to scale, 6.25 px per ft: 64 ft mat 5 ft thick, 16 ft storeys, 16 ft sand on 39 ft gravel (rock cut with a fade)
+      const MS = 6.25, gy = 590, top = gy - 5 * MS;
+      s.soil = K.soil(g, {x: 120, y: gy, w: 760, layers: [
+        {h: 16 * MS, kind: "sand", name: "Sand, 16 ft"}, {h: 39 * MS, kind: "gravel", name: "Gravel, 39 ft"}],
+        hs: {h: 110, kind: "rock", name: "Rock"}, labels: "right", labelSize: 32});
       s.soil.layers.forEach((L) => { L.g.classList.add("sv-in", "sv-fade"); });
-      s.stick = K.stick(g, {x: 500, y: 600, z: [100, 200, 300, 400], matW: 400, matH: 26, r: 24, slabW: 170, hidden: true});
+      const zs = [16, 32, 48, 64].map((z) => z * MS);
+      s.stick = K.stick(g, {x: 500, y: top, z: zs, matW: 64 * MS, matH: 5 * MS, r: 24, slabW: 170, hidden: true});
       s.dim = K.g(g, {hidden: true});
-      K.dim(s.dim, 300, 555, 700, 555, "");
-      K.text(s.dim, 360, 545, "20 m", {cls: "t-label", anchor: "middle", size: 28});
+      K.dim(s.dim, 500 - 32 * MS, top - 45, 500 + 32 * MS, top - 45, "");
+      K.text(s.dim, 360, top - 55, "64 ft", {cls: "t-label", anchor: "middle", size: 28});
       s.masses = K.g(g, {hidden: true});
-      [500, 400, 300, 200].forEach((y) => K.text(s.masses, 610, y + 9, "1000 t", {cls: "t-label", size: 30, color: "var(--ink)"}));
+      zs.forEach((z) => K.text(s.masses, 610, top - z + 9, "2,200 kips", {cls: "t-label", size: 30, color: "var(--ink)"}));
       s.code = K.code(s.root, ["INP,ex01_surface_stick.pre"], {x: 1180, y: 520, w: 640, size: 32, title: "One command"});
       s.codeLab = K.para(s.root, "runs the whole SASSI chain in about <b>4 seconds</b>", {x: 1180, y: 680, w: 640, size: 32});
     },
     beats: [
-      {say: "[m]Our example is a four-storey stick on a 20-metre square mat, with 1000 tonnes per floor.",
+      {say: "[m]Our example is a four-storey stick on a 64-foot square mat, with 2,200 kips per floor.",
         go(k) { k.show(k.s.head); }, m(k) { k.show([k.s.stick.g, k.s.dim]); k.show(k.s.masses, {delay: 500}); }},
-      {say: "It sits on [s]5 metres of sand, [g]12 metres of gravel, [r]and weathered rock.",
+      {say: "It sits on [s]16 ft of sand, [g]39 ft of gravel, [r]and weathered rock.",
         s(k) { k.show(k.s.soil.g); k.show(k.s.soil.layers[0].g); }, g(k) { k.show(k.s.soil.layers[1].g); }, r(k) { k.show(k.s.soil.layers[2].g); }},
       {say: "[c]One command runs the whole SASSI chain, in about four seconds.",
         c(k) { k.show(k.s.code.el); k.type(k.s.code.lines, {cps: 34}); k.show(k.s.codeLab, {delay: 800}); }},
@@ -304,8 +312,8 @@
       s.roof = s.p.line(roof.f, roof.amp, {color: C.ssi, width: 7, draw: true});
       s.one = K.g(s.p.g, {hidden: true});
       K.circle(s.one, s.p.X(0.098), s.p.Y(1), 12, {fill: C.ink});
-      K.line(s.one, s.p.X(0.098) + 8, s.p.Y(1) - 14, s.p.X(1.1), s.p.Y(3.2), {stroke: C.ink, "stroke-width": 3});
-      K.text(s.one, s.p.X(1.2), s.p.Y(3.2) - 4, "1 at low frequency", {cls: "t-label", color: "var(--ink)"});
+      K.line(s.one, s.p.X(0.098) + 10, s.p.Y(1) + 10, s.p.X(0.9), s.p.Y(0.45), {stroke: C.ink, "stroke-width": 3});
+      K.text(s.one, s.p.X(1.0), s.p.Y(0.3), "1 at low frequency", {cls: "t-label", color: "var(--ink)"});
       s.pk = K.g(s.p.g, {hidden: true});
       K.circle(s.pk, s.p.X(pk.f), s.p.Y(pk.v), 14, {fill: C.ssi});
       K.text(s.pk, s.p.X(pk.f) + 30, s.p.Y(pk.v) + 12, `${pk.v.toFixed(1)} × the ground at ${pk.f.toFixed(2)} Hz`, {cls: "t-label", color: "var(--ssi)", size: 34});
@@ -341,15 +349,15 @@
       s.rS = s.p2.line(rsS.f, rsS.sa, {color: C.ssi, width: 7, draw: true});
       s.rsLab = K.g(s.p2.g, {hidden: true});
       const qF = peak(rsF.f, rsF.sa, 1, 20), qS = peak(rsS.f, rsS.sa, 1, 20);
-      K.text(s.rsLab, s.p2.X(qF.f) + 18, s.p2.Y(qF.v) - 18, `${qF.v.toFixed(2)} g`, {cls: "t-label", color: "var(--ref)"});
-      K.text(s.rsLab, s.p2.X(qS.f) - 18, s.p2.Y(qS.v) - 18, `${qS.v.toFixed(2)} g`, {cls: "t-label", anchor: "end", color: "var(--ssi)"});
+      K.text(s.rsLab, s.p2.X(qF.f) + 18, s.p2.Y(qF.v) - 18, `${g2(qF.v)} g`, {cls: "t-label", color: "var(--ref)"});
+      K.text(s.rsLab, s.p2.X(qS.f) - 18, s.p2.Y(qS.v) - 18, `${g2(qS.v)} g`, {cls: "t-label", anchor: "end", color: "var(--ssi)"});
       s.warn = K.card(s.root, {x: 1120, y: 790, w: 700, kind: "warn", title: "Not automatically good news", size: 32, body: "The peak moved and <b>stayed as high</b>. Compute it."});
     },
     beats: [
       {say: "[f]Now run the same building on rigid ground: the fixed-base case.", go(k) { k.show(k.s.head); }, f(k) { k.show(k.s.p1.g); k.draw(k.s.lF, 1500); k.draw(k.s.lS, 1500, {delay: 600}); }},
       {say: "[s]The soil lowered the sway frequency by 30 percent, from 5 to 3.5 hertz.", s(k) { k.show(k.s.shift); k.draw(k.s.shift.line, 700); k.show(k.s.pct.el, {delay: 300}); }},
       {say: "[r]And the floor spectrum peak moved right along with it.", r(k) { k.show(k.s.p2.g); k.draw(k.s.rF, 1300); k.draw(k.s.rS, 1300, {delay: 500}); }},
-      {say: "[h]Notice the peak did not drop: 8.2 g on soil, against 7.9 on a fixed base.", h(k) { k.show(k.s.rsLab); }},
+      {say: "[h]Notice the peak did not drop: 8.03 g on soil, the same as on a fixed base.", h(k) { k.show(k.s.rsLab); }},
       {say: "[w]So SSI is not automatically good news. You have to compute it.", w(k) { k.show(k.s.warn); }},
     ],
   });
@@ -367,7 +375,7 @@
       s.pk = K.g(s.p.g, {hidden: true});
       const q = peak(rsS.f, rsS.sa, 1, 10);
       K.circle(s.pk, s.p.X(q.f), s.p.Y(q.v), 12, {fill: C.ssi});
-      K.text(s.pk, s.p.X(q.f) + 24, s.p.Y(q.v) - 16, `${q.v.toFixed(2)} g`, {cls: "t-label", color: "var(--ssi)", size: 34});
+      K.text(s.pk, s.p.X(q.f) + 24, s.p.Y(q.v) - 16, `${g2(q.v)} g`, {cls: "t-label", color: "var(--ssi)", size: 34});
       s.why = K.card(s.root, {x: 1240, y: 300, w: 580, title: "Why?", size: 34, body: "The swaying building <b>rocks its own foundation</b>."});
       s.eq = K.card(s.root, {x: 1240, y: 560, w: 580, kind: "warn", title: "Equipment on the basemat", size: 32, body: "feels more than the ground: don't use the free-field spectrum there."});
     },

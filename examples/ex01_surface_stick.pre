@@ -9,11 +9,11 @@
 *
 * Physics in one paragraph
 *   A vertically incident SV wave (control motion in X at the free-field ground surface)
-*   shakes a 20 m x 20 m surface mat that carries a four-storey stick.  The mat is much
+*   shakes a 64 ft x 64 ft surface mat that carries a four-storey stick.  The mat is much
 *   stiffer than the soil, so the 81 mat nodes move as one rigid body: the soil under the mat
 *   acts as frequency-dependent springs and dashpots (the impedance computed by POINT and
 *   ANALYS), and the stick sways and rocks on them.  Inertial SSI lowers the fundamental
-*   frequency from the fixed-base value (5.05 Hz; second mode 19 Hz) to about 3.5 Hz and adds
+*   frequency from the fixed-base value (4.97 Hz; second mode 18.5 Hz) to about 3.5 Hz and adds
 *   radiation damping; at low frequency everything moves with the ground (transfer functions -> 1).
 *
 * How to run: the model directory (MDL) and the data paths (../data/...) are relative to the
@@ -24,22 +24,24 @@
 *     .venv/bin/sassi --cwd examples run ex01_surface_stick.pre
 * Results are written to examples/ex01/ (the model directory set by MDL).
 *
-* Units: m, kN, t (= kN s2/m), s.  Gravity 9.81 m/s2.  Weights are specific weights (kN/m3).
+* Units: ft, kip, s (US customary); mass in kip s2/ft.  Gravity 32.2 ft/s2.  Weights are unit
+* weights (kcf = kip/ft3), moduli are in ksf (576,000 ksf = 4,000 ksi), lumped masses are
+* given as weights in kips.  Accelerations are in g.
 * ======================================================================================
 MDL,ex01,ex01
 TIT,Ex01 - 4-mass stick on a rigid surface mat, vertical SV (X) input
 *
 * ---------------------------------------------------------------------- soil profile
 * L,<nm>,<thick>,<weight>,<Vp>,<Vs>,<pdamp>,<sdamp>
-*   layer 1: 5 m of dense sand (Vs 300 m/s) as ten 0.5 m sublayers
-*   layer 2: 12 m of very dense gravel (Vs 500 m/s) as twelve 1 m sublayers
-*   layer 3: half-space, weathered rock (Vs 1000 m/s); its thickness is not used
+*   layer 1: 16 ft of dense sand (Vs 1,000 ft/s) as ten 1.6 ft sublayers
+*   layer 2: 39 ft of very dense gravel (Vs 1,650 ft/s) as twelve 3.25 ft sublayers
+*   layer 3: half-space, weathered rock (Vs 3,300 ft/s); its thickness is not used
 * Each TOPL sublayer must be thin compared with the shortest wavelength of interest:
-* Vs/(5 h) = 120 Hz and 100 Hz, well above the 20 Hz cut-off of the frequency set, and the
+* Vs/(5 h) = 125 Hz and 102 Hz, well above the 20 Hz cut-off of the frequency set, and the
 * manual recommends more than 20 top layers for accurate Rayleigh and Love modes (22 here).
-L,1,0.5,19.0,600,300,0.05,0.05
-L,2,1.0,20.0,1000,500,0.04,0.04
-L,3,1.0,21.0,2000,1000,0.02,0.02
+L,1,1.6,0.120,2000,1000,0.05,0.05
+L,2,3.25,0.125,3300,1650,0.04,0.04
+L,3,3.25,0.130,6600,3300,0.02,0.02
 TOPL,1,1,1,1,1,1,1,1,1,1
 TOPL,2,2,2,2,2,2,2,2,2,2
 TOPL,2,2
@@ -62,42 +64,43 @@ SITE,0,1,0,20,3,1,0,1,4096,1,0,0.005,8192,1
 WAVE,2,1,1,1,0
 *
 * ---------------------------------------------------------------------- structure
-* Mat nodes 1..81: a 9 x 9 grid at grade, 2.5 m spacing, numbered row by row (x fastest)
-N,1,-10,-10,0
-N,9,10,-10,0
+* Mat nodes 1..81: a 9 x 9 grid at grade, 8 ft spacing, numbered row by row (x fastest)
+N,1,-32,-32,0
+N,9,32,-32,0
 FILL,1,9
-NGEN,8,9,1,9,1,0,2.5,0
-* Stick nodes 82..85 above the mat centre (node 41 at the origin), storey height 5 m
-N,82,0,0,5
-NGEN,3,1,82,82,1,0,0,5
+NGEN,8,9,1,9,1,0,8,0
+* Stick nodes 82..85 above the mat centre (node 41 at the origin), storey height 16 ft
+N,82,0,0,16
+NGEN,3,1,82,82,1,0,0,16
 * Beam orientation (K) nodes 86..89, one beside each storey in the +X direction:
 * local axis 2 of every beam points to +X, so X-direction bending is about local axis 3 (MZ)
-N,86,10,0,2.5
-NGEN,3,1,86,86,1,0,0,5
+N,86,32,0,8
+NGEN,3,1,86,86,1,0,0,16
 * K node of the horizontal rigid links (any point off their axes)
-N,90,0,0,2.5
+N,90,0,0,8
 *
 * Materials  M,<nm>,<val1>,<val2>,<weight>,<pdamp>,<sdamp>,<type>   (type 1: E, nu)
+*   concrete: E = 576,000 ksf (4,000 ksi), nu 0.2, 0.150 kcf
 *   1: basemat, 10 x concrete stiffness (stiff, but it still bends under rocking: the SSI peak is
-*      3.49 Hz, 3.86 Hz with a rigid mat; lesson 4), 24 kN/m3 (mat mass)
+*      3.47 Hz, 3.83 Hz with a rigid mat; lesson 4), 0.150 kcf (mat weight)
 *   2: stick, concrete, massless (the storey masses are lumped at the floors with MT)
 *   3: rigid links, 1000 x concrete stiffness, massless
-M,1,3.0E8,0.2,24.0,0.05,0.05,1
-M,2,3.0E7,0.2,0.0,0.05,0.05,1
-M,3,3.0E10,0.2,0.0,0.0,0.0,1
-* Beam sections  R,<nm>,<A>,<As2>,<As3>,<J>,<I2>,<I3>
-*   1: shear-wall core of the stick;  2: rigid link, 2.5 m x 2.5 m square
-R,1,20.0,10.0,10.0,400.0,200.0,200.0
-R,2,6.25,5.2,5.2,5.5,3.26,3.26
+M,1,5.76E6,0.2,0.150,0.05,0.05,1
+M,2,5.76E5,0.2,0.0,0.05,0.05,1
+M,3,5.76E8,0.2,0.0,0.0,0.0,1
+* Beam sections  R,<nm>,<A>,<As2>,<As3>,<J>,<I2>,<I3>   (ft2, ft4)
+*   1: shear-wall core of the stick;  2: rigid link, 8 ft x 8 ft square
+R,1,215.0,108.0,108.0,46000.0,23000.0,23000.0
+R,2,64.0,53.0,53.0,576.0,341.0,341.0
 *
-* Group 1: the basemat, 8 x 8 SHELL elements of 2.5 m x 2.5 m, 1.5 m thick
+* Group 1: the basemat, 8 x 8 SHELL elements of 8 ft x 8 ft, 5 ft thick
 GROUP,1,SHELL
 GTIT,1,basemat
 MACT,1
 E,1,1,2,11,10
 EGEN,7,1,1
 EGEN,7,9,1,8
-THICK,1,64,1,1.5
+THICK,1,64,1,5.0
 *
 * Group 2: the stick, 4 BEAMS elements (I, J, K)
 GROUP,2,BEAMS
@@ -111,7 +114,7 @@ E,2,82,83,87
 EGEN,2,1,2
 *
 * Group 3: a rigid "spider" from the stick base (41) to the 8 surrounding mat nodes.  It clamps
-* the stick to the mat over the 5 m x 5 m core area; a single shell node cannot take the
+* the stick to the mat over the 16 ft x 16 ft core area; a single shell node cannot take the
 * concentrated base moment of the stick without a large, mesh-dependent local rotation.
 GROUP,3,BEAMS
 GTIT,3,rigid links
@@ -127,19 +130,20 @@ FOREACH,SPIDER,E,#,41,@SPIDER[#],90
 * torsional impedance of the soil.  (Run FIXROT after all elements exist: it reads the topology.)
 FIXROT
 *
-* Storey masses: 1000 t per floor, entered as weights (MUNITS default 1 = weight, kN)
+* Storey masses: 2,200 kips per floor, entered as weights (MUNITS default 1 = weight, kips;
+* HOUSE divides them by g: 68.3 kip s2/ft per floor)
 VAR,FLOOR,82,83,84,85
-FOREACH,FLOOR,MT,@FLOOR[#],9810,9810,9810
+FOREACH,FLOOR,MT,@FLOOR[#],2200,2200,2200
 *
 * Interaction nodes: the 81 mat nodes (INT code 0 = interaction)
 INT,1,81,1,1
 *
 * ---------------------------------------------------------------------- module options
 * POINT,<opmode>,<layer>,<rad>: surface foundation (0 embedded layers); central-zone radius
-*   R0 = 0.9 x mesh size (2.5 m) for a square mesh of interaction nodes
-POINT,0,0,2.25
-* HOUSE,<gravity>,<gelev>,<opmode>,<dim>,<imp>,<coh>,<wpass>,<me>,<cmplxspec>
-HOUSE,9.81,0,0,2,0,0,0,0,0
+*   R0 = 0.9 x mesh size (8 ft) for a square mesh of interaction nodes
+POINT,0,0,7.2
+* HOUSE,<gravity>,<gelev>,<opmode>,<dim>,<imp>,<coh>,<wpass>,<me>,<cmplxspec>: g = 32.2 ft/s2
+HOUSE,32.2,0,0,2,0,0,0,0,0
 * ANALYS,<opmode>,<type>,<mode>,<save>,<prnt>,<fopt>,<ang>,<xc>,<yc>,<zc>,<impe>: seismic
 *   initiation run, frequencies of the set, control point at the origin
 ANALYS,0,0,0,0,1,0,0,0,0,0,0
@@ -162,11 +166,11 @@ NOUT,3,1,0,0,0,0,1,37,45
 * STRESS,<opmode>,<iter>,<save>,<itran>,<interopt>: save histories and the force TFs
 STRESS,0,0,1,1,1
 * EOUT,<12 codes>,<group>,<elements>: beam end forces FXI FYI FZI MXI MYI MZI FXJ ... MZJ
-*   code 1 = maximum only, 2 = maximum and history; histories of the X shear (FYI) and of the
-*   bending moment about local 3 (MZI) at the bottom of every storey
+*   (kips and kip ft); code 1 = maximum only, 2 = maximum and history; histories of the X shear
+*   (FYI) and of the bending moment about local 3 (MZI) at the bottom of every storey
 EOUT,1,2,1,1,1,2,1,1,1,1,1,1,2,1-4
 *
-* RELDISP: X displacement of the floors relative to the mat centre (reference .TFI file)
+* RELDISP: X displacement of the floors relative to the mat centre (reference .TFI file), in ft
 RELD,1,0,0
 RELFILE,00041TR_X.TFI
 RDND,41,1,0,0,0,0,0

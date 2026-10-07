@@ -88,13 +88,13 @@ The shape of a model file (`.pre`, or the same lines typed in the console):
 ```
 * model name and directory
 MDL,demo,demo
-* SI units: m, kN, t, s
-GRAVITY,9.81
-* soil layer: thickness, weight, Vp, Vs, damping
-L,1,1.0,19,500,250,0.05,0.05
+* US units: ft, kip, s (g = 32.2 ft/s², the default; GRAVITY,9.81 for m, kN, t, s)
+GRAVITY,32.2
+* soil layer: thickness (ft), unit weight (kcf), Vp, Vs (ft/s), damping
+L,1,3.0,0.120,1650,800,0.05,0.05
 * half-space
-L,2,1.0,21,2000,1000,0.02,0.02
-* ten 1 m layers on the half-space
+L,2,3.0,0.130,6500,3300,0.02,0.02
+* ten 3 ft layers on the half-space
 TOPL,1,1,1,1,1,1,1,1,1,1
 * SSI frequency numbers: f = n df, df = 1/(0.005 x 8192)
 FREQ,1,4,20,41,82,123,164,205,246,328,410

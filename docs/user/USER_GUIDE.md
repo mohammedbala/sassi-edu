@@ -257,11 +257,14 @@ MOTION and STRESS are independent of each other; RELDISP needs MOTION's complex 
 
 ## 3. Units, axes and sign conventions
 
-* **Units.** Any consistent set. Weights are specific weights (force/length³) and masses are entered
-  as weights or masses (`MUNITS`); the program divides by the **gravity** you give
-  (`GRAVITY,9.81` for m, kN, t, s; `GRAVITY,32.2` for ft, kip, s). New models start with the
-  manual's default 32.2: set `GRAVITY` (or HOUSE argument 1) first when you work in SI. SOIL has its
-  own gravity (SOIL argument 2). Control motions are always in **g**.
+* **Units.** Any consistent set. The examples, the lessons and this guide use **ft, kip, s**:
+  lengths in ft, forces in kips, unit weights in kcf (kip/ft³), moduli and stresses in ksf (kip/ft²),
+  wave velocities in ft/s and `GRAVITY,32.2` (ft/s²), the manual's default, with which every new model
+  starts. Weights are specific weights (force/length³) and masses are entered as weights or masses
+  (`MUNITS`); the program divides by the **gravity** you give. For SI set `GRAVITY,9.81` (m, kN, t, s)
+  first (or HOUSE argument 1). SOIL has its own gravity (SOIL argument 2). Control motions are always
+  in **g**. A few commands detect British units from the gravity (> 20) and take strengths in ksi
+  (`SHEAR`, `BBCGEN`) or distances in ft (`INCOH`).
 * **Axes.** Global right-handed Cartesian, **Z up**. Two-dimensional models lie in the X-Z plane.
   Depths are measured down from the ground elevation `GROUNDELEV` (HOUSE `<gelev>`).
 * **Damping.** Hysteretic (frequency independent), applied as a complex modulus
@@ -330,8 +333,8 @@ Variables hold lists; `FOREACH` repeats a command for each item (`#` is the 1-ba
 
 ```
 VAR,FLOOR,82,83,84,85
-* 9810 kN = 1000 t on each floor
-FOREACH,FLOOR,MT,@FLOOR[#],9810,9810,9810
+* 2,200 kips on each floor
+FOREACH,FLOOR,MT,@FLOOR[#],2200,2200,2200
 VAR,LFIRST,1,26,51,76,101,126
 VAR,LLAST,25,50,75,100,125,150
 * interaction nodes level by level
@@ -413,7 +416,7 @@ library, and **reports every default it uses**:
 | RSIN (no RSIN file at all) | RSIN 1 = `@rg160h_030g.rsi`; a blank Number of Frequencies takes its 27 rows | EQUAKE `<accopt>` ≠ 2 |
 | RSOUT / ACCOUT of a spectrum that runs | `<model>_eq<i>.rso` / `<model>_eq<i>.acc` in the model folder | always |
 | a DYNP label used by SPRO that the model does not define | the built-in curve Clay, Sand or Rock of that label (no INP needed; labels are case-sensitive) | a model `DYNP` of the same label always wins |
-| SPRO (none at all) | sublayer k = TOPL layer k with Sand (Vs < 760 m/s, 2493 ft/s) or Rock, then the SITE half-space `<hs>` (linear) | TOPL and `<hs>` defined |
+| SPRO (none at all) | sublayer k = TOPL layer k with Sand (Vs < 2,493 ft/s, i.e. 760 m/s) or Rock, then the SITE half-space `<hs>` (linear) | TOPL and `<hs>` defined |
 
 Where a default is used, CHECK lists **Warning EDU-29 Built-In Default Input Used** under each module that
 uses it, naming the input and its replacement, for example
@@ -491,8 +494,8 @@ is the normal (I → J → K → L counter-clockwise seen from +z'), y' = z' × 
 ```
 * type 1 (E, nu), 2 (M, G), 3 (Vp, Vs)
 M,<nm>,<val1>,<val2>,<weight>,<pdamp>,<sdamp>,<type>
-* concrete, 5 % damping, 24 kN/m3
-M,1,3.0E7,0.2,24.0,0.05,0.05,1
+* concrete: E = 576,000 ksf (4,000 ksi), nu 0.2, 0.150 kcf, 5 % damping
+M,1,576000,0.2,0.150,0.05,0.05,1
 * beam section (As = 0: no shear deformation)
 R,<nm>,<A>,<As2>,<As3>,<J>,<I2>,<I3>
 * spring constants in global axes
@@ -512,9 +515,9 @@ constrained (P-wave) modulus and `sdamp` to the shear modulus; for beams and she
 * nodes 82..85: masses given as weights (default 1 = weight)
 MUNITS,82,85,1,1
 * translational mass (weight units -> divided by gravity)
-MT,82,9810,9810,9810
+MT,82,2200,2200,2200
 * rotational inertia about X, Y, Z
-MR,30,1.2E6,1.2E6,2.4E6
+MR,30,2.9E6,2.9E6,5.8E6
 * force factor 1 in X at node 25 (FORCE, vibration analysis)
 F,25,1,0,0
 * moment factor about Z
@@ -571,8 +574,8 @@ Most engineers build the structure in ANSYS. SASSI-EDU reads an ANSYS `CDWRITE` 
 APDL file back:
 
 ```
-* ANSYS -> SASSI-EDU (gravity in model units is required)
-CONVERT,ANSYS,,mybuilding.cdb,9.81
+* ANSYS -> SASSI-EDU (gravity in model units is required: 32.2 for an ft-kip model)
+CONVERT,ANSYS,,mybuilding.cdb,32.2
 ANSYS                                 * SASSI-EDU -> <model>.inp (APDL), read with /INPUT in ANSYS
 ```
 
@@ -725,7 +728,7 @@ INP,../sassi/data/dynp_library.pre
 * SOIL sublayer -> L properties + curve label (last SPRO = half-space)
 SPRO,<layer>,<L>,<label>
 * values, gravity, header lines, outcrop, save FILE88, 8 iterations, ratio 0.65
-SOIL,4000,9.81,1,1,1,8,0.65,1,0
+SOIL,4000,32.2,1,1,1,8,0.65,1,0
 * horizontal input, factor 1, control at sublayer 23
 SOILX,0,1,0,23
 * save the surface acceleration ACC001.TH
@@ -804,10 +807,10 @@ Fewer interaction nodes are cheaper, because the impedance matrix is dense
 `<imp>` records the method (0 FV, 1 FFV, 2 FI); the computation is the same, only the set differs.
 ASCE 4-16 and SRP 3.7.2 require that a non-FV method be **validated against FV** (CHECK warning
 EDU-12): compare the transfer functions at the common structure/excavation nodes. Example 2 shows the
-spurious peak of FI-FSIN at 6 Hz (roof amplitude 1.34 against 0.85 with FV, +58 %) and its removal by
+spurious peak of FI-FSIN at 11 Hz (roof amplitude 0.89 against 0.63 with FV, +40 %) and its removal by
 FI-EVBN. Example 8 does the same comparison on a full shear-wall building with a two-level basement:
-FI-FSIN resonates at 15.5-16 Hz (about 2 to 4 times the FV transfer functions, ISRS up to 31 % too high),
-FI-EVBN stays within 3.7 % of FV.
+FI-FSIN resonates near 16 Hz (about 2.6 to 5 times the FV transfer functions, ISRS up to 16 % too high),
+FI-EVBN stays within 5.1 % of FV.
 
 ### 8.4 The central-zone radius
 
@@ -823,8 +826,8 @@ flexibility matrix to the mesh:
 
 ```
 POINT,<opmode>,<layer>,<rad>
-* surface foundation (no embedded layers), R0 = 0.9 x 2.5 m
-POINT,0,0,2.25
+* surface foundation (no embedded layers), R0 = 0.9 x 8 ft
+POINT,0,0,7.2
 * embedment over 5 TOPL layers: point loads at interfaces 1..6
 POINT,0,5,2.25
 ```
@@ -1119,7 +1122,7 @@ the control displacement spectrum. Files: `BEAMS_002_00001_MZI.THS` (history), `
 After a run the GUI opens a **Run Summary** window: the model's key inputs (from the decks the modules read),
 its key outputs (the transfer-function peaks, peak accelerations, in-structure response spectra, relative
 displacements and element forces of the result files) and their graphs, each of which opens as a plot tab
-([GUI §7.1](GUI.md#71-the-run-summary-window)). View > Run Summary shows it at any time.
+([GUI §7.2](GUI.md#72-the-run-summary-window)). View > Run Summary shows it at any time.
 
 In the GUI, the Plot menu draws the model (3D), transfer functions (TFU against TFI), histories,
 spectra, soil layers and soil-property curves; plots can be exported as PNG. The same plots are
@@ -1157,10 +1160,10 @@ steady-state motion at one SSI frequency that `HARMFRAME` (SASSI-EDU extension) 
 u(t) = Re(H e^{iωt}) per unit control motion over one period:
 
 ```
-* the SSI mode of example 1: every node at 3.49 Hz, 24 frames, drawn 0.2 m per unit of control motion
+* the SSI mode of example 1: every node at 3.49 Hz, 24 frames, drawn 0.6 ft per unit of control motion
 HARMFRAME,FILE8,3.49,HARM_SSI
 PROCFRAME,HARM_SSI,HARM_SSI_ani,SSI system at 3.49 Hz,3
-DEFORMPLOT,HARM_SSI_ani,1,24,1,0.2
+DEFORMPLOT,HARM_SSI_ani,1,24,1,0.6
 WINDOWSETTINGS,UNDEFORMED,1
 ```
 
@@ -1278,15 +1281,15 @@ approximate and validated for stick models on rigid mats only (EDU-13).
 | SRSS FRS | `<nmodes>` = -k, `<supmode>` = 0 | one run per mode; SRSS of the modal spectra (`SRSS` line operation) |
 
 A stochastic simulation of a surface foundation with the 2007 hard-rock model (X, Y and Z input as in
-example 5, SI units):
+example 5, ft-kip units):
 
 ```
 * 3D, incoherent motion with wave passage
-HOUSE,9.81,0,0,2,0,1,1,0,0
+HOUSE,32.2,0,0,2,0,1,1,0,0
 * no delay (V_app = 1e9), Line D along X, model 5
 WPASS,1e9,0,5
-* alpha 0.5, I N C O listing, all modes, SI, seeds, +-180 deg
-INCOH,0.1,0.1,0.2,0.5,1,1,0,1,1975,2026,180
+* alpha 0.5, I N C O listing, all modes, unit flag 0 (British; the distances follow the gravity), seeds, +-180 deg
+INCOH,0.1,0.1,0.2,0.5,1,1,0,0,1975,2026,180
 * Linear superposition, 20 samples
 HOUSEX,0,0,20
 * 20 samples x FILE1X/Y/Z -> FILE8001 ... FILE8060
@@ -1321,11 +1324,11 @@ per unit length.
 
 ```
 * <dim> 1: 2D plane strain (POINT2)
-HOUSE,9.81,0,0,1,0,0,0,0,0
+HOUSE,32.2,0,0,1,0,0,0,0,0
 * excavated soil (ETYPE 2) and plane structures, nodes in the X-Z plane
 GROUP,1,PLANE
-* 2D rule: central-zone radius R0 = h, the interaction-node spacing
-POINT,0,2,1.0
+* 2D rule: central-zone radius R0 = h, the interaction-node spacing (3 ft)
+POINT,0,2,3.0
 * <simul> 1: the in-plane cases X and Z (FILE1X, FILE1Z -> FILE8X, FILE8Z)
 ANALYS,0,0,0,0,1,0,0,0,0,0,0,1
 ```
@@ -1445,10 +1448,10 @@ the damping by less than 0.5 %.
 
 ```
 PNLGEN                                      * one panel per vertical shell group (each with its own material)
-* shear capacities: f'c 30 MPa, f_y 420 MPa, 0.5 % web steel (kN/m2)
-SHEAR,0,30000,420000,0.005,0
+* shear capacities: f'c 4 ksi, f_y 60 ksi, 0.5 % web steel (ksi: British units, gravity 32.2)
+SHEAR,0,4,60,0.005,0
 * 22-point backbones from the ACI 318-08 capacity, cracking at 0.3 V_u
-BBCGEN,0,1,30000,420000,0.005,0,0,0,0.3
+BBCGEN,0,1,4,60,0.005,0,0,0,0.3
 * EDF 0.8, panels, no damping cut-off, elastic damping added
 EQL,0.8,1,0,0,1
 NONLINMOTDISP                               * panel corners into the MOTION and RELDISP requests
@@ -1470,7 +1473,7 @@ whole chain against a closed-form fixed-point iteration); example 7.
 ### 12.6 Water in pools and tanks
 
 Water adds hydrodynamic mass to pool and tank walls. `FILLPOOL` fills a pool sub-model with water SOLIDs
-(bulk modulus 2.2 GPa, shear modulus 10⁻⁸ K) attached to the walls by springs along the wall normals;
+(bulk modulus 46,000 ksf (320 ksi), shear modulus 10⁻⁸ K) attached to the walls by springs along the wall normals;
 `REFINEMODEL` refines the wall mesh first, `LISTPOOLINTER` checks the interface nodes and `MERGEPOOL`
 imports the water into the building model:
 
@@ -1679,93 +1682,94 @@ check.
 | ex06 | loose backfill behind a wall: near-field soil iterations | SOIL SITE ×3 POINT HOUSE ANALYS STRESS ×3, then 6 iterations HOUSE ANALYS STRESS ×3; MOTION | ~5 s |
 | ex07 | Option NON: shear-wall building with cracking wall panels | SITE ×3 POINT HOUSE ANALYS MOTION ×3 RELDISP ×3 NONLINEAR, then 7 iterations; MOTION | 30-120 s |
 | ex08 | embedded shear-wall building with a tower: FV against FI-FSIN (SM) and FI-EVBN (MSM) | SITE POINT HOUSE ANALYS MOTION STRESS (3 models) | 60-90 s |
-| ex09 | three-storey braced steel frame (W and HSS shapes) on a 1.2 m RC mat: SSI against a fixed base, ISRS, brace forces, storey drifts | SITE POINT HOUSE ANALYS MOTION STRESS RELDISP ×3 (2 models) | ~30 s |
+| ex09 | three-storey braced steel frame (W and HSS shapes) on a 4 ft RC mat: SSI against a fixed base, ISRS, brace forces, storey drifts | SITE POINT HOUSE ANALYS MOTION STRESS RELDISP ×3 (2 models) | ~30 s |
 
 ### 15.1 Example 1: stick on a surface mat (the basic workflow)
 
-*Model.* A 20 m × 20 m SHELL mat (9 × 9 nodes, 1.5 m thick, ten times stiffer than concrete) carries
-a four-storey BEAMS stick (5 m storeys, 1000 t per floor given as weights with `MT` in a `FOREACH`
+*Model.* A 64 ft × 64 ft SHELL mat (9 × 9 nodes, 5 ft thick, ten times stiffer than concrete) carries
+a four-storey BEAMS stick (16 ft storeys, 2,200 kips per floor given as weights with `MT` in a `FOREACH`
 loop). A rigid "spider" of beams connects the stick base to the surrounding mat nodes. The site is
-5 m of sand (Vs 300 m/s) and 12 m of gravel (Vs 500 m/s) on rock (Vs 1000 m/s), discretised in 22
-TOPL layers of 0.5-1 m. Input: vertically incident SV wave, control motion in X at the free surface;
+16 ft of sand (Vs 1,000 ft/s) and 39 ft of gravel (Vs 1,650 ft/s) on rock (Vs 3,300 ft/s), discretised in 22
+TOPL layers of 1.6-3.25 ft. Input: vertically incident SV wave, control motion in X at the free surface;
 22 SSI frequencies from 0.1 Hz to the 20 Hz cut-off.
 
 *Walk-through.* `L`/`TOPL` build the site; `FREQ` gives frequency numbers (Δf = 1/(8192 × 0.005) =
 0.0244 Hz); `SITE`/`WAVE` set the wave field; `N`/`FILL`/`NGEN` and `E`/`EGEN` build the mesh;
 `FIXROT` restrains the shell drilling rotations of shell-only nodes; `INT,1,81,1,1` makes the 81 mat
-nodes interaction nodes; `POINT,0,0,2.25` sets R0 = 0.9 × 2.5 m; `HOUSE`, `ANALYS`, `MOTION`, `NOUT`,
+nodes interaction nodes; `POINT,0,0,7.2` sets R0 = 0.9 × 8 ft; `HOUSE`, `ANALYS`, `MOTION`, `NOUT`,
 `STRESS`, `EOUT`, `RELD`/`RELFILE`/`RDND` set the analyses; `AOPT`, `CHECK`, `AFWRITE` and the `RUN`
 commands run them; `WRITE` saves the complete model.
 
-*Results to look at.* The fixed-base frequency is 5.05 Hz; with SSI the roof transfer function peaks
-at 3.49 Hz (|ATF| = 13.1): the soil springs lower the frequency and radiation damping limits the
-peak. At 0.1 Hz every transfer function is 1.000. The ZPA grows from 0.36 g at the mat to 1.29 g at
-the roof (input PGA 0.324 g). The roof drift relative to the mat is 23.2 mm. The top-storey shear
-equals the roof mass times the roof acceleration within 2 %. The rocking motions of the two mat
+*Results to look at.* The fixed-base frequency is 4.97 Hz; with SSI the roof transfer function peaks
+at 3.47 Hz (|ATF| = 13.1, interpolated; 13.0 at the computed frequency 3.49 Hz): the soil springs lower
+the frequency and radiation damping limits the peak. At 0.1 Hz every transfer function is 1.000. The
+ZPA grows from 0.36 g at the mat to 1.28 g at the roof (input PGA 0.324 g). The roof drift relative
+to the mat is 0.077 ft (0.92 in). The top-storey shear (2,808 kips) equals the roof weight times the
+roof acceleration within 0.1 %. The rocking motions of the two mat
 edges are equal and opposite. VP-E1 runs this example and checks that AFWRITE writes exactly the
 intended decks.
 
 ### 15.2 Example 2: embedded basement, FV versus FI-FSIN and FI-EVBN
 
-*Model.* A 10 m × 10 m × 5 m concrete box (SHELL walls and slabs) embedded in 5 m of sand. The
-excavated soil is 80 SOLID elements with `ETYPE` 2 in five groups, one per 1 m embedment layer; each
+*Model.* A 32 ft × 32 ft × 16 ft concrete box (SHELL walls and slabs) embedded in 16 ft of sand. The
+excavated soil is 80 SOLID elements with `ETYPE` 2 in five groups, one per 3.2 ft embedment layer; each
 embedment layer has its own L number and each excavated group uses it (`MACT,k`). Interaction nodes
 are set level by level with `INT` in `FOREACH` loops. `CPMODEL`, `ACTM` and `MDL` create two more
 models whose interaction sets are FI-FSIN (lateral and bottom faces) and FI-EVBN (plus the top
 face); `FCOPY` reuses FILE1 and FILE3 of the first run.
 
 *Results to look at.* With FV the roof X transfer function stays at or below 1 (kinematic
-interaction filters the motion). FI-FSIN shows a spurious resonance at 6.0 Hz (roof amplitude +58 % above FV): the
+interaction filters the motion). FI-FSIN shows a spurious resonance at 11.0 Hz (roof amplitude +40 % above FV, base slab +62 %): the
 roof slab rests on top-face nodes that are not interaction nodes, and the slab and the subtracted
-soil form an unphysical oscillator. FI-EVBN follows FV within 2.5 % in amplitude at a fraction of the
+soil form an unphysical oscillator. FI-EVBN follows FV within 2.4 % in amplitude at a fraction of the
 interaction nodes. This is the subtraction-method problem reported by DOE in 2011, in miniature.
 
 ### 15.3 Example 3: forced vibration, compliance and impedance
 
-*Model.* A rigid massless 12 m × 12 m mat (7 × 7 interaction nodes) on a uniform half-space, tied to
+*Model.* A rigid massless 39 ft × 39 ft mat (7 × 7 interaction nodes) on a uniform half-space, tied to
 its centre node by stiff beams. Six unit load cases (`F`/`MM` at the centre) are run through FORCE
 and copied to FILE9001 ... FILE9006; one ANALYS run (`<type>` = 1, `<simul>` = 6, `<impe>` = 2) solves
 all six and writes the global impedance (FOUNSTIF, FOUNDASH, FOUNDAMP, FOUNIMPD). MOTION
-(`EDUOPT,TFFILE,FILE8003`, displacement response) gives the vertical displacement under a 1000 kN
+(`EDUOPT,TFFILE,FILE8003`, displacement response) gives the vertical displacement under a 225 kip
 Ricker pulse.
 
 *Results to look at.* The inverse of the 6×6 compliance from FILE8001-8006 equals the global
-impedance within 0.2 %. Compared with Pais and Kausel (1988) the 2 m mesh is 6 % too stiff in
+impedance within 0.2 %. Compared with Pais and Kausel (1988) the 6.5 ft mesh is 6 % too stiff in
 translation and about 20 % in rocking and torsion: the impedance converges with mesh refinement
-(VP-14 shows the convergence). The Ricker pulse response peaks at 0.205 mm, below the static value
-0.279 mm, and radiation damping stops the motion almost at once.
+(VP-14 shows the convergence). The Ricker pulse response peaks at 0.0083 in (0.00069 ft), below the
+static value 0.0113 in, and radiation damping stops the motion almost at once.
 
 ### 15.4 Example 4: the free-field chain EQUAKE → SOIL → SITE
 
-*Model.* 10 m of sand on 12 m of clay on rock, in 1 m sublayers, no structure. EQUAKE matches a 20 s
+*Model.* 30 ft of sand on 42 ft of clay on rock, in 3 ft and 3.5 ft sublayers, no structure. EQUAKE matches a 20 s
 record to the RG 1.60 spectrum (`RSIN`/`RSOUT`/`ACCOUT`); SOIL runs the equivalent-linear analysis
 with the record as a rock-outcrop motion, using the SHAKE91 curves of `sassi/data/dynp_library.pre`
 assigned with `SPRO` in `FOREACH` loops; `SITEX,1` makes SITE read FILE88.
 
 *Results to look at.* EQUAKE: every SRP 3.7.1 acceptance check passes (listing `ex04_EQUAKE.out`).
-SOIL: the sand softens from Vs 200 m/s to 74 m/s at 10 m depth, damping 2 % to 18 %; the
-surface/base amplification peaks at 4.65 at 1.83 Hz (68 at 3.10 Hz with the low-strain properties).
-SITE with FILE88 reproduces the SOIL amplification within 0.5 % up to 7 Hz; the difference grows as
+SOIL: the sand softens from Vs 650 ft/s to 242 ft/s at 28.5 ft depth, damping 2 % to 18 %; the
+surface/base amplification peaks at 4.96 at 1.97 Hz (69 at 3.22 Hz with the low-strain properties).
+SITE with FILE88 reproduces the SOIL amplification within 1 % up to 7.8 Hz; the difference grows as
 (kh)², the thin-layer discretisation error, which tells you how thin the layers must be.
 
 ### 15.5 Example 5: X, Y and Z input with simultaneous cases
 
-*Model.* A two-storey stick on a 12 m × 12 m mat with an eccentric roof mass. SITE runs three times
+*Model.* A two-storey stick on a 40 ft × 40 ft mat with an eccentric roof mass. SITE runs three times
 (SV along x', SH along y', P along z'; FILE1 copied to FILE1X/Y/Z); ANALYS with `<simul>` = 1 solves the
 three cases with one factorisation per frequency (FILE8X/Y/Z); MOTION runs once per direction
 (`EDUOPT,TFFILE,FILE8X` ...; vertical motion scaled to 2/3), RELDISP for Y with the free-field
 reference.
 
 *Results to look at.* Each case has |ATF| = 1 in its own direction at low frequency. The eccentric
-mass couples the directions: the X input produces a Y response of the roof mass of up to 1.85 and a
+mass couples the directions: the X input produces a Y response of the roof mass of up to 1.78 and a
 torsion of the stick. The directional results are combined afterwards (SRSS or 100-40-40), outside
 the SASSI modules.
 
 ### 15.6 Example 6: near-field soil nonlinearity
 
-*Model.* A 0.6 m reinforced-concrete wall (SHELL, 4 m long, 2 m high) carrying a 150 t bridge deck,
-with a 4 m × 4 m × 2 m block of loose backfill (Vs 160 m/s at low strain) behind it, in 10 m of
-medium-dense sand on rock. SOIL first computes the strain-compatible free field for a 0.30 g rock
+*Model.* A 2 ft reinforced-concrete wall (SHELL, 13 ft long, 6.5 ft high) carrying a 330 kip bridge deck,
+with a 13 ft × 13 ft × 6.5 ft block of loose backfill (Vs 500 ft/s at low strain) behind it, in 32.5 ft
+of medium-dense sand on rock. SOIL first computes the strain-compatible free field for a 0.30 g rock
 outcrop motion (0.58 g at the surface). The backfill is SOLID elements of the *structure* (ETYPE 1)
 at the nodes of the excavated soil (FV); `PIN`/`PINGRP` declare it a nonlinear soil group and
 `NLSSIITER` runs the iterations HOUSE → ANALYS (New Structure restart) → STRESS (X, Y, Z) →
@@ -1775,7 +1779,7 @@ COMBXYZSTRAIN.
 scaled to 0.30 g with `SOILX`, `SACC` saves the surface motion `ACC001.TH`). Part 2 copies the
 strain-compatible layers of FILE88 into L 11-16 (each embedment layer with its own L number), builds
 the excavated soil (two groups, ETYPE 2, `MACT` = the layer), the backfill (group 3, ETYPE 1, a
-low-strain material `M,2` with Vs 160 m/s), the wall (SHELL) and the deck masses, and makes every
+low-strain material `M,2` with Vs 500 ft/s), the wall (SHELL) and the deck masses, and makes every
 excavated node an interaction node (FV). Part 3 declares the nonlinear group (`PIN,0.65`,
 `PINGRP,3,1,0.4,1.0,Sand`, `HOUSEX,0,0,1,1`). Part 4 is the initiation: three SITE runs (FILE1X/Y/Z),
 POINT, HOUSE, ANALYS with restart files, then STRESS (`<iter>` = 1) per direction and
@@ -1783,17 +1787,17 @@ POINT, HOUSE, ANALYS with restart files, then STRESS (`<iter>` = 1) per directio
 ANALYS to New Structure (`<mode>` 1) and runs `NLSSIITER` with the same command lists. Part 6 computes
 the spectra of the wall top with the converged backfill.
 
-*Results to look at.* The iterations converge in six passes (max |ΔG/G| = 66, 22, 14, 9.4, 4.0, 2.9,
-1.5 %); the converged backfill has G/Gmax = 0.52-0.57 and 6.4-7.2 % damping, and the elements next
-to the wall strain more than those at the back. The wall top reaches 0.75 g against 0.58 g in the
-free field. See `ex06_HOUSE.out` (convergence tables), `NLSOIL_CONVERGENCE.TXT`, FILE74 and FILE78.
+*Results to look at.* The iterations converge in four passes (max |ΔG/G| = 74, 26, 27, 9.8, 0.7 %:
+iteration 2 overshoots and iteration 3 stiffens the backfill back); the converged backfill has
+G/Gmax = 0.49-0.53 and 7.0-7.7 % damping; the elements next to the wall strain more than those at the
+back, clearly in the lower level and barely in the upper one. The wall top reaches 0.77 g against 0.58 g in the free field. See `ex06_HOUSE.out` (convergence tables), `NLSOIL_CONVERGENCE.TXT`, FILE74 and FILE78.
 The expected values are tested by `tests/unit/test_nlsoil_example.py`.
 
 ### 15.7 Example 7: nonlinear shear walls (Option NON)
 
-*Model.* A 12 m × 12 m two-storey reinforced-concrete box (storeys of 4 m, 0.3 m walls meshed 3 m × 2
-m, 0.4 m slabs with 400 t of equipment each) on a 1.5 m stiff surface mat, on 10 m of stiff soil (Vs
-400 m/s, 25 sublayers) over rock. Each wall of each storey is a SHELL group with its own material: 8
+*Model.* A 40 ft × 40 ft two-storey reinforced-concrete box (storeys of 13 ft, 1 ft walls meshed 10 ft ×
+6.5 ft, 1.25 ft slabs with 875 kips of equipment each) on a 5 ft stiff surface mat, on 32.5 ft of stiff
+soil (Vs 1,300 ft/s, 25 sublayers) over rock. Each wall of each storey is a SHELL group with its own material: 8
 panels (h/l = 1/3, low-rise, shear governed). The RG 1.60 record of the examples is scaled to 0.6 g in X
 and Y and 0.4 g in Z (Demo 9 of the manual is an RC shear-wall building at 0.60 g).
 
@@ -1805,37 +1809,37 @@ analysis (three SITE runs, POINT, HOUSE, ANALYS with restart files), MOTION + RE
 `COMBXYZTHD` and the elastic NONLINEAR run follow; `NONLINITER` then repeats HOUSE (with
 `ex07_new.hou`) → ANALYS New Structure → MOTION + RELDISP ×3 → COMBXYZTHD → NONLINEAR.
 
-*Results to look at.* Convergence after 7 iterations (max |ΔE/E| = 28.0, 22.9, 17.1, 11.5, 6.6, 4.2,
-2.4, 1.3 %). The four storey-1 walls crack: E/E_el = 0.35 and 16.7 % damping (4 % elastic + 12.7 %
-hysteretic), peak shear strain 3.7e-4, i.e. 4.4 times the cracking strain (F_μ = 3.3); the storey-2
-walls stay elastic (μ = 0.84). With the converged model the X acceleration is 0.64 g at the mat centre,
-0.85 g at the floor and 1.12 g at the roof. See `ex07_NONLINEAR.out`, `NONLINEAR_CONVERGENCE.TXT`,
+*Results to look at.* Convergence after 7 iterations (max |ΔE/E| = 25.5, 20.9, 16.1, 11.1, 7.4, 4.0,
+2.6, 1.7 %). The four storey-1 walls crack: E/E_el = 0.37 and 16.5 % damping (4 % elastic + 12.5 %
+hysteretic), peak shear strain 3.6e-4, i.e. 4.1 times the cracking strain (F_μ = 3.1); the storey-2
+walls stay elastic (μ = 0.82). With the converged model the X acceleration is 0.65 g at the mat centre,
+0.86 g at the floor and 1.14 g at the roof. See `ex07_NONLINEAR.out`, `NONLINEAR_CONVERGENCE.TXT`,
 `Panel_EQL_Matl_Prop.txt`, `Panel.fmu` and `Panel000k.thd` / `.ths` (plot one against the other to see
 the hysteresis loops). [OPTION_NON.md §11](OPTION_NON.md#11-tutorial-example-7) discusses the variants
 (a 7 % damping cut-off, the Gulec-Whittaker backbone). Tested by `tests/unit/test_nonlinear_example.py`.
 
 ### 15.8 Example 8: an embedded shear-wall building, FV against the subtraction methods
 
-*Model.* A 24 m × 24 m reinforced-concrete shear-wall building embedded 8 m: a 2 m basemat, 1.0 m outer
-basement walls, 0.6 m interior walls on x, y = −6, 0, 6 m (sixteen rooms of 6 m × 6 m), a 0.6 m
-basement slab and a 0.8 m grade slab; above grade a main block of two 5 m storeys (0.8 m outer walls,
-0.5 m floor and roof) whose four central rooms continue as a tower to 20 m; a stair opening; 810 t of
-equipment (`MT`); 16,556 t in all. The structural groups (basemat, outer basement walls, interior walls,
+*Model.* An 80 ft × 80 ft reinforced-concrete shear-wall building embedded 26 ft: a 6.5 ft basemat,
+3.5 ft outer basement walls, 2 ft interior walls on x, y = −20, 0, 20 ft (sixteen rooms of 20 ft × 20 ft),
+a 2 ft basement slab and a 2.5 ft grade slab; above grade a main block of two 16 ft storeys (2.5 ft outer
+walls, 1.5 ft floor and roof) whose four central rooms continue as a tower to 64 ft; a stair opening;
+1,780 kips of equipment (`MT`); 36,019 kips in all. The structural groups (basemat, outer basement walls, interior walls,
 slabs, roofs, outer walls above grade) are numbered for distinct colours in the 3D view, and the four
 excavated-soil groups are hidden there (`WINDOWSETTINGS,HIDEGROUP`), so the element plot shows the closed
-building. Site: 8 m of sand and gravel (Vs 300 m/s) over dense gravels and rock. The excavated soil (256
-SOLID elements, 3 m × 3 m × 2 m: 20 Hz by the λ/5 rule) shares nodes with the basemat and the outer walls
+building. Site: 26 ft of sand and gravel (Vs 1,000 ft/s) over dense gravels and rock. The excavated soil
+(256 SOLID elements, 10 ft × 10 ft × 6.5 ft: 20 Hz by the λ/5 rule) shares nodes with the basemat and the outer walls
 only; the interior walls and slabs have nodes of their own (manual rule 11, `EXCSTRCHK`), generated as
 "excavation node + 1000" and renumbered by `RMVUNUSED` and `NCOM`. `INTGEN` builds the FV (405 nodes),
 FI-FSIN (209) and FI-EVBN (258) sets on copies of the model (`CPMODEL`, `FCOPY` of FILE1 and FILE3).
 
-*Results to look at.* FV: tower roof transfer function 2.82 at 6.5 Hz (fixed base 12.4-12.5 Hz), 5 % ISRS
-ZPA 0.280 g at the basemat, 0.320 g at grade and 0.464 g at the tower roof. FI-FSIN follows FV within
-2.4 % below 10 Hz but resonates at 15.5-16 Hz (basemat 0.68 against 0.33, tower roof 1.22 against 0.60,
-the soil enclosed by the basement 12.6 against 1.6): the excavated soil inside the interface, which
-carries no impedance, has its own natural frequency there (15.45 Hz). Its ISRS are up to 31 % too high
-at 15.5 Hz; the wall forces change by about 1 %, because they come from the 6.5 Hz SSI mode. FI-EVBN
-follows FV within 3.7 % (ISRS 1.0 %). On this small model the reduced sets save little time (FV takes
+*Results to look at.* FV: tower roof transfer function 2.78 at 6.5 Hz (fixed base 12.6 Hz), 5 % ISRS
+ZPA 0.283 g at the basemat, 0.321 g at grade and 0.451 g at the tower roof. FI-FSIN follows FV within
+2.2 % below 10 Hz but resonates near 16 Hz (at 16 Hz basemat 0.92 against 0.29, tower roof 1.81 against
+0.57, the soil enclosed by the basement 18.4 against 1.8): the excavated soil inside the interface, which
+carries no impedance, has its own natural frequency there (15.6 Hz). Its ISRS are up to 16 % too high at
+15.1-15.9 Hz and up to 10 % too low just below; the wall forces change by about 1.5 %, because they come
+from the 6.5 Hz SSI mode. FI-EVBN follows FV within 5.1 % (X within 1.1 %, ISRS 1.2 %). On this small model the reduced sets save little time (FV takes
 about 1.25 times as long as FI-FSIN in ANALYS): the structure's equations cost as much as the impedance.
 Lesson 11 of the guided course builds the example step by step, shows the soil, the interaction nodes
 and a cutaway, animates the spurious resonance and discusses the validation against FV.

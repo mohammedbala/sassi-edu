@@ -48,7 +48,7 @@ def test_ex07_panels_and_backbones(ex07):
         cv = NC.curve(m, k)
         assert len(cv["x"]) == 22 and cv["yield_"] == 21 and cv["type"] == 1
         assert cv["y"][0] == pytest.approx(0.3 * cv["y"][20])                  # CrackingForceLevel 0.3
-        assert cv["y"][0] / cv["x"][0] == pytest.approx(3.0e7 / 2.4 * 0.3 * 12.0)   # G A_W
+        assert cv["y"][0] / cv["x"][0] == pytest.approx(576000.0 / 2.4 * 1.0 * 40.0)  # G A_W (ksf x ft2)
     inp = (md / "COMB_XYZ_THD.inp").read_text().split("\n")
     assert inp[0] == "36"                                                     # 12 corner nodes x 3 DOFs
     assert (md / "ex07_NONLINBAT.pre").exists()

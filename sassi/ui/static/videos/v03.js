@@ -3,9 +3,9 @@
  * SASSI computes them from the interaction nodes instead of taking them from a formula; radiation damping is
  * energy leaving as waves.
  * Numbers: sassi/ui/lessons/03_impedance.md; curves: d03.js (the lesson's runs, python -m sassi.ui.video_data):
- * FOUNSTIF / FOUNDAMP of the 2 m mesh, the Ricker load and the mat's response.
- * Geometry to scale: the 12 m mat of example 3 (7 x 7 interaction nodes at 2 m); the hook's building is the
- * example 1 stick (20 m mat, four 5 m storeys), moving with the one-mode SSI model of lessons 1 and 4
+ * FOUNSTIF / FOUNDAMP of the 6.5 ft mesh, the Ricker load and the mat's response.  Units: ft, kip, s.
+ * Geometry to scale: the 39 ft mat of example 3 (7 x 7 interaction nodes at 6.5 ft); the hook's building is the
+ * example 1 stick (64 ft mat, four 16 ft storeys), moving with the one-mode SSI model of lessons 1 and 4
  * (PH.ssiResponse) at its SSI frequency.  Spring and dashpot symbols, waves and the rigid-body motions are
  * labelled schematic / illustration on screen. */
 "use strict";
@@ -17,8 +17,8 @@
   const DISP = D["ex03/00025TR_Z.ACC"], LOAD = D["data/ricker_5hz.th"];
   const FS = ST[0];                                          // the 16 analysis frequencies (Hz)
   const IJ = (r, c) => 1 + 6 * r + c;                        // column of K(r, c) in the FOUN* files (rows X Y Z XX YY ZZ)
-  const G = 80000, B = 6;                                    // soil shear modulus (kPa), half-width of the mat (m)
-  /** Mode 1 of the example 1 stick: Gamma1 phi1 at the floors (5, 10, 15, 20 m); 1.34 at the roof. */
+  const G = 0.125 * 650 * 650 / 32.2, B = 19.5;              // soil shear modulus (ksf, 1,640), half-width of the mat (ft)
+  /** Mode 1 of the example 1 stick: Gamma1 phi1 at the floors (16, 32, 48, 64 ft); 1.34 at the roof. */
   const GPHI = [0.2131, 0.5546, 0.9521, 1.3428];
 
   // ---------------------------------------------------------------- shared pieces
@@ -65,16 +65,17 @@
   const scenes = [];
 
   // ---------------------------------------------------------------- 0. hook
-  // to scale, 14 px per metre: the example 1 building; motion relative to the ground at 3.49 Hz (its SSI
-  // frequency), 1 mm of ground motion drawn x 600 = 8.4 px, 5 x slower
-  const HP = 14, HA = 8.4, HF = 3.49, MH = 1.5 * HP;
+  // to scale, 4.375 px per ft (the 64 ft mat = 280 px): the example 1 building (16 ft storeys, 5 ft mat); motion
+  // relative to the ground at 3.49 Hz (its SSI frequency), 0.04 in of ground motion drawn x 600 (2 ft) = 8.75 px,
+  // 5 x slower.  HU: px per length unit of the one-mode model PH.SSI (its mat width B), for the rocking angle.
+  const HP = 4.375, HA = 2 * HP, HF = 3.49, MH = 5 * HP, HU = 64 * HP / PH.SSI.B;
   scenes.push({
     id: "hook", title: "Springs from a formula",
     build(s) {
       const g = K.g(s.svg);
       s.ssi = PH.ssiResponse(PH.ssiModel(1), HF);
       s.head = K.heading(s.root, "Where do soil springs come from?", {x: 120, y: 70});
-      const stick = (p, x) => K.stick(p, {x, y: 760 - MH, z: [5 * HP, 10 * HP, 15 * HP, 20 * HP], matW: 20 * HP, matH: MH, r: 15, slabW: 96});
+      const stick = (p, x) => K.stick(p, {x, y: 760 - MH, z: [16 * HP, 32 * HP, 48 * HP, 64 * HP], matW: 64 * HP, matH: MH, r: 15, slabW: 96});
       // left: the ANSYS model on springs and dashpots
       s.L = K.g(g, {hidden: true});
       K.ground(s.L, 250, 840, 400);
@@ -100,23 +101,23 @@
       s.q = K.text(g, 1690, 470, "?", {cls: "t-big", size: 170, anchor: "middle", color: "var(--ssi)", hidden: true, in: "pop"});
       s.scale = K.g(g, {hidden: true});
       note(s.scale, 1800, 240, "example 1 building at 3.49 Hz, relative to the ground", {anchor: "end"});
-      note(s.scale, 1800, 270, "1 mm of ground motion drawn × 600 · 5 × slower", {anchor: "end"});
+      note(s.scale, 1800, 270, "0.04 in of ground motion drawn × 600 · 5 × slower", {anchor: "end"});
       s.A = 0; s.B = 0;
     },
     tick(s, t) {
       const ph = TAU * HF * t / 5, r = s.ssi;
-      const pose = (st, A) => st.set({sway: A * re(r.u0, ph), rock: (A / HP) * re(r.th, ph), bend: GPHI.map((gp) => A * gp * re(r.u, ph))});
+      const pose = (st, A) => st.set({sway: A * re(r.u0, ph), rock: (A / HU) * re(r.th, ph), bend: GPHI.map((gp) => A * gp * re(r.u, ph))});
       pose(s.sL, HA * s.A);
       pose(s.sR, HA * s.B);
       const P = (lx, ly) => matPt(s.sL, 450, 760 - MH, MH, lx, ly);
       [-125, 125].forEach((lx, i) => { const q = P(lx, MH / 2); s.vS[i].update(q[0], q[1], 450 + lx, 840); });
       [-88, 88].forEach((lx, i) => { const q = P(lx, MH / 2); s.vD[i].update(q[0], q[1], 450 + lx, 840); });
-      const ql = P(-10 * HP, 0), qr = P(10 * HP, 0);
+      const ql = P(-32 * HP, 0), qr = P(32 * HP, 0);
       s.hS.update(250, ql[1], ql[0], ql[1]);
       s.hD.update(qr[0], qr[1], 650, qr[1]);
       const st = s.sR.state, c = Math.cos(st.rock), sn = Math.sin(st.rock), h = MH / 2;
       const Q = (lx) => [1420 + st.sway + lx * c - h * sn, 760 - h + lx * sn + h * c];
-      const a = Q(-10 * HP), b = Q(10 * HP), d = `M${a}L${b}L${b[0]},760L${a[0]},760Z`;
+      const a = Q(-32 * HP), b = Q(32 * HP), d = `M${a}L${b}L${b[0]},760L${a[0]},760Z`;
       s.glue.forEach((e) => e.setAttribute("d", d));
       s.rip.amp = s.B;
       s.rip.set(t, 1.6);
@@ -145,7 +146,7 @@
   });
 
   // ---------------------------------------------------------------- 2. springs and dashpots
-  // the 12 m mat of example 3 to scale (30 px per metre); the springs and dashpots are symbols
+  // the 39 ft mat of example 3 to scale (360 px = 39 ft); the springs and dashpots are symbols
   scenes.push({
     id: "suspension", title: "Springs and dashpots",
     build(s) {
@@ -157,7 +158,7 @@
       s.gnd = K.ground(g, 700, 640, 520, {color: C.ref});
       s.mat = K.rect(g, X0 - 180, Y0, 360, MT, {cls: "mat"});
       K.dim(g, X0 - 180, Y0 - 34, X0 + 180, Y0 - 34, "");
-      K.text(g, X0, Y0 - 50, "12 m mat", {cls: "t-label", anchor: "middle", size: 30, color: "var(--ink)"});
+      K.text(g, X0, Y0 - 50, "39 ft mat", {cls: "t-label", anchor: "middle", size: 30, color: "var(--ink)"});
       const yb = Y0 + MT;
       // one pair, as in a car's suspension
       s.one = K.g(g, {hidden: true});
@@ -237,34 +238,34 @@
   });
 
   // ---------------------------------------------------------------- 3. push the mat: radiation damping
-  // the 12 m mat to scale (20 px per metre); its computed vertical motion drawn x 10 000, 2.5 x slower
-  const RP = 20, RX = 10000;
+  // the 39 ft mat to scale (240 px = 39 ft); its computed vertical motion drawn x 10 000, 2.5 x slower
+  const RP = 240 / 39, RX = 10000;
   scenes.push({
     id: "radiation", title: "Where the energy goes",
     build(s) {
       const g = K.g(s.svg);
       s.head = K.heading(s.root, "Push it: where does the energy go?", {x: 120, y: 70});
       K.soil(g, {x: 120, y: 640, w: 680, layers: [{h: 190, kind: "sand"}], hs: {h: 150, kind: "sand"}, labels: false}).layers[0].edge.style.display = "none";
-      // the top 2 m of soil, whose surface follows the mat (welded contact; decay 1/r outside it, as in statics)
+      // the top 6.5 ft of soil, whose surface follows the mat (welded contact; decay 1/r outside it, as in statics)
       s.top = [K.path(g, "", {fill: C.sand, "fill-opacity": 0.78}), K.path(g, "", {fill: "url(#sv-pat-sand)"})];
-      s.soilLab = halo(K.text(g, 140, 900, "uniform soil · Vs 200 m/s · 2 % damping", {cls: "t-label", size: 28, color: "var(--ink)"}));
+      s.soilLab = halo(K.text(g, 140, 900, "uniform soil · Vs 650 ft/s · 2 % damping", {cls: "t-label", size: 28, color: "var(--ink)"}));
       // the radiated wave: two fronts leaving the mat after the pulse (schematic, not to speed)
       s.fronts = [0, 1].map(() => K.path(g, "", {stroke: C.dash, "stroke-width": 4, fill: "none"}));
-      s.mat = K.rect(g, 460 - 6 * RP, 578, 12 * RP, 22, {cls: "mat"});
-      K.text(g, 322, 530, "12 m mat", {cls: "t-label", anchor: "end", size: 28, color: "var(--ink)"});
+      s.mat = K.rect(g, 460 - 19.5 * RP, 578, 39 * RP, 22, {cls: "mat"});
+      K.text(g, 322, 530, "39 ft mat", {cls: "t-label", anchor: "end", size: 28, color: "var(--ink)"});
       s.arr = K.arrow(g, 460, 560, 460, 440, {color: C.ssi, width: 7, head: 22});
       note(g, 800, 960, "mat motion drawn × 10 000 · 2.5 × slower", {anchor: "end"});
       s.wNote = note(g, 800, 990, "waves: schematic, not to speed", {anchor: "end", hidden: true, color: "var(--dash)"});
-      // the push and the response (computed)
-      const PL = K.plot(s.svg, {x: 1000, y: 160, w: 800, h: 220, xr: [0, 2], yr: [-600, 1200], xticks: [0, 0.5, 1, 1.5, 2], yticks: [0, 1000],
-        ylabel: "push (kN)", ylabelOffset: 90});
-      const PD = K.plot(s.svg, {x: 1000, y: 500, w: 800, h: 330, xr: [0, 2], yr: [-0.15, 0.32], xticks: [0, 0.5, 1, 1.5, 2], yticks: [-0.1, 0, 0.1, 0.2],
-        xlabel: "time (s)", ylabel: "mat moves (mm)", ylabelOffset: 90});
+      // the push (the 5 Hz Ricker wavelet x 225 kips) and the response (computed, ft -> in)
+      const PL = K.plot(s.svg, {x: 1000, y: 160, w: 800, h: 220, xr: [0, 2], yr: [-135, 270], xticks: [0, 0.5, 1, 1.5, 2], yticks: [0, 200],
+        ylabel: "push (kips)", ylabelOffset: 90});
+      const PD = K.plot(s.svg, {x: 1000, y: 500, w: 800, h: 330, xr: [0, 2], yr: [-0.006, 0.0125], xticks: [0, 0.5, 1, 1.5, 2], yticks: [-0.004, 0, 0.004, 0.008],
+        xlabel: "time (s)", ylabel: "mat moves (in)", ylabelOffset: 90});
       s.PL = PL; s.PD = PD;
-      const lt = LOAD.t.filter((t) => t <= 2), lv = lt.map((t, i) => 1000 * LOAD.v[i]);
+      const lt = LOAD.t.filter((t) => t <= 2), lv = lt.map((t, i) => 225 * LOAD.v[i]);
       s.lLoad = PL.line(lt, lv, {color: C.ssi, width: 5, draw: true});
       const dt = [], dv = [];
-      DISP.t.forEach((t, i) => { if (t <= 2) { dt.push(t); dv.push(1000 * DISP.v[i]); } });
+      DISP.t.forEach((t, i) => { if (t <= 2) { dt.push(t); dv.push(12 * DISP.v[i]); } });
       s.lDisp = PD.line(dt, dv, {color: C.wave, width: 6, draw: true});
       s.stop = K.pill(s.root, "stops almost at once", {x: PD.X(1.0), y: PD.Y(0) - 120, color: "var(--good)", size: 32});
       s.term = K.pill(s.root, "radiation damping", {x: 580, y: 420, color: "var(--dash)", size: 34});
@@ -275,15 +276,15 @@
     tick(s, t, dt) {
       s.ph += (dt || 0) * 0.4 * s.R;
       const td = s.R ? Math.min(2, s.ph % 2.6) : 0;
-      const u = 1000 * interp(DISP, td), F = 1000 * interp(LOAD, Math.min(td, 2));
-      const up = -u * RP * RX / 1000;                         // mm -> px (x 10 000)
+      const u = interp(DISP, td), F = 225 * interp(LOAD, Math.min(td, 2));     // ft, kips
+      const up = -u * RP * RX;                                // ft -> px (x 10 000)
       s.mat.setAttribute("y", 578 + up);
       const pts = [];
       for (let x = 120; x <= 800; x += 10) { const dx = Math.abs(x - 460); pts.push([x, 600 + up * (dx <= 120 ? 1 : 120 / dx)]); }
       const d = "M120,640" + K.d(pts).replace("M", "L") + "L800,640Z";
       s.top.forEach((e) => e.setAttribute("d", d));
-      s.arr.update(460, 572 + up, 460, 572 + up - 0.13 * F);
-      s.arr.g.style.opacity = String(Math.min(1, Math.abs(F) / 60));
+      s.arr.update(460, 572 + up, 460, 572 + up - 0.58 * F);
+      s.arr.g.style.opacity = String(Math.min(1, Math.abs(F) / 13.5));
       s.fronts.forEach((f, i) => {
         const age = td - 0.45 - 0.12 * i, r = 30 + 260 * age;
         if (age <= 0 || r > 330) { f.setAttribute("d", ""); return; }
@@ -293,7 +294,7 @@
       [s.headL, s.headD].forEach((h, i) => { const P = i ? s.PD : s.PL; h.setAttribute("x1", P.X(td)); h.setAttribute("x2", P.X(td)); });
     },
     beats: [
-      {say: "Take a rigid square mat, 12 metres wide, on uniform soil. [p]Give it one short, sharp push upwards.",
+      {say: "Take a rigid square mat, 39 feet wide, on uniform soil. [p]Give it one short, sharp push upwards.",
         go(k) { k.show(k.s.head); }, p(k) { k.show(k.s.PL.g); k.draw(k.s.lLoad, 1000); }},
       {say: "[m]The mat jumps up, [s]and then stops almost at once. No long ringing.",
         m(k) { k.show(k.s.PD.g); k.draw(k.s.lDisp, 1000); k.tween(k.s, {R: 1}, 10); }, s(k) { k.show(k.s.stop); }},
@@ -307,7 +308,7 @@
   });
 
   // ---------------------------------------------------------------- 4. how SASSI does it
-  // the mat in plan: 7 x 7 interaction nodes at 2 m (400 px = 12 m)
+  // the mat in plan: 7 x 7 interaction nodes at 6.5 ft (400 px = 39 ft)
   scenes.push({
     id: "how", title: "How SASSI computes them",
     build(s) {
@@ -316,9 +317,9 @@
       s.links = K.path(g, "", {stroke: C.spring, "stroke-width": 1.6, fill: "none", hidden: true});
       s.p = plan(g, 160, 230, 400, 7, {hidden: true, r: 9});
       s.pLab = K.g(g, {hidden: true});
-      K.text(s.pLab, 360, 735, "12 m mat · 7 × 7 = 49 interaction nodes", {cls: "t-label", anchor: "middle", size: 30, color: "var(--ink)"});
+      K.text(s.pLab, 360, 735, "39 ft mat · 7 × 7 = 49 interaction nodes", {cls: "t-label", anchor: "middle", size: 30, color: "var(--ink)"});
       const [a0, a1] = [s.p.pts[0], s.p.pts[1]];
-      K.dim(s.pLab, a0[0], a0[1] + 46, a1[0], a1[1] + 46, "2 m");
+      K.dim(s.pLab, a0[0], a0[1] + 46, a1[0], a1[1] + 46, "6.5 ft");
       const c = s.p.pts[24];                                  // node 25, the centre
       s.fan = K.path(g, s.p.pts.filter((q, i) => i !== 24).map((q) => `M${c[0]},${c[1]}L${q[0]},${q[1]}`).join(""),
         {stroke: C.ssi, "stroke-width": 2, "stroke-opacity": 0.55, fill: "none", hidden: true});
@@ -346,7 +347,7 @@
     beats: [
       {say: "How does SASSI compute all this? [p]It starts with the points where the building and the soil hold hands.",
         go(k) { k.show(k.s.head); }, p(k) { k.show(k.s.p.g); k.show(k.s.p.dots, {stagger: 12}); }},
-      {say: "[n]These are the interaction nodes: here, 49 points on a 2 metre grid.",
+      {say: "[n]These are the interaction nodes: here, 49 points on a 6.5-foot grid.",
         n(k) { k.show(k.s.pLab); k.pulse(k.s.p.dots, {amp: 0.4}); }},
       {say: "[k]SASSI works out how a push at any one point moves every other point, through the ground.",
         k(k) { k.show([k.s.push, k.s.fan, k.s.ripLab, k.s.list.items[0]]); k.tween(k.s, {Rp: 1}, 800); }},
@@ -367,8 +368,8 @@
       K.soil(s.side, {x: 140, y: 560, w: 620, layers: [{h: 200, kind: "sand"}], hs: {h: 120, kind: "sand"}, labels: false});
       K.rect(s.side, 330, 538, 240, 22, {cls: "mat"});
       K.dim(s.side, 330, 500, 570, 500, "");
-      K.text(s.side, 450, 482, "12 m, rigid", {cls: "t-label", anchor: "middle", size: 30, color: "var(--ink)"});
-      halo(K.text(s.side, 160, 840, "uniform soil, Vs 200 m/s", {cls: "t-label", size: 30, color: "var(--ink)"}));
+      K.text(s.side, 450, 482, "39 ft, rigid", {cls: "t-label", anchor: "middle", size: 30, color: "var(--ink)"});
+      halo(K.text(s.side, 160, 840, "uniform soil, Vs 650 ft/s", {cls: "t-label", size: 30, color: "var(--ink)"}));
       const P = K.plot(s.svg, {x: 1000, y: 230, w: 780, h: 420, xr: [0, 3], yr: [0, 25], yticks: [0, 10, 20], yfmt: (v) => "+" + v + " %",
         ylabel: "SASSI above the formula", ylabelOffset: 100});
       s.P = P;
@@ -419,12 +420,12 @@
       s.pk = K.g(P.g, {hidden: true});
       K.circle(s.pk, P.X(FS[i8]), P.Y(r8), 10, {fill: C.ssi, stroke: "#0a111d", "stroke-width": 3});
       halo(K.text(s.pk, P.X(FS[i8]) - 24, P.Y(r8) + 50, `−${Math.round(100 * (1 - r8))} % at ${FS[i8].toFixed(0)} Hz`, {cls: "t-big", size: 40, anchor: "end", color: "var(--ssi)"}));
-      // a shear wave under the mat: wavelength to scale (20 px per metre, Vs 200 m/s)
+      // a shear wave under the mat: wavelength to scale (240 px = 39 ft, Vs 650 ft/s)
       s.W = K.g(g, {hidden: true});
       K.rect(s.W, 1140, 210, 660, 460, {rx: 14, fill: "rgba(20,32,51,.6)", stroke: "#2a3b52", "stroke-width": 2});
       K.text(s.W, 1170, 256, "shear wavelength and the mat, to scale", {cls: "t-label", size: 28});
       K.rect(s.W, 1350, 360, 240, 20, {cls: "mat"});
-      K.text(s.W, 1470, 345, "12 m", {cls: "t-label", anchor: "middle", size: 26, color: "var(--ink2)"});
+      K.text(s.W, 1470, 345, "39 ft", {cls: "t-label", anchor: "middle", size: 26, color: "var(--ink2)"});
       s.wave = K.path(s.W, "", {stroke: C.wave, "stroke-width": 5, fill: "none"});
       s.lamTxt = K.text(s.W, 1470, 590, "", {cls: "t-label", anchor: "middle", size: 30, color: "var(--wave)"});
       s.fTxt = K.text(s.W, 1470, 634, "", {cls: "t-label", anchor: "middle", size: 32, color: "var(--ink)"});
@@ -432,10 +433,10 @@
     },
     tick(s, t) {
       // lambda = Vs / f; the crests move at the same speed at every frequency (Vs, slowed down)
-      const lam = 20 * 200 / s.f, xc = 160 * t * s.Wv, pts = [];
+      const lam = (240 / 39) * 650 / s.f, xc = 160 * t * s.Wv, pts = [];
       for (let x = 1170; x <= 1770; x += 5) pts.push([x, 480 + 40 * Math.sin(TAU * (x - 1470 - xc) / lam)]);
       s.wave.setAttribute("d", K.d(pts));
-      s.lamTxt.textContent = "λ = " + (200 / s.f).toFixed(0) + " m";
+      s.lamTxt.textContent = "λ = " + Math.round(650 / s.f).toLocaleString("en-US") + " ft";
       s.fTxt.textContent = (s.f < 2 ? "slow shaking" : s.f > 12 ? "fast shaking" : "faster") + " · " + s.f.toFixed(1) + " Hz";
     },
     beats: [

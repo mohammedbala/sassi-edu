@@ -245,10 +245,10 @@ dense matrix) much smaller:
 | FFV (Ghiocel 2013) | EVBN plus internal horizontal levels every `skip` levels | the sub-volumes between interaction levels are small and stiff; close to FV at a fraction of the cost |
 
 In SASSI-EDU the variants differ **only** by the interaction set (INT/INTGEN); the equations and the
-code are the same. Example 2 shows the SM anomaly at 6 Hz on a 10 × 10 × 5 m box and its removal by
-FI-EVBN; example 8 shows it at 15.5-16 Hz on a 24 × 24 m shear-wall building embedded 8 m, whose
+code are the same. Example 2 shows the SM anomaly at 11 Hz on a 32 × 32 × 16 ft box and its removal by
+FI-EVBN; example 8 shows it near 16 Hz on an 80 × 80 ft shear-wall building embedded 26 ft, whose
 interior structure has nodes of its own, so that the anomaly comes from the enclosed excavated soil alone
-(its first natural frequency with the FI-FSIN nodes fixed is 15.45 Hz).
+(its first natural frequency with the FI-FSIN nodes fixed is 15.6 Hz).
 Screening frequencies used in practice (DOE/STP 2011): the soil-layer frequency $V_s/(4H)$
 for embedment $H$ and the excavated-volume frequency $f_\text{EV}$.
 
@@ -1923,11 +1923,11 @@ $\rho\ddot u = (K + 4G/3)\,\nabla(\nabla\cdot u) - G\,\nabla\times(\nabla\times 
 only stress is the pressure $p = -K\,\nabla\cdot u$, and
 
 ```math
-\rho\,\ddot u = -\nabla p, \qquad \ddot p = c^2\,\nabla^2 p, \qquad c = \sqrt{K/\rho} \approx 1480\,\text{m/s} \tag{19.1}
+\rho\,\ddot u = -\nabla p, \qquad \ddot p = c^2\,\nabla^2 p, \qquad c = \sqrt{K/\rho} \approx 4870\,\text{ft/s} \tag{19.1}
 ```
 
 the linear acoustic equation of an inviscid compressible fluid, written in displacements. Far below
-the first compression frequency of the water column, $c/(4H)$ (74 Hz for $H = 5\,\text{m}$), the
+the first compression frequency of the water column, $c/(4H)$ (76 Hz for $H = 16\,\text{ft}$), the
 water is incompressible, $\nabla^2 p = 0$, with $\partial p/\partial n = -\rho\,a_n$ on the walls and
 the floor (imposed by the interface springs along the wall normals, frictionless along the walls) and
 $p = 0$ at the free surface: the potential-flow problem of Westergaard (1933) and Housner (1963). The
@@ -1942,11 +1942,11 @@ the direction of motion and depth $H$ the exact series is
 conservative).
 
 **Why $G = 10^{-8} K$ (D-W3-07).** D-WAT-01 proposed $\nu = 0.49$, i.e. $G = 0.0201\,K$. Such a
-"water" is an elastic solid whose shear modes lie in the seismic band (about 10 Hz for 5 m of water);
+"water" is an elastic solid whose shear modes lie in the seismic band (the first resonance of a 16 ft deep tank lies near 15 Hz);
 below them it moves rigidly with the tank and gives the **total** mass instead of the impulsive mass
 ($F/(m a) = 1.00$ at 0.2-2 Hz for $L = H$, where the exact value is 0.50). The smaller $G$, the lower
 the spurious shear modes: with $G = 10^{-8} K$ ($V_s = 10^{-4} V_p$) they lie below about 0.05 Hz for
-metre-sized pools and the water behaves as an inviscid fluid from 0.2 Hz up; $K/G = 10^8$ is far from
+pools a few feet deep and the water behaves as an inviscid fluid from 0.2 Hz up; $K/G = 10^8$ is far from
 the double-precision limit, and at every non-zero frequency the inertia controls the
 near-zero-stiffness shear deformations. The water SOLIDs must use **incompatible modes** (FILLPOOL and
 MERGEPOOL set `MOPT,0`): a trilinear hexahedron with 2×2×2 Gauss points locks volumetrically for a

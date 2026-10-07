@@ -21,9 +21,9 @@ to a unit motion at the control point. SITE builds the three free fields, ANALYS
 cases with one factorisation per frequency, and MOTION convolves each case with its own record. The
 directional combination is post-processing, done with the line operations of the Plot menu.
 
-Example 5 is built to show coupling: a two-storey stick on a 12 m × 12 m basemat with its 300 t roof
-mass 2.24 m off the stick axis, so an X input also moves the roof in Y and twists the stick. The lesson
-runs in about 6 s.
+Example 5 is built to show coupling: a two-storey stick on a 40 ft × 40 ft basemat with its 660 kip
+roof mass (given as a weight) 7.27 ft off the stick axis, so an X input also moves the roof in Y and
+twists the stick. The lesson runs in about 6 s.
 
 ## The site and the frequencies
 
@@ -32,9 +32,9 @@ The site of lesson 04 (sand over gravel over rock) and a set of 19 SSI frequenci
 ```sassi
 MDL,ex05,ex05
 TIT,Ex05 - eccentric two-storey stick, X + Y + Z input with ANALYS simul = 1
-L,1,0.5,19.0,600,300,0.05,0.05
-L,2,1.0,20.0,1000,500,0.04,0.04
-L,3,1.0,21.0,2000,1000,0.02,0.02
+L,1,1.6,0.120,2000,1000,0.05,0.05
+L,2,3.25,0.125,3300,1650,0.04,0.04
+L,3,3.25,0.130,6600,3300,0.02,0.02
 TOPL,1,1,1,1,1,1,1,1,1,1
 TOPL,2,2,2,2,2,2,2,2,2,2
 TOPL,2,2
@@ -44,15 +44,16 @@ FREQ,1,205,246,287,328,369,410,492,573,614
 ```
 
 ### What this does
-Ten sublayers of 0.5 m of sand ($V_s = 300\,\text{m/s}$), twelve of 1 m of gravel
-($V_s = 500\,\text{m/s}$), rock half-space ($V_s = 1000\,\text{m/s}$); `FREQ` appends 19 frequency
-numbers to set 1. The damping of the layers (5 %, 4 %, 2 %) stands for strain-compatible values: in a
-project these layers come from SOIL (lesson 06).
+Ten sublayers of 1.6 ft of sand ($V_s = 1{,}000\,\text{ft/s}$), twelve of 3.25 ft of gravel
+($V_s = 1{,}650\,\text{ft/s}$), rock half-space ($V_s = 3{,}300\,\text{ft/s}$), with unit weights of
+0.120, 0.125 and 0.130 kcf; `FREQ` appends 19 frequency numbers to set 1. The damping of the layers
+(5 %, 4 %, 2 %) stands for strain-compatible values: in a project these layers come from SOIL
+(lesson 06).
 
 ### Why it matters
 The frequency set must resolve the peaks of every case: the X and Y responses of this structure peak
-near 5 Hz, the vertical one near 10 Hz, so the set extends to 15 Hz. One set serves the three
-directions, because ANALYS solves them together.
+near 5 Hz, the vertical one between 10 and 12 Hz, so the set extends to 15 Hz. One set serves the
+three directions, because ANALYS solves them together.
 
 ### Technical basis
 $f = n\,\Delta f$, $\Delta f = 1/(\Delta t\cdot\mathrm{NFFT})$
@@ -65,34 +66,35 @@ plot-layers
 
 ## The structure: a stick with an eccentric roof mass
 
-A 12 m × 12 m basemat of 4 × 4 shells (3 m mesh, 1.5 m thick, ten times stiffer than concrete)
-carries a two-storey stick (4 m storeys). The roof mass, node 30 at (2, 1, 8), is tied to the stick
-top (node 27) by a rigid arm.
+A 40 ft × 40 ft basemat of 4 × 4 shells (10 ft mesh, 5 ft thick, ten times stiffer than concrete)
+carries a two-storey concrete stick (13 ft storeys). The roof mass, node 30 at (6.5, 3.25, 26), is tied
+to the stick top (node 27) by a rigid arm.
 
 ```sassi
-* basemat nodes 1..25 (3 m grid), centre node 13; stick nodes 26 (z = 4) and 27 (z = 8)
-N,1,-6,-6,0
-N,5,6,-6,0
+* basemat nodes 1..25 (10 ft grid), centre node 13; stick nodes 26 (z = 13) and 27 (z = 26)
+N,1,-20,-20,0
+N,5,20,-20,0
 FILL,1,5
-NGEN,4,5,1,5,1,0,3,0
-N,26,0,0,4
-N,27,0,0,8
-N,28,6,0,2
-N,29,6,0,6
+NGEN,4,5,1,5,1,0,10,0
+N,26,0,0,13
+N,27,0,0,26
+N,28,20,0,6.5
+N,29,20,0,19.5
 * the eccentric roof mass and the K node of the rigid links
-N,30,2,1,8
-N,31,0,0,2
-M,1,3.0E8,0.2,24.0,0.05,0.05,1
-M,2,3.0E7,0.2,0.0,0.05,0.05,1
-M,3,3.0E10,0.2,0.0,0.0,0.0,1
-R,1,10.0,5.0,5.0,10.0,5.0,5.0
-R,2,9.0,7.5,7.5,11.4,6.75,6.75
+N,30,6.5,3.25,26
+N,31,0,0,6.5
+* E (ksf), nu, unit weight (kcf): basemat 10 x concrete, stick concrete, rigid links 1000 x
+M,1,5.76E6,0.2,0.150,0.05,0.05,1
+M,2,5.76E5,0.2,0.0,0.05,0.05,1
+M,3,5.76E8,0.2,0.0,0.0,0.0,1
+R,1,116.0,58.0,58.0,1240.0,620.0,620.0
+R,2,100.0,83.3,83.3,1406.0,833.3,833.3
 GROUP,1,SHELL
 MACT,1
 E,1,1,2,7,6
 EGEN,3,1,1
 EGEN,3,5,1,4
-THICK,1,16,1,1.5
+THICK,1,16,1,5.0
 GROUP,2,BEAMS
 MACT,2
 RACT,1
@@ -106,24 +108,24 @@ VAR,SPIDER,7,8,9,12,14,17,18,19
 FOREACH,SPIDER,E,#,13,@SPIDER[#],31
 E,9,27,30,31
 FIXROT
-* 300 t per storey (weights 2943 kN) and the rotary inertia of each 12 m x 12 m slab (I x g)
-MT,26,2943,2943,2943
-MT,30,2943,2943,2943
-MR,26,35316,35316,70632
-MR,30,35316,35316,70632
+* 660 kips per storey (as weights) and the rotary inertia of each 40 ft x 40 ft slab (I x g, kip ft2)
+MT,26,660,660,660
+MT,30,660,660,660
+MR,26,88000,88000,176000
+MR,30,88000,88000,176000
 INT,1,25,1,1
-POINT,0,0,2.7
-HOUSE,9.81,0,0,2,0,0,0,0,0
+POINT,0,0,9.0
+HOUSE,32.2,0,0,2,0,0,0,0,0
 ```
 
 ### What this does
-* `MT,30,2943,2943,2943` puts 300 t (as a weight, kN) at node 30 in X, Y and Z; `MR,30,...` adds the
-  rotary inertia of the slab about X, Y and Z ($I \times g$: 3600 t m² about X and Y, 7200 t m² about
-  Z).
+* `MT,30,660,660,660` puts 660 kips (a weight; mass $660/32.2 = 20.5\,\text{kip\,s}^2/\text{ft}$) at
+  node 30 in X, Y and Z; `MR,30,...` adds the rotary inertia of the slab about X, Y and Z ($I \times g$:
+  88,000 kip·ft² about X and Y, 176,000 kip·ft² about Z).
 * `E,9,27,30,31` is the rigid arm (material 3, 1000 × concrete stiffness, massless) from the stick
-  top to the mass: the mass sits 2 m off the axis in x and 1 m in y.
-* `INT,1,25,1,1` makes the 25 basemat nodes interaction nodes; `POINT,0,0,2.7` is a surface foundation
-  with central-zone radius $0.9 \times 3\,\text{m}$.
+  top to the mass: the mass sits 6.5 ft off the axis in x and 3.25 ft in y.
+* `INT,1,25,1,1` makes the 25 basemat nodes interaction nodes; `POINT,0,0,9.0` is a surface foundation
+  with central-zone radius $0.9 \times 10\,\text{ft}$.
 
 ### Why it matters
 Real buildings have eccentric masses: the centre of mass of a floor rarely coincides with the centre
@@ -132,18 +134,20 @@ horizontal direction. A design that combines directions only "in the input direc
 the combination rules exist precisely to collect these cross terms.
 
 ### Technical basis
-The slab inertias follow from a uniform 12 m × 12 m slab of 300 t:
+The slab inertias follow from a uniform 40 ft × 40 ft slab of 660 kips, written directly as weights
+times length squared ($I \times g$):
 
 ```math
 \begin{aligned}
-I_Z &= \frac{m\,(a^2 + b^2)}{12} = \frac{300 \times 288}{12} = 7200\,\text{t\,m}^2\\
-I_X = I_Y &= \frac{m\,a^2}{12} = 3600\,\text{t\,m}^2
+I_Z\,g &= \frac{W\,(a^2 + b^2)}{12} = \frac{660 \times 3200}{12} = 176{,}000\,\text{kip\,ft}^2\\
+I_X\,g = I_Y\,g &= \frac{W\,a^2}{12} = 88{,}000\,\text{kip\,ft}^2
 \end{aligned}
 ```
 
-with $m = 300\,\text{t}$ the mass and $a = b = 12\,\text{m}$ the sides of the slab. `MT`/`MR` take
-weights ($I \times g$ with the default `MUNITS` 1, divided by $g$ in HOUSE). The stick and the arm are
-2-node 3D Timoshenko frames (shear areas of `R`), the basemat flat shells
+with $W = 660\,\text{kips}$ the weight and $a = b = 40\,\text{ft}$ the sides of the slab. `MT`/`MR`
+take weights ($I \times g$ with the default `MUNITS` 1, divided by $g = 32.2\,\text{ft/s}^2$ in HOUSE:
+$I_Z = 176{,}000/32.2 = 5{,}466\,\text{kip\,ft\,s}^2$). The stick and the arm are 2-node 3D
+Timoshenko frames (shear areas of `R`), the basemat flat shells
 ([Theory §13.1](docs/theory/THEORY_MANUAL.md#131-the-element-library)).
 
 ### In ANSYS terms
@@ -154,7 +158,7 @@ link (CERIG or MPC184). The stick is BEAM188 with an arbitrary section (`SECTYPE
 
 ```action
 plot-model
-explain: MR,30,35316,35316,70632
+explain: MR,30,88000,88000,176000
 ```
 
 ## Three wave fields: SV for X, SH for Y, P for Z
@@ -260,7 +264,7 @@ The expensive part of an SSI run is the impedance of the soil at the interaction
 factorisation of the system, frequency by frequency. They do not depend on the input direction, so
 three directions cost little more than one. The ANALYS listing's **low-frequency check** should show
 $\lvert\mathrm{ATF}\rvert$ close to 1 in the input direction of each case: at $f \to 0$ the whole
-system moves with the free field. Here the largest deviation at 0.098 Hz is 0.028 % (FILE8X), 0.030 %
+system moves with the free field. Here the largest deviation at 0.098 Hz is 0.027 % (FILE8X), 0.029 %
 (FILE8Y) and 0.006 % (FILE8Z), all at node 30.
 
 ### Technical basis
@@ -312,19 +316,19 @@ HARMFRAME,FILE8X,5.0,HARM_X5
 * `00030TR_Y01.RS` means "node 30, translation Y, damping 1" whatever the input direction, so the
   next run would overwrite it: `FOREACH ... FCOPY` keeps copies with the prefix `X_`.
 * `HARMFRAME,FILE8X,5.0,HARM_X5` writes the steady-state motion of every node under a harmonic X
-  input of unit amplitude at 5.005 Hz (24 frames over one period). In the animation (0.3 m per unit of
-  control motion) the roof mass does not move along X only: X 5.00 (39° behind the control motion),
-  Y 1.85 (72° ahead of it) and Z 1.25. Out of phase, X and Y make it run round an ellipse in plan, and
-  the rigid arm swings about the stick top (Y 1.22): the stick twists. Turn the view with the mouse
+  input of unit amplitude at 5.005 Hz (24 frames over one period). In the animation (1 ft per unit of
+  control motion) the roof mass does not move along X only: X 4.74 (37° behind the control motion),
+  Y 1.78 (75° ahead of it) and Z 1.17. Out of phase, X and Y make it run round an ellipse in plan, and
+  the rigid arm swings about the stick top (Y 1.15): the stick twists. Turn the view with the mouse
   to look at it from above.
 
 ### Why it matters
-The X input moves the roof mass mostly in X (transfer function peak 5.00 at 5.0 Hz, 1.000 at
-0.1 Hz), but also in Y (1.85 at 5.0 Hz, zero at low frequency) and vertically (1.49 at 6.0 Hz: the
+The X input moves the roof mass mostly in X (transfer function peak 4.74 at 5.0 Hz, 1.000 at
+0.1 Hz), but also in Y (1.78 at 5.0 Hz, zero at low frequency) and vertically (1.53 at 6.0 Hz: the
 mass is off the axis, so the rocking of the stick moves it up and down), and it twists the stick
-top (0.37 rad per metre of control motion at 5.0 Hz). The 5 % spectra of the roof mass under this
-one input peak at **4.27 g in X, 1.07 g in Y and 1.47 g in Z**. A design that kept only the response
-in the input direction would miss a horizontal spectrum of 1.07 g and a vertical one of 1.47 g at the
+top (0.112 rad per foot of control motion at 5.0 Hz). The 5 % spectra of the roof mass under this
+one input peak at **4.21 g in X, 1.07 g in Y and 1.45 g in Z**. A design that kept only the response
+in the input direction would miss a horizontal spectrum of 1.07 g and a vertical one of 1.45 g at the
 roof mass.
 
 ### Technical basis
@@ -338,7 +342,7 @@ for nuclear ISRS per SRP 3.7.1
 ```action
 plot-spectrum: ex05/X_00030TR_X01.RS, ex05/X_00030TR_Y01.RS, ex05/X_00030TR_Z01.RS | log
 plot-spectrum: ex05/X_00030TR_Y.TFU, ex05/X_00027R_ZZ.TFU
-animate: ex05/HARM_X5 | deformed 0.3 | X input at 5.0 Hz
+animate: ex05/HARM_X5 | deformed 1.0 | X input at 5.0 Hz
 open-listing: MOTION
 ```
 
@@ -385,15 +389,15 @@ FOREACH,R30,FCOPY,@R30[#],Z_@R30[#]
 * `MOTION ... <mult>` = 0.6667 scales the record for the vertical case.
 
 ### Why it matters
-* **Y input.** The Y transfer function of the roof mass peaks at 6.53 at 5.0 Hz, higher than the X one
-  (5.00): the mass is 2 m off the axis in x and only 1 m in y, so the Y input twists the stick twice
-  as much (0.74 against 0.37 rad/m) and the twist adds to the Y motion of the mass. The cross terms
-  are equal: X response to Y input = Y response to X input = 1.85. Its 5 % spectrum peaks at
-  4.25 g at 5.0 Hz.
-* **Z input.** The vertical transfer function of the roof mass peaks at 1.67 at 10.0 Hz; through the
-  eccentric mass the vertical input also produces X (1.03) and Y (0.51) motion at 6.0 Hz, and no
-  torsion at all (the stick-top rotation about Z is zero to round-off).
-* **RELDISP.** The stick top drifts up to **5.2 mm** in Y relative to the free field
+* **Y input.** The Y transfer function of the roof mass peaks at 6.24 at 5.0 Hz, higher than the X one
+  (4.74): the mass is 6.5 ft off the axis in x and only 3.25 ft in y, so the Y input twists the stick
+  twice as much (0.225 against 0.112 rad/ft) and the twist adds to the Y motion of the mass. The cross
+  terms are equal: X response to Y input = Y response to X input = 1.78. Its 5 % spectrum peaks at
+  4.07 g at 5.0 Hz.
+* **Z input.** The vertical transfer function of the roof mass peaks at 1.69 at 12.0 Hz (1.63 at
+  10.0 Hz); through the eccentric mass the vertical input also produces X (1.06) and Y (0.53) motion
+  at 6.0 Hz, and no torsion at all (the stick-top rotation about Z is zero to round-off).
+* **RELDISP.** The stick top drifts up to **0.0160 ft (0.19 in)** in Y relative to the free field
   ($t = 3.6\,\text{s}$):
   the interstorey and building-to-building displacements for gaps and for distribution systems that
   span between structures come from RELDISP, not from double integration of the accelerations.
@@ -451,10 +455,10 @@ WRITESPEC,roof_Y_1004040.rs,8
 * `WRITESPEC` writes the two combined spectra to `ex05/`.
 
 ### Why it matters
-The Y response of the roof mass collects 4.25 g from the Y input, 1.07 g from the X input and 0.34 g
-from the Z input (spectral peaks). The SRSS peaks at **4.36 g** at 5.0 Hz, 2.6 % above the Y
-contribution alone; the 100-40-40 envelope peaks at **4.76 g** at 5.1 Hz, 9 % above the SRSS. At
-100 Hz (the ZPA) they give 0.736 g and 0.798 g. The cross-direction terms are not negligible for an
+The Y response of the roof mass collects 4.07 g from the Y input, 1.07 g from the X input and 0.34 g
+from the Z input (spectral peaks). The SRSS peaks at **4.18 g** at 5.0 Hz, 2.8 % above the Y
+contribution alone; the 100-40-40 envelope peaks at **4.57 g** at 5.1 Hz, 9 % above the SRSS. At
+100 Hz (the ZPA) they give 0.711 g and 0.773 g. The cross-direction terms are not negligible for an
 eccentric structure, and the choice of rule is a design-basis decision: state it with the ISRS.
 
 ### Technical basis
@@ -475,7 +479,7 @@ Answer: with the largest contribution $R_1$ and the two others fractions $a$ and
 $R_\text{SRSS} = R_1\sqrt{1 + a^2 + b^2}$ and $R_\text{100-40-40} = R_1\,(1 + 0.4a + 0.4b)$. They
 agree when one direction acts alone ($a = b = 0$), differ by 4 % when the three are equal (1.80
 against 1.73), and by up to 15 % when the two others are each about 40 % of the dominant one (1.32
-against 1.15). For the Y response of the roof mass the X input gives about 25 % and the Z input 8 % of
+against 1.15). For the Y response of the roof mass the X input gives about 26 % and the Z input 8 % of
 the Y input's peak, hence the 9 %. Try the X response yourself with `X_00030TR_X01.RS`,
 `Y_00030TR_X01.RS` and `Z_00030TR_X01.RS`.
 
@@ -503,11 +507,11 @@ WRITESPEC,roof_Y_design.rs,9
 sources (`BROADEN,9,0,15,4,14,24`): the envelope is taken first, then broadened.
 
 ### Why it matters
-The broadened spectrum keeps the SRSS peak, 4.36 g, over a plateau from 4.26 to 5.76 Hz
-($5.01\,\text{Hz} \pm 15\,\%$), and leaves the ZPA practically unchanged (0.737 g against 0.736 g). A
-component or a piping mode anywhere in that band is qualified for the peak. Broadening covers the
-uncertainty of the structure's frequencies (material properties, modelling, mass), which the soil
-cases alone do not.
+The broadened spectrum keeps the SRSS peak, 4.18 g, over a plateau from 4.26 to 5.76 Hz
+($5.01\,\text{Hz} \pm 15\,\%$), and leaves the ZPA practically unchanged (0.7114 g against
+0.7110 g). A component or a piping mode anywhere in that band is qualified for the peak. Broadening
+covers the uncertainty of the structure's frequencies (material properties, modelling, mass), which
+the soil cases alone do not.
 
 This file, for every floor, direction and damping value, is what the equipment and piping engineers
 qualify against. Typical deliverables use several damping values (`DAMP,0.02,0.03,0.05,...`, up to

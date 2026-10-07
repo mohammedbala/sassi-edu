@@ -3,10 +3,11 @@
  * SITE computes this free field for every layer and frequency, and the half-space below lets waves leave.
  * Numbers: sassi/ui/lessons/02_free_field.md; curves: d02.js (the lesson's SOIL runs, python -m sassi.ui.video_data)
  * and the exact one-dimensional column of the lesson's soil-column figure (SV.K.PH.columnU, figures.js).
- * Geometry to scale: the example 1 site (5 m sand, 12 m gravel, rock) and its building (20 m mat 1.5 m thick,
- * four 5 m storeys).  Every moving column follows the 1D wave solution at the frequency stated on screen,
- * with one displacement factor per scene; the building of the hook moves with the one-mode SSI model of
- * example 1 (PH.ssiResponse, lessons 1 and 4) at the same frequency. */
+ * Geometry to scale: the example 1 site (16 ft sand, 39 ft gravel, rock) and its building (64 ft mat 5 ft thick,
+ * four 16 ft storeys).  Every moving column follows the 1D wave solution at the frequency stated on screen,
+ * with one displacement factor per scene (a surface or rock motion of 0.04 in, drawn larger); the building of
+ * the hook moves with the one-mode SSI model of example 1 (PH.ssiResponse, lessons 1 and 4) at the same
+ * frequency. */
 "use strict";
 
 (function () {
@@ -15,20 +16,22 @@
   const OUT = D["ex01/SAF001W_023O.TFU"], WIT = D["ex01/SAF001W_023W.TFU"], ACC = D["data/rg160h_030g.acc"];
   const DF = 0.0244140625;                                  // SITE frequency step (Hz)
   const F01 = 4 * DF, F20 = 819 * DF;                        // lowest / highest SITE frequency
-  const SLOW = 10;                                          // animations at 7.2-7.3 Hz run 10 x slower
-  /** Mode 1 of the example 1 stick (floors at 5, 10, 15, 20 m, 1000 t each; Timoshenko beams of the input):
-   *  Gamma1 phi1 at the floors.  5.05 Hz, M1 = 3063 t, h1 = 15.6 m and 1.34 at the roof, as PH.SSI. */
-  const GPHI = [0.2131, 0.5546, 0.9521, 1.3428];
+  const SLOW = 10;                                          // animations at 7.3-7.4 Hz run 10 x slower
+  /** Mode 1 of the example 1 stick (floors at 16, 32, 48, 64 ft, 2,200 kips each; Timoshenko beams of the input,
+   *  clamped at the base): Gamma1 phi1 at the floors.  4.99 Hz, M1 = 6,750 kips, h1 = 49.8 ft, 1.34 at the roof. */
+  const GPHI = [0.2157, 0.5578, 0.9542, 1.3423];
+  /** Pixels of a displayed displacement: `inch` inches drawn `times` larger, at `pxf` px per ft. */
+  const disp = (inch, times, pxf) => inch / 12 * times * pxf;
 
   // ---------------------------------------------------------------- shared pieces
   /** Exact free field of the lesson's column (SHAKE recursion, figures.js) per unit surface motion at f
-   *  (rounded to 0.1 Hz): a function of the depth z (m) returning the complex amplitude [re, im]. */
+   *  (rounded to 0.1 Hz): a function of the depth z (ft) returning the complex amplitude [re, im]. */
   const PROF = {};
   function profile(f) {
     const key = Math.max(0.1, Math.round(f * 10) / 10).toFixed(1);
     if (PROF[key]) return PROF[key];
-    const wv = PH.columnRatios(COL, +key).wv, dz = 0.25, us = [];
-    for (let z = 0; z <= 40.0001; z += dz) us.push(PH.columnU(wv, COL, z));
+    const wv = PH.columnRatios(COL, +key).wv, dz = 0.8, us = [];
+    for (let z = 0; z <= 131.2001; z += dz) us.push(PH.columnU(wv, COL, z));
     const fn = (z) => {
       const x = Math.max(0, Math.min(us.length - 1.001, z / dz)), i = Math.floor(x), a = x - i;
       return [us[i][0] * (1 - a) + us[i + 1][0] * a, us[i][1] * (1 - a) + us[i + 1][1] * a];
@@ -51,17 +54,17 @@
     X.forEach((x, i) => { if (x >= a && x <= b && (!best || Y[i] > best.a)) best = {f: x, a: Y[i]}; });
     return best;
   }
-  /** The site of example 1: 5 m of sand on 12 m of gravel on rock (pxm: px per metre). */
+  /** The site of example 1: 16 ft of sand on 39 ft of gravel on rock (pxf: px per ft). */
   function column(p, o) {
-    const pxm = o.pxm;
-    const col = K.soil(p, {x: o.x, y: o.y, w: o.w, layers: [{h: 5 * pxm, kind: "sand"}, {h: 12 * pxm, kind: "gravel"}],
+    const pxf = o.pxf;
+    const col = K.soil(p, {x: o.x, y: o.y, w: o.w, layers: [{h: 16 * pxf, kind: "sand"}, {h: 39 * pxf, kind: "gravel"}],
       hs: o.hsH === 0 ? null : {h: o.hsH || 120, kind: "rock"}, labels: false, hidden: o.hidden});
-    col.base = o.y + 17 * pxm;
+    col.base = o.y + 55 * pxf;
     return col;
   }
   /** Shear a column with the free field U (per unit surface motion): surface amplitude A px, phase ph. Returns u(depth px). */
-  function shake(col, U, pxm, A, ph) {
-    const u = (d) => A * re(U(d / pxm), ph);
+  function shake(col, U, pxf, A, ph) {
+    const u = (d) => A * re(U(d / pxf), ph);
     col.shear(u);
     return u;
   }
@@ -80,52 +83,55 @@
     return a;
   }
   const rise = (k, a, ms) => k.draw(a.line, ms, {done: () => k.show(a.head)});
-  const IFC = [].concat(K.linspace(0, 5, 11), K.linspace(6, 17, 12));     // the 23 interface depths of SITE (m)
+  const IFC = [].concat(K.linspace(0, 16, 11), K.linspace(19.25, 55, 12));   // the 23 interface depths of SITE (ft)
 
   // ================================================================== scenes
   const scenes = [];
 
   // ---------------------------------------------------------------- 0. hook
-  // to scale, 16 px per metre: the example 1 building (20 m mat, four 5 m storeys) on its site
-  const HP = 16, HA = 32;                                    // px per m; 1 mm of surface motion x 2000 = 32 px
+  // to scale, 5 px per ft: the example 1 building (64 ft mat, four 16 ft storeys) on its site
+  const HP = 5, HA = disp(0.04, 2000, HP), HF = 7.4;          // px per ft; 0.04 in of surface motion x 2000 = 33 px
   scenes.push({
     id: "hook", title: "Where the shaking comes from",
     build(s) {
       const g = K.g(s.svg);
-      s.U = profile(7.3);
-      s.ssi = PH.ssiResponse(PH.ssiModel(1), 7.3);           // the building's motion per unit free-field motion
+      s.U = profile(HF);
+      s.ssi = PH.ssiResponse(PH.ssiModel(1), HF);            // the building's motion per unit free-field motion
       s.head = K.heading(s.root, "Where does the shaking come from?", {x: 120, y: 80});
-      const stick = (p, x, y) => K.stick(p, {x, y, z: [5 * HP, 10 * HP, 15 * HP, 20 * HP], matW: 20 * HP, matH: 1.5 * HP, r: 16, slabW: 100});
+      const stick = (p, x, y) => K.stick(p, {x, y, z: [16 * HP, 32 * HP, 48 * HP, 64 * HP], matW: 64 * HP, matH: 5 * HP, r: 16, slabW: 100});
       // left: the fixed-base model
       s.L = K.g(g, {hidden: true});
       K.text(s.L, 470, 210, "Fixed base", {cls: "t-label", anchor: "middle", size: 36, color: "var(--ref)"});
       K.ground(s.L, 290, 640, 360);
-      s.fb = stick(s.L, 470, 640 - 1.5 * HP);
+      s.fb = stick(s.L, 470, 640 - 5 * HP);
       s.acc = K.signal(s.L, {x: 290, y: 690, w: 360, h: 100, color: C.wave, width: 3, draw: true, n: 260,
         fn: (u) => { const i = Math.min(ACC.v.length - 1, Math.floor(u * ACC.v.length * 0.55)); return ACC.v[i] / ACC.peak; }});
       s.accLab = K.text(s.L, 470, 840, "earthquake in, at the base", {cls: "t-label", anchor: "middle", size: 28, hidden: true});
       // right: the same building on the soil site
       s.R = K.g(g, {hidden: true});
       K.text(s.R, 1340, 210, "On a soil site", {cls: "t-label", anchor: "middle", size: 36, color: "var(--wave)"});
-      s.col = column(s.R, {x: 1040, y: 600, w: 600, pxm: HP, hsH: 118});
+      s.col = column(s.R, {x: 1040, y: 600, w: 600, pxf: HP, hsH: 115});
       s.glue = [K.path(s.R, "", {fill: C.sand, "fill-opacity": 0.78}), K.path(s.R, "", {fill: "url(#sv-pat-sand)"})];   // soil stuck to the mat
-      s.st = stick(s.R, 1340, 600 - 1.5 * HP);
+      s.st = stick(s.R, 1340, 600 - 5 * HP);
       onLayer(s.R, 1060, 650, "sand", {size: 30}); onLayer(s.R, 1060, 785, "gravel", {size: 30}); onLayer(s.R, 1060, 940, "rock", {size: 30});
       s.rise = arrowD(s.R, 1700, 985, 1700, 612, {color: C.wave, width: 6, head: 20});
       K.text(s.R, 1722, 780, "waves\nrise", {cls: "t-label", size: 28, color: "var(--wave)"});
-      note(s.R, 1830, 300, "7.3 Hz · surface 1 mm, drawn × 2000 · building: simplified one-mode model", {anchor: "end"});
-      note(s.R, 1830, 330, "10 × slower", {anchor: "end"});
+      note(s.R, 1830, 290, `${HF} Hz · surface 0.04 in`, {anchor: "end"});
+      note(s.R, 1830, 318, "drawn × 2000 · 10 × slower", {anchor: "end"});
+      note(s.R, 1830, 346, "building: simplified model", {anchor: "end"});
       s.q = K.heading(s.root, "Weaker…<br>or <span style='color:var(--ssi)'>stronger</span>?", {x: 160, y: 430, size: "h1"});
       s.S = 0;
     },
     tick(s, t) {
-      const ph = TAU * 7.3 * t / SLOW, A = HA * s.S, r = s.ssi;
+      const ph = TAU * HF * t / SLOW, A = HA * s.S, r = s.ssi;
       shake(s.col, s.U, HP, A, ph);
-      s.st.set({sway: A * re([1 + r.u0[0], r.u0[1]], ph), rock: (A / HP) * re(r.th, ph), bend: GPHI.map((gp) => A * gp * re(r.u, ph))});
+      // th is the rotation per unit length of ground motion in the length unit of PH.SSI, whose mat width is B:
+      // the ground motion drawn as A px is A * B / (64 * HP) of those units
+      s.st.set({sway: A * re([1 + r.u0[0], r.u0[1]], ph), rock: A * PH.SSI.B / (64 * HP) * re(r.th, ph), bend: GPHI.map((gp) => A * gp * re(r.u, ph))});
       // the soil under the mat follows it (welded contact): fill between the ground surface and the mat's underside
-      const st = s.st.state, c = Math.cos(st.rock), sn = Math.sin(st.rock), h = 0.75 * HP;
+      const st = s.st.state, c = Math.cos(st.rock), sn = Math.sin(st.rock), h = 2.5 * HP;
       const P = (lx) => [1340 + st.sway + lx * c - h * sn, 600 - h + lx * sn + h * c];
-      const a = P(-10 * HP), b = P(10 * HP), d = `M${a}L${b}L${b[0]},600L${a[0]},600Z`;
+      const a = P(-32 * HP), b = P(32 * HP), d = `M${a}L${b}L${b[0]},600L${a[0]},600Z`;
       s.glue.forEach((e) => e.setAttribute("d", d));
     },
     beats: [
@@ -157,18 +163,19 @@
     build(s) {
       const g = K.g(s.svg);
       s.head = K.heading(s.root, "Meet the site", {x: 120, y: 70});
-      s.col = column(g, {x: 250, y: 230, w: 420, pxm: 30, hsH: 210});         // sand 230-380, gravel 380-740, rock 740-950
+      const SF = 9.25;                                                          // px per ft
+      s.col = column(g, {x: 250, y: 230, w: 420, pxf: SF, hsH: 211});         // sand 230-378, gravel 378-739, rock 739-950
       s.col.layers.forEach((L) => L.g.classList.add("sv-in", "sv-fade"));
       const [Ls, Lg, Lr] = s.col.layers;
       onLayer(Ls.g, 280, 318, "Sand");
-      K.dim(Ls.g, 216, 230, 216, 380, "");
-      K.text(Ls.g, 196, 316, "5 m", {cls: "t-label", anchor: "end", size: 32, color: "var(--ink)"});
+      K.dim(Ls.g, 216, 230, 216, 230 + 16 * SF, "");
+      K.text(Ls.g, 196, 316, "16 ft", {cls: "t-label", anchor: "end", size: 32, color: "var(--ink)"});
       onLayer(Lg.g, 280, 572, "Gravel");
-      K.dim(Lg.g, 216, 380, 216, 740, "");
-      K.text(Lg.g, 196, 572, "12 m", {cls: "t-label", anchor: "end", size: 32, color: "var(--ink)"});
+      K.dim(Lg.g, 216, 230 + 16 * SF, 216, 230 + 55 * SF, "");
+      K.text(Lg.g, 196, 572, "39 ft", {cls: "t-label", anchor: "end", size: 32, color: "var(--ink)"});
       onLayer(Lr.g, 280, 830, "Rock");
       // the race of the shear waves: speeds to scale
-      s.lanes = [["Sand", 300, "300 m/s", 400], ["Gravel", 500, "500 m/s", 560], ["Rock", 1000, "1000 m/s", 720]].map(([name, vs, lab, y]) => {
+      s.lanes = [["Sand", 1000, "1,000 ft/s", 400], ["Gravel", 1650, "1,650 ft/s", 560], ["Rock", 3300, "3,300 ft/s", 720]].map(([name, vs, lab, y]) => {
         const lg = K.g(g, {hidden: true});
         K.text(lg, 900, y + 10, name, {cls: "t-label", size: 32, color: "var(--ink)"});
         K.line(lg, 1070, y, 1630, y, {stroke: "rgba(185,196,208,.35)", "stroke-width": 3, "stroke-linecap": "round"});
@@ -182,7 +189,7 @@
     },
     tick(s, t) {
       for (const L of s.lanes) {
-        const x0 = 1070, len = 560, xp = x0 + ((t * L.vs * 0.32 + 120) % len), pts = [];
+        const x0 = 1070, len = 560, xp = x0 + ((t * L.vs * 0.096 + 120) % len), pts = [];
         for (let dx = -60; dx <= 60; dx += 4) {
           const x = xp + dx;
           if (x < x0 || x > x0 + len) continue;
@@ -192,7 +199,7 @@
       }
     },
     beats: [
-      {say: "Here's the site of example one: [s]5 metres of sand, [g]on 12 metres of gravel, [r]on rock.",
+      {say: "Here's the site of example one: [s]16 ft of sand, [g]on 39 ft of gravel, [r]on rock.",
         go(k) { k.show(k.s.head); }, s(k) { k.show(k.s.col.layers[0].g); }, g(k) { k.show(k.s.col.layers[1].g); }, r(k) { k.show(k.s.col.layers[2].g); }},
       {say: "How stiff is each layer? We measure it by [v]how fast shear waves run through it.",
         v(k) { k.show(k.s.lanesHead); k.show(k.s.lanes.map((L) => L.g), {stagger: 150}); k.show(k.s.lanes.map((L) => L.v), {stagger: 150, delay: 400}); }},
@@ -202,15 +209,15 @@
   });
 
   // ---------------------------------------------------------------- 3. waves rise: the free field
-  // to scale, 18 px per metre; 7.3 Hz, 1 mm of surface motion drawn x 2000 = 36 px
-  const FP = 18, FA = 36;
+  // to scale, 5.5 px per ft; 7.4 Hz, 0.04 in of surface motion drawn x 2000 = 37 px
+  const FP = 5.5, FA = disp(0.04, 2000, FP);
   scenes.push({
     id: "free-field", title: "The free field",
     build(s) {
       const g = K.g(s.svg);
-      s.U = profile(7.3);
+      s.U = profile(HF);
       s.head = K.heading(s.root, "Waves rise through the soil", {x: 120, y: 70});
-      s.col = column(g, {x: 160, y: 580, w: 520, pxm: FP, hsH: 80});         // base 886, rock to 966
+      s.col = column(g, {x: 160, y: 580, w: 520, pxf: FP, hsH: 80});         // base 882, rock to 962
       s.env = K.path(g, "", {stroke: C.ink2, "stroke-width": 2.5, "stroke-dasharray": "7 7", fill: "none", hidden: true});
       // the vertically incident shear wave: travels up, moves the soil sideways
       s.rise = arrowD(g, 730, 962, 730, 600, {color: C.wave, width: 6, head: 20});
@@ -220,14 +227,14 @@
       s.side = K.g(g, {hidden: true});
       K.arrow(s.side, 760, 820, 880, 820, {color: C.ink, width: 5, head: 16, both: true});
       K.text(s.side, 900, 830, "soil moves sideways", {cls: "t-label", size: 30, color: "var(--ink)"});
-      s.scale = note(g, 160, 990, "7.3 Hz · surface 1 mm, drawn × 2000 · 10 × slower", {hidden: true});
-      // the building of example 1 to scale, later (20 m mat 1.5 m thick, four 5 m storeys)
+      s.scale = note(g, 160, 990, `${HF} Hz · surface 0.04 in, drawn × 2000 · 10 × slower`, {hidden: true});
+      // the building of example 1 to scale, later (64 ft mat 5 ft thick, four 16 ft storeys)
       s.ghost = K.g(g, {hidden: true});
       const gs = {stroke: C.muted, "stroke-width": 3, "stroke-dasharray": "10 8", fill: "none"};
-      const mt = 580 - 1.5 * FP;
-      K.rect(s.ghost, 420 - 10 * FP, mt, 20 * FP, 1.5 * FP, gs);
-      K.line(s.ghost, 420, mt, 420, mt - 20 * FP, gs);
-      for (const z of [5, 10, 15, 20]) { K.line(s.ghost, 370, mt - z * FP, 470, mt - z * FP, gs); K.circle(s.ghost, 420, mt - z * FP, 14, gs); }
+      const mt = 580 - 5 * FP;
+      K.rect(s.ghost, 420 - 32 * FP, mt, 64 * FP, 5 * FP, gs);
+      K.line(s.ghost, 420, mt, 420, mt - 64 * FP, gs);
+      for (const z of [16, 32, 48, 64]) { K.line(s.ghost, 370, mt - z * FP, 470, mt - z * FP, gs); K.circle(s.ghost, 420, mt - z * FP, 14, gs); }
       K.text(s.ghost, 500, 300, "your building, later", {cls: "t-label", size: 28, color: "var(--ink2)"});
       s.card = K.card(s.root, {x: 1060, y: 380, w: 720, title: "The free field",
         body: "how the ground shakes with <b>no building</b> on it"});
@@ -235,10 +242,10 @@
     },
     tick(s, t) {
       const A = FA * s.A;
-      shake(s.col, s.U, FP, A, TAU * 7.3 * t / SLOW);
+      shake(s.col, s.U, FP, A, TAU * HF * t / SLOW);
       // the envelope of the standing wave: how far each depth swings
       const xr = 680, L = [], R = [];
-      for (let z = 0; z <= 21.1; z += 0.5) { const a = A * mag(s.U(z)), y = 580 + z * FP; L.push([xr - a, y]); R.push([xr + a, y]); }
+      for (let z = 0; z <= 69.1; z += 1.5) { const a = A * mag(s.U(z)), y = 580 + z * FP; L.push([xr - a, y]); R.push([xr + a, y]); }
       s.env.setAttribute("d", K.d(L) + K.d(R));
     },
     beats: [
@@ -254,15 +261,15 @@
   });
 
   // ---------------------------------------------------------------- 4. amplification: the column's own note
-  // to scale, 26 px per metre; rock outcrop 1 mm at every frequency, drawn x 500 = 13 px
-  const AP = 26, AA = 13;
+  // to scale, 8 px per ft; rock outcrop 0.04 in at every frequency, drawn x 500 = 13 px
+  const AP = 8, AA = disp(0.04, 500, AP);
   scenes.push({
     id: "amplification", title: "Stronger at some frequencies",
     build(s) {
       const g = K.g(s.svg);
       s.head = K.heading(s.root, "Stronger or weaker?", {x: 120, y: 70});
-      s.col = column(g, {x: 150, y: 300, w: 360, pxm: AP, hsH: 150});         // base 742, rock to 892
-      note(g, 150, 940, "rock outcrop 1 mm at every frequency");
+      s.col = column(g, {x: 150, y: 300, w: 360, pxf: AP, hsH: 150});         // base 740, rock to 890
+      note(g, 150, 940, "rock outcrop 0.04 in at every frequency");
       note(g, 150, 970, "drawn × 500 · 10 × slower");
       const P = K.plot(s.svg, {x: 760, y: 190, w: 1020, h: 520, xr: [0, 25], yr: [0, 2.5], xticks: [0, 5, 10, 15, 20, 25], yticks: [0, 1, 2],
         xlabel: "frequency (Hz)", ylabel: "surface ÷ bare rock", ylabelOffset: 70});
@@ -306,9 +313,9 @@
         go(k) { k.show(k.s.head); k.tween(k.s, {A: 1}, 600); }, p(k) { k.show([k.s.P.g, k.s.note]); }},
       {say: "[c]This curve shows how much the surface shakes compared with bare rock, at each frequency.",
         c(k) { k.show(k.s.cur); k.show(k.s.one, {delay: 200}); k.tween(k.s, {fmax: 25, f: 24.9}, 2400, {ease: "linear"}); }},
-      {say: "[pk]But at 7.3 hertz, the surface shakes 2.2 times harder than the rock.",
+      {say: "[pk]But at 7.4 hertz, the surface shakes 2.2 times harder than the rock.",
         pk(k) { k.tween(k.s, {f: k.s.pk1.f}, 1000, {done: () => k.show(k.s.pk)}); }},
-      {say: "[n]That's the soil column's first natural frequency; [m]its second mode, at 17.3 hertz, makes the second hump.",
+      {say: "[n]That's the soil column's first natural frequency; [m]its second mode, at 17.8 hertz, makes the second hump.",
         n(k) { k.show(k.s.m1); }, m(k) { k.show(k.s.m2); k.pulse(k.s.m2, {amp: 0.1}); }},
       {say: "[w]So anything in your building that vibrates near 7 hertz gets an extra push from the soil.",
         w(k) { k.show(k.s.why); k.pulse(k.s.pk, {amp: 0.06}); }},
@@ -316,22 +323,22 @@
   });
 
   // ---------------------------------------------------------------- 5. the half-space
-  // to scale, 26 px per metre; 7.2 Hz (the peak of both curves), the same 1 mm of rock motion in both cases
-  // (the rigid base, or the rock outcrop), displacements x 150 = 3.9 px
-  const HSP = 26, HSA = 3.9, HSF = 7.2;
+  // to scale, 8 px per ft; 7.3 Hz (the peak of the rigid-base curve, within 0.2 % of the outcrop peak), the same
+  // 0.04 in of rock motion in both cases (the rigid base, or the rock outcrop), displacements x 150 = 4 px
+  const HSP = 8, HSA = disp(0.04, 150, HSP), HSF = 7.3;
   scenes.push({
     id: "half-space", title: "Rock that goes on forever",
     build(s) {
       const g = K.g(s.svg);
       s.U = profile(HSF);
       const rr = PH.columnRatios(COL, HSF);
-      s.rOut = mag(rr.outcrop); s.rWit = mag(rr.within);       // 2.20 and 17.05: surface per unit rock motion
+      s.rOut = mag(rr.outcrop); s.rWit = mag(rr.within);       // 2.16 and 17.06: surface per unit rock motion
       s.head = K.heading(s.root, "What's below the rock?", {x: 120, y: 70});
-      s.col = column(g, {x: 150, y: 230, w: 380, pxm: HSP, hsH: 260});        // base 672, rock to 932
+      s.col = column(g, {x: 150, y: 230, w: 380, pxf: HSP, hsH: 260});        // base 670, rock to 930
       s.rockG = s.col.layers[2].g;
       s.rockG.classList.add("sv-in", "sv-fade", "sv-on");
       s.rigid = K.g(g, {hidden: true});
-      K.ground(s.rigid, 140, 672, 400, {color: "var(--ink2)"});
+      K.ground(s.rigid, 140, s.col.base, 400, {color: "var(--ink2)"});
       K.text(s.rigid, 340, 750, "rigid base", {cls: "t-label", anchor: "middle", size: 32, color: "var(--ink2)"});
       s.trap = K.g(g, {hidden: true});
       K.arrow(s.trap, 625, 640, 625, 290, {color: C.wave, width: 5, head: 18});
@@ -344,7 +351,7 @@
       s.chev = [0, 1, 2, 3].map(() => K.path(g, "", {stroke: C.dash, "stroke-width": 5, fill: "none", "stroke-linecap": "round", "stroke-linejoin": "round"}));
       s.chevLab = note(g, 150, 965, "energy flows down (schematic)", {hidden: true, color: "var(--dash)"});
       s.hsPill = K.pill(s.root, "half-space", {x: 190, y: 800, color: "var(--wave)", size: 34});
-      note(g, 150, 190, `${HSF} Hz · the same rock motion in both, 1 mm`);
+      note(g, 150, 190, `${HSF} Hz · the same rock motion in both, 0.04 in`);
       note(g, 150, 218, "drawn × 150 · 10 × slower");
       const P = K.plot(s.svg, {x: 900, y: 190, w: 880, h: 460, xr: [0, 25], yr: [0, 18], xticks: [0, 5, 10, 15, 20, 25], yticks: [0, 5, 10, 15],
         xlabel: "frequency (Hz)", ylabel: "amplification", ylabelOffset: 64});
@@ -363,7 +370,7 @@
     tick(s, t) {
       const ph = TAU * HSF * t / SLOW, ratio = (1 - s.R) * s.rOut + s.R * s.rWit;
       const u = shake(s.col, s.U, HSP, HSA * ratio * s.A, ph);
-      s.rigid.setAttribute("transform", `translate(${u(17 * HSP).toFixed(2)},0)`);   // the rigid base moves with the input
+      s.rigid.setAttribute("transform", `translate(${u(55 * HSP).toFixed(2)},0)`);   // the rigid base moves with the input
       s.chev.forEach((c, i) => {
         const p = (t * 0.55 + i / 4) % 1, y = 700 + p * 200, x = 450;
         c.setAttribute("d", `M${x - 16},${y}L${x},${y + 16}L${x + 16},${y}`);
@@ -391,18 +398,20 @@
   });
 
   // ---------------------------------------------------------------- 6. how SASSI does it: SITE
-  // to scale, 22 px per metre: the 22 sublayers, then the generated rock sublayers as at 20 Hz (20 of 3.75 m,
-  // 75 m in all: the first two and the last are drawn); the column moves at 20 Hz, 1 mm x 1000 = 22 px
-  const SP = 22, SA = 22, ST = 230, SB = ST + 17 * SP;          // surface 230, top of the rock 604
-  const BUF = [[17, 20.75, SB, SB + 3.75 * SP], [20.75, 24.5, SB + 3.75 * SP, SB + 7.5 * SP], [71.25, 75, 800, 800 + 3.75 * SP]];
-  const BOT = 800 + 3.75 * SP;                                    // 882.5: the bottom of the 20th rock sublayer
+  // to scale, 6.8 px per ft: the 22 sublayers, then the generated rock sublayers as at 20 Hz (20 of 12.38 ft,
+  // 248 ft in all, SITE listing: the first two and the last are drawn); the column moves at 20 Hz,
+  // 0.04 in x 1000 = 23 px
+  const SP = 6.8, SA = disp(0.04, 1000, SP), ST = 230, SB = ST + 55 * SP;   // surface 230, top of the rock 604
+  const HL = 12.378, HB = 55 + 20 * HL;                                     // rock sublayer at 20 Hz; their base (ft)
+  const BUF = [[55, 55 + HL, SB, SB + HL * SP], [55 + HL, 55 + 2 * HL, SB + HL * SP, SB + 2 * HL * SP], [HB - HL, HB, 800, 800 + HL * SP]];
+  const BOT = 800 + HL * SP;                                      // 884: the bottom of the 20th rock sublayer
   scenes.push({
     id: "site-module", title: "How SASSI does it: SITE",
     build(s) {
       const g = K.g(s.svg);
       s.U = profile(20);
       s.head = K.heading(s.root, "How SASSI does it: <span style='color:var(--wave)'>SITE</span>", {x: 120, y: 70});
-      s.col = column(g, {x: 180, y: ST, w: 400, pxm: SP, hsH: 0, hidden: true});
+      s.col = column(g, {x: 180, y: ST, w: 400, pxf: SP, hsH: 0, hidden: true});
       s.subs = K.path(g, IFC.slice(1, 22).map((z) => `M180,${ST + SP * z}L580,${ST + SP * z}`).join(""), {stroke: "rgba(255,244,225,.85)", "stroke-width": 2.5, fill: "none", draw: true});
       s.subLab = K.text(g, 640, 420, "22 thin slices", {cls: "t-label", size: 32, color: "var(--ink)", hidden: true});
       // the generated half-space sublayers (to scale at 20 Hz) and the viscous boundary at their base
@@ -412,8 +421,8 @@
         K.path(s.buf, "", {stroke: "rgba(255,255,255,.55)", "stroke-width": 2, fill: "none", "stroke-dasharray": "8 6"})]);
       K.text(s.buf, 380, 792, "⋮", {cls: "t-label", anchor: "middle", size: 34, color: "var(--ink2)"});
       K.text(s.buf, 640, 690, "20 rock slices,", {cls: "t-label", size: 30, color: "var(--ink)"});
-      K.text(s.buf, 640, 726, "75 m deep at 20 Hz", {cls: "t-label", size: 30, color: "var(--ink)"});
-      K.text(s.buf, 640, 760, "(16 not drawn)", {cls: "t-small"});
+      K.text(s.buf, 640, 726, "248 ft deep at 20 Hz", {cls: "t-label", size: 30, color: "var(--ink)"});
+      K.text(s.buf, 640, 760, "(17 not drawn)", {cls: "t-small"});
       s.dps = K.g(g, {hidden: true});
       s.dpV = K.dashpot(s.dps, 300, BOT, 300, 950, {w: 26, cyl: 36});
       K.ground(s.dps, 260, 950, 80, {color: "var(--muted)"});
@@ -428,16 +437,16 @@
       s.ifc = K.nodes(g, IFC.map((z) => [580, ST + SP * z]), {r: 6, hidden: true});
       s.cp = K.circle(g, 580, ST, 14, {fill: C.wave, stroke: C.ink, "stroke-width": 3, hidden: true, in: "pop"});
       s.cpPill = K.pill(s.root, "control point", {x: 625, y: 196, color: "var(--wave)", size: 30});
-      s.scale = note(g, 640, 985, "20 Hz · surface 1 mm, drawn × 1000 · 30 × slower", {hidden: true});
-      s.code = K.code(s.root, ["L,1,0.5,19.0,600,300,0.05,0.05", "TOPL,1,1,1,1,1,1,1,1,1,1"], {x: 1000, y: 230, w: 800, size: 34});
-      s.codeL = [K.label(s.root, "L: the sand · Vs 300 m/s · 5 % damping", {x: 1020, y: 470, size: 30}),
-        K.label(s.root, "TOPL: ten 0.5 m slices of it, from the top", {x: 1020, y: 530, size: 30})];
+      s.scale = note(g, 640, 985, "20 Hz · surface 0.04 in, drawn × 1000 · 30 × slower", {hidden: true});
+      s.code = K.code(s.root, ["L,1,1.6,0.120,2000,1000,0.05,0.05", "TOPL,1,1,1,1,1,1,1,1,1,1"], {x: 1000, y: 230, w: 800, size: 34});
+      s.codeL = [K.label(s.root, "L: the sand · Vs 1,000 ft/s · 5 % damping", {x: 1020, y: 470, size: 30}),
+        K.label(s.root, "TOPL: ten 1.6 ft slices of it, from the top", {x: 1020, y: 530, size: 30})];
       // the check against the exact solution (SOIL, the lesson's SHAKE run) at four SITE frequencies (listing)
       const P = K.plot(s.svg, {x: 1080, y: 230, w: 700, h: 380, xr: [0, 25], yr: [0, 2.5], xticks: [0, 5, 10, 15, 20, 25], yticks: [0, 1, 2],
         xlabel: "frequency (Hz)", ylabel: "surface ÷ bare rock", ylabelOffset: 70});
       s.P = P;
       s.exact = P.line(OUT.f, OUT.amp, {color: C.wave, width: 5});
-      s.dots = [[F01, 1.00], [287 * DF, 2.18], [492 * DF, 1.51], [737 * DF, 2.15]].map(([f, a]) => P.dot(f, a, {color: C.ink, r: 11, hidden: true}));
+      s.dots = [[F01, 1.000], [287 * DF, 2.126], [492 * DF, 1.480], [737 * DF, 2.181]].map(([f, a]) => P.dot(f, a, {color: C.ink, r: 11, hidden: true}));
       s.leg = P.legend([{label: "exact solution", color: C.wave}, {label: "SITE", color: C.ink, dash: "0.1 14"}], {x: 1480, y: 560});
       s.stat = K.stat(s.root, {x: 1080, y: 760, w: 700, value: "0.5", unit: "%", label: "SITE and the exact solution agree within this", color: "var(--good)", vsize: 104});
       s.A = 0;
@@ -458,7 +467,7 @@
         const a = ub(z0), b = ub(z1);
         s.bufP[i][2].setAttribute("d", `M${180 + a},${y0}L${580 + a},${y0}M${180 + b},${y1}L${580 + b},${y1}`);
       });
-      const uB = ub(75);
+      const uB = ub(HB);
       s.dpV.update(300 + uB, BOT, 300 + uB, 950);                       // on rollers: it moves sideways with the base
       s.dpLink.setAttribute("x1", 470 + uB); s.dpLink.setAttribute("x2", 470 + uB);
       s.dpH.update(470 + uB, 918, 565, 918);
@@ -483,39 +492,39 @@
   });
 
   // ---------------------------------------------------------------- 7. what it means: the motion changes with depth
-  // to scale, 36 px per metre; surface motion 1 mm drawn x 1000 = 36 px
-  const DP = 36, DA = 36;
+  // to scale, 11 px per ft; surface motion 0.04 in drawn x 1000 = 37 px
+  const DP = 11, DA = disp(0.04, 1000, DP);
   scenes.push({
     id: "depth", title: "Every layer moves differently",
     build(s) {
       const g = K.g(s.svg);
       s.lo = profile(F01); s.hi = profile(F20);
       s.head = K.heading(s.root, "Every layer moves differently", {x: 120, y: 70});
-      s.col = column(g, {x: 200, y: 220, w: 400, pxm: DP, hsH: 120});         // base 832, rock to 952
-      note(g, 200, 990, "surface 1 mm, drawn × 1000 · time not to scale");
-      // a 10 m x 5 m basement (the size of example 2), outline only
+      s.col = column(g, {x: 200, y: 220, w: 400, pxf: DP, hsH: 120});         // base 825, rock to 945
+      note(g, 200, 990, "surface 0.04 in, drawn × 1000 · time not to scale");
+      // a 32 ft x 16 ft basement (the size of example 2), outline only
       s.bsmt = K.g(g, {hidden: true});
-      K.rect(s.bsmt, 400 - 5 * DP, 220, 10 * DP, 5 * DP, {rx: 4, fill: "rgba(10,17,29,.35)", stroke: C.ssi, "stroke-width": 4, "stroke-dasharray": "12 8"});
+      K.rect(s.bsmt, 400 - 16 * DP, 220, 32 * DP, 16 * DP, {rx: 4, fill: "rgba(10,17,29,.35)", stroke: C.ssi, "stroke-width": 4, "stroke-dasharray": "12 8"});
       halo(K.text(s.bsmt, 400, 296, "basement", {cls: "t-label", anchor: "middle", size: 30, color: "var(--ssi)"}));
-      halo(K.text(s.bsmt, 400, 330, "5 m deep · outline", {cls: "t-small", anchor: "middle", color: "var(--ink2)"}));
-      const P = K.plot(s.svg, {x: 860, y: 220, w: 480, h: 612, xr: [0, 1.1], yr: [17, 0], xticks: [0, 0.5, 1], yticks: [0, 4, 10, 17],
-        yfmt: (v) => v + " m", xlabel: "motion (surface = 1)", ylabel: "depth", ylabelOffset: 86});
+      halo(K.text(s.bsmt, 400, 330, "16 ft deep · outline", {cls: "t-small", anchor: "middle", color: "var(--ink2)"}));
+      const P = K.plot(s.svg, {x: 860, y: 220, w: 480, h: 55 * DP, xr: [0, 1.1], yr: [55, 0], xticks: [0, 0.5, 1], yticks: [0, 16, 55],
+        yfmt: (v) => v + " ft", xlabel: "motion (surface = 1)", ylabel: "depth", ylabelOffset: 86});
       s.P = P;
-      const zs = K.linspace(0, 17, 69);
+      const zs = K.linspace(0, 55, 111);
       s.lLo = P.line(zs.map((z) => mag(s.lo(z))), zs, {color: C.ref, width: 5, draw: true});
       s.lHi = P.line(zs.map((z) => mag(s.hi(z))), zs, {color: C.wave, width: 6, draw: true});
       s.legLo = P.legend([{label: "0.098 Hz", color: C.ref}], {x: 1410, y: 520, size: 30, hidden: true});
       s.legHi = P.legend([{label: "20 Hz", color: C.wave}], {x: 1410, y: 570, size: 30, hidden: true});
-      // annotations at the computed points they name
-      const u0 = mag(s.hi(0)), u4 = mag(s.hi(4));
+      // annotations at the computed points they name (Z13: interface 9 of SITE, 12.8 ft)
+      const Z13 = 12.8, u0 = mag(s.hi(0)), u4 = mag(s.hi(Z13));
       s.cS = K.g(P.g, {hidden: true});
       K.line(s.cS, P.X(u0) + 12, P.Y(0), 1400, P.Y(0) + 14, {stroke: C.ink2, "stroke-width": 2});
       K.text(s.cS, 1410, P.Y(0) + 24, "surface: moves fully", {cls: "t-label", size: 30, color: "var(--ink)"});
       s.c4 = K.g(P.g, {hidden: true});
-      K.circle(s.c4, P.X(u4), P.Y(4), 10, {fill: C.wave, stroke: "#0a111d", "stroke-width": 3});
-      K.line(s.c4, P.X(u4) + 14, P.Y(4), 1400, P.Y(4), {stroke: C.ink2, "stroke-width": 2});
-      K.text(s.c4, 1410, P.Y(4) - 6, "4 m down:", {cls: "t-label", size: 30, color: "var(--ink)"});
-      K.text(s.c4, 1410, P.Y(4) + 32, `almost still (${u4.toFixed(2)})`, {cls: "t-label", size: 30, color: "var(--wave)"});
+      K.circle(s.c4, P.X(u4), P.Y(Z13), 10, {fill: C.wave, stroke: "#0a111d", "stroke-width": 3});
+      K.line(s.c4, P.X(u4) + 14, P.Y(Z13), 1400, P.Y(Z13), {stroke: C.ink2, "stroke-width": 2});
+      K.text(s.c4, 1410, P.Y(Z13) - 6, "13 ft down:", {cls: "t-label", size: 30, color: "var(--ink)"});
+      K.text(s.c4, 1410, P.Y(Z13) + 32, `almost still (${u4.toFixed(2)})`, {cls: "t-label", size: 30, color: "var(--wave)"});
       s.kin = K.card(s.root, {x: 1400, y: 670, w: 430, title: "Kinematic interaction", size: 30,
         body: "a stiff basement averages these motions · lesson 5"});
       s.kin.querySelector(".sv-card-t").style.color = "var(--kin)";
@@ -528,7 +537,7 @@
     beats: [
       {say: "[a]At very low frequency, the whole column moves together, as one block.",
         go(k) { k.show([k.s.head, k.s.P.g]); }, a(k) { k.tween(k.s, {A: 1}, 800); k.draw(k.s.lLo, 1000); k.show(k.s.legLo, {delay: 400}); }},
-      {say: "[b]But at 20 hertz, the surface moves fully, [c]while 4 metres down, the soil is almost still.",
+      {say: "[b]But at 20 hertz, the surface moves fully, [c]while 13 ft down, the soil is almost still.",
         b(k) { k.tween(k.s, {mix: 1}, 1000); k.dim(k.s.lLo, true); k.draw(k.s.lHi, 1000); k.show([k.s.legHi, k.s.cS], {delay: 400}); },
         c(k) { k.show(k.s.c4); }},
       {say: "[k]A stiff basement averages them: that's kinematic interaction, the topic of lesson five.",
@@ -542,7 +551,7 @@
     build(s) {
       s.head = K.heading(s.root, "Recap", {x: 120, y: 80, size: "h1"});
       s.list = K.bullets(s.root, [
-        {t: "Soil layers amplify their own frequencies", sub: "2.2 × the rock at 7.3 Hz"},
+        {t: "Soil layers amplify their own frequencies", sub: "2.2 × the rock at 7.4 Hz"},
         {t: "SITE computes the free field", sub: "every layer, every frequency"},
         {t: "The half-space lets waves leave", sub: "peak 2.2 ×, not 17 × on a rigid base"},
       ], {x: 120, y: 230, w: 900, num: true});

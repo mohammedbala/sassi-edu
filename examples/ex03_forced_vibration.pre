@@ -14,15 +14,15 @@
 *     surface foundation the inverse of the 6 x 6 compliance matrix of the six load cases IS K_G:
 *     two independent routes to the same impedance;
 *   - MOTION for a vibration analysis: the displacement history of the foundation under a
-*     1000 kN Ricker pulse (MOTIONX <resp> = 0), which dies out quickly by radiation damping.
+*     225 kip Ricker pulse (MOTIONX <resp> = 0), which dies out quickly by radiation damping.
 *
-* The model: a rigid, massless 12 m x 12 m square mat (half-width B = 6 m) on a uniform
-* half-space (Vs 200 m/s, nu 1/3, rho 2 t/m3, 2 % damping).  The mat is a grid of 7 x 7
-* interaction nodes tied to the centre node 25 by stiff massless beams ("rigid links").
-* Expected static stiffnesses (Pais & Kausel 1988, R2 B.2; G = 80 000 kPa):
-*     K_z = 7.05 G B = 3.38E6 kN/m      K_x = K_y = 5.52 G B = 2.65E6 kN/m
-*     K_xx = K_yy = 6.00 G B^3 = 1.04E8 kN m/rad      K_zz = 8.31 G B^3 = 1.44E8 kN m/rad
-* The 2 m mesh (6 elements across the mat) is coarse and over-predicts the static stiffness, the
+* The model: a rigid, massless 39 ft x 39 ft square mat (half-width B = 19.5 ft) on a uniform
+* half-space (Vs 650 ft/s, nu 1/3, unit weight 0.125 kcf, 2 % damping).  The mat is a grid of
+* 7 x 7 interaction nodes tied to the centre node 25 by stiff massless beams ("rigid links").
+* Expected static stiffnesses (Pais & Kausel 1988, R2 B.2; G = gamma Vs^2 / g = 1640 ksf):
+*     K_z = 7.05 G B = 2.25E5 kip/ft      K_x = K_y = 5.52 G B = 1.77E5 kip/ft
+*     K_xx = K_yy = 6.00 G B^3 = 7.30E7 kip-ft/rad      K_zz = 8.31 G B^3 = 1.01E8 kip-ft/rad
+* The 6.5 ft mesh (6 elements across the mat) is coarse and over-predicts the static stiffness, the
 * more so for the moments: at 0.2 Hz the computed K_x = K_y and K_z are about 6 % above
 * Pais-Kausel, K_xx = K_yy about 20 % and K_zz about 18 % above (VP-14 shows the convergence
 * with mesh refinement).  The inverse compliance and K_G agree within 0.2 % (the rigid links
@@ -34,15 +34,16 @@
 *   or from the repository root:  .venv/bin/sassi --cwd examples run ex03_forced_vibration.pre
 * Results: examples/ex03/.
 *
-* Units: m, kN, t, s.  Gravity 9.81 m/s2.
+* Units: ft, kip, s.  Gravity 32.2 ft/s2 (HOUSE <gravity>); unit weights in kcf, moduli in ksf.
 * ======================================================================================
 MDL,ex03,ex03
 TIT,Ex03 - rigid square surface foundation, forced vibration and global impedance
 *
 * ---------------------------------------------------------------------- uniform half-space
-* 24 TOPL sublayers of 1 m (4 B deep) of the same soil as the half-space (L 2)
-L,1,1.0,19.62,400,200,0.02,0.02
-L,2,1.0,19.62,400,200,0.02,0.02
+* 24 TOPL sublayers of 3.25 ft (78 ft, 4 B deep) of the same soil as the half-space (L 2):
+* L,<nm>,<thick>,<unit weight>,<Vp>,<Vs>,<pdamp>,<sdamp>; Vs/(5 h) = 40 Hz
+L,1,3.25,0.125,1300,650,0.02,0.02
+L,2,3.25,0.125,1300,650,0.02,0.02
 TOPL,1,1,1,1,1,1,1,1,1,1
 TOPL,1,1,1,1,1,1,1,1,1,1
 TOPL,1,1,1,1
@@ -57,17 +58,18 @@ FREQ,1,205,246,287,328,369,410
 SITE,0,1,0,20,2,0,0,1,2048,1,0,0.005,4096,1
 *
 * ---------------------------------------------------------------------- foundation
-* 7 x 7 interaction nodes, 2 m spacing, numbered row by row; node 25 is the centre
-N,1,-6,-6,0
-N,7,6,-6,0
+* 7 x 7 interaction nodes, 6.5 ft spacing, numbered row by row; node 25 is the centre
+N,1,-19.5,-19.5,0
+N,7,19.5,-19.5,0
 FILL,1,7
-NGEN,6,7,1,7,1,0,2,0
+NGEN,6,7,1,7,1,0,6.5,0
 INT,1,49,1,1
 * K node of the rigid links (above the centre, off the axis of every horizontal link)
-N,50,0,0,5
-* Rigid links: E = 1E5 x G of the soil, massless, square section 2 m x 2 m
-M,1,8.0E9,0.25,0.0,0.0,0.0,1
-R,1,4.0,3.333,3.333,2.25,1.333,1.333
+N,50,0,0,16
+* Rigid links: E = 1E5 x G of the soil (ksf), massless, square section 6.5 ft x 6.5 ft
+* (A 42.25 ft2, shear areas 5/6 A, J 251 ft4, I 148.8 ft4)
+M,1,1.64E8,0.25,0.0,0.0,0.0,1
+R,1,42.25,35.21,35.21,251.0,148.8,148.8
 GROUP,1,BEAMS
 GTIT,1,rigid links
 MACT,1
@@ -79,8 +81,8 @@ FOREACH,RIM,E,#,25,@RIM[#],50
 * no rotation needs to be fixed)
 *
 * ---------------------------------------------------------------------- module options
-POINT,0,0,1.8
-HOUSE,9.81,0,0,2,0,0,0,0,0
+POINT,0,0,5.85
+HOUSE,32.2,0,0,2,0,0,0,0,0
 FORCE,0
 *
 * ---------------------------------------------------------------------- 1. site, point loads, house
@@ -135,12 +137,13 @@ AFWRITE
 RUNANALYS
 *
 * ---------------------------------------------------------------------- 4. MOTION: Ricker pulse
-* Displacement of the mat centre under a vertical 1000 kN Ricker pulse (5 Hz): the vertical
-* load case FILE8003 (EDUOPT,TFFILE) times the load history (THFILE, factor 1000).
+* Displacement of the mat centre under a vertical 225 kip Ricker pulse (5 Hz): the vertical
+* load case FILE8003 (EDUOPT,TFFILE) times the load history (THFILE, factor 225 kips).
+* Peak 0.00069 ft (0.0083 in) at 0.525 s; the static value 225 / K_z is 0.00094 ft (0.0113 in).
 EDUOPT,TFFILE,FILE8003
 * MOTIONX,<f1213>,<resp>: response type 0 = displacement
 MOTIONX,0,0
-MOTION,0,0,0,5,0,0.1,100,301,1000,0,1,0,0,0,0,1,0,0,1
+MOTION,0,0,0,5,0,0.1,100,301,225,0,1,0,0,0,0,1,0,0,1
 THFILE,../data/ricker_5hz.th
 THTIT,Ricker wavelet 5 Hz, peak 1 at t = 0.5 s
 NOUT,3,1,1,0,0,0,1,25

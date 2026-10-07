@@ -228,19 +228,19 @@ def test_soil_column_against_shake_and_lesson2():
         if (o > io) { io = o; fo = f; } if (w > iw) { iw = w; fw = f; }
       }
       const w20 = P.columnWaves(col, 20), u = (z) => C.abs(P.columnU(w20, col, z));
-      return {fs, waves, io, fo, iw, fw, u20: [u(0), u(0.5), u(3.5), u(17)]};""")
-    g = 9.81
-    th, rho = np.array([5.0, 12.0, 1.0]), np.array([19.0, 20.0, 21.0]) / g
-    vs, beta = np.array([300.0, 500.0, 1000.0]), np.array([0.05, 0.04, 0.02])
+      return {fs, waves, io, fo, iw, fw, u20: [u(0), u(1.6), u(12.8), u(55)]};""")
+    g = 32.2                                                    # ft, kip, s
+    th, rho = np.array([16.0, 39.0, 1.0]), np.array([0.120, 0.125, 0.130]) / g
+    vs, beta = np.array([1000.0, 1650.0, 3300.0]), np.array([0.05, 0.04, 0.02])
     E, F = wave_amplitudes(np.array(res["fs"]), th, rho, complex_velocity(rho * vs ** 2, rho, beta))
     Ej = np.array([[complex(*e) for e in w["E"]] for w in res["waves"]])
     Fj = np.array([[complex(*e) for e in w["F"]] for w in res["waves"]])
     assert np.abs(E - Ej).max() < 1e-10 and np.abs(F - Fj).max() < 1e-10
-    # lesson 2: outcrop amplification 2.21 at 7.3 Hz, within ratio 17.1 at 7.2 Hz
-    assert res["io"] == pytest.approx(2.21, abs=0.01) and res["fo"] == pytest.approx(7.3, abs=0.05)
-    assert res["iw"] == pytest.approx(17.1, abs=0.1) and res["fw"] == pytest.approx(7.2, abs=0.05)
-    # lesson 2, SITE listing at 20 Hz: 1 at the surface, 0.98 at 0.5 m, 0.13 at 3.5 m, 0.47 at 17 m
-    assert res["u20"] == pytest.approx([1.0, 0.98, 0.13, 0.47], abs=0.006)
+    # lesson 2: outcrop amplification 2.16 at 7.4 Hz, within ratio 17.1 at 7.3 Hz
+    assert res["io"] == pytest.approx(2.163, abs=0.01) and res["fo"] == pytest.approx(7.45, abs=0.05)
+    assert res["iw"] == pytest.approx(17.07, abs=0.1) and res["fw"] == pytest.approx(7.31, abs=0.05)
+    # lesson 2, SITE listing at 20 Hz: 1 at the surface, 0.980 at 1.6 ft, 0.088 at 12.8 ft, 0.370 at 55 ft
+    assert res["u20"] == pytest.approx([1.0, 0.98, 0.088, 0.37], abs=0.006)
 
 
 @needs_node
@@ -262,8 +262,8 @@ def test_interpolation_and_critfreq_against_motion_module():
       const DF = 1 / (8192 * 0.005), out = {};
       const sets = {lesson: [4,20,41,61,82,102,123,143,164,184,205,225,246,287,328,369,410,492,573,655,737,819],
                     coarse: [4,41,82,123,164,205,287,369,492,655,819]};
-      const modes = {"2": [{f: 3.49, beta: 0.052, P: 1.34}, {f: 13.0, beta: 0.10, P: -0.34}],
-                     "3": [{f: 3.49, beta: 0.052, P: 1.0}, {f: 4.6, beta: 0.04, P: 0.34}, {f: 13.0, beta: 0.10, P: -0.34}]};
+      const modes = {"2": [{f: 3.47, beta: 0.052, P: 1.34}, {f: 13.0, beta: 0.10, P: -0.34}],
+                     "3": [{f: 3.47, beta: 0.052, P: 1.0}, {f: 4.6, beta: 0.04, P: 0.34}, {f: 13.0, beta: 0.10, P: -0.34}]};
       for (const m of ["2", "3"]) for (const s of ["lesson", "coarse"]) {
         const fu = sets[s].map((n) => n * DF), Hu = fu.map((f) => P.modalTF(f, modes[m]));
         const fi = []; for (let q = 0; q <= 819; q++) fi.push(q * DF);
@@ -278,9 +278,9 @@ def test_interpolation_and_critfreq_against_motion_module():
         Hp = interpolate_tf(fu, Hu, fi, option=1, h0=1.0)
         Hj = np.array([complex(*h) for h in v["Hi"]])
         assert np.abs(Hp - Hj).max() < 1e-8 * np.abs(Hp).max(), key
-    # lesson 10, experiment 1: the coarse set misses 3.49 Hz, the 2-DOF interpolant recovers the peak, CRITFREQ flags it
+    # lesson 10, experiment 1: the coarse set misses 3.47 Hz, the 2-DOF interpolant recovers the peak, CRITFREQ flags it
     c = res["2coarse"]["crit"]
-    assert [q["n"] for q in c if q["flag"]] == [143] and c[0]["d"] > 150
+    assert [q["n"] for q in c if q["flag"]] == [142] and c[0]["d"] > 150
     assert not [q for q in res["2lesson"]["crit"] if q["flag"]]
 
 
@@ -295,7 +295,7 @@ def test_masing_loops_against_hysteresis_module():
       const hy = P.hyperbolic(1, 0.1);
       return {{bb, xi: amps.map((a) => P.masing(pl, a).xi), ratio: amps.map((a) => P.masing(pl, a).ratio),
               hyp: [0.01, 0.1, 1].map((g) => P.masing(hy, g).xi), gr: P.sandRefStrain()}};""")
-    g, v, yi = bbcgen_curve(12472, 3742, 3742 / 8.31e-5)
+    g, v, yi = bbcgen_curve(2821, 846, 846 / 8.82e-5)
     assert np.allclose(res["bb"]["xs"], g, rtol=1e-12) and np.allclose(res["bb"]["ys"], v, rtol=1e-12)
     bk = Backbone(g, v, yi)
     for a, xi, r in zip(amps, res["xi"], res["ratio"]):
@@ -319,9 +319,9 @@ def test_ssi_oscillator_and_impedance_numbers():
     b = 0.05
     # fixed base: Theory Eq. 2.5, |H|max = 1/(2 beta sqrt(1 - beta^2)) at f1 sqrt(1 - 2 beta^2)
     assert res["fb"]["amp"] == pytest.approx(1 / (2 * b * np.sqrt(1 - b * b)), rel=1e-4)
-    assert res["fb"]["f"] == pytest.approx(5.054 * np.sqrt(1 - 2 * b * b), abs=0.002)
+    assert res["fb"]["f"] == pytest.approx(4.987 * np.sqrt(1 - 2 * b * b), abs=0.002)
     # on the springs: the Veletsos-Meek estimate of lesson 4 (about 3.9 Hz) for a massless mat
-    assert res["vm"] == pytest.approx(3.93, abs=0.01)
+    assert res["vm"] == pytest.approx(3.90, abs=0.01)
     assert res["massless"]["f"] == pytest.approx(res["vm"], rel=0.01) and res["ssi"]["f"] == pytest.approx(3.9, abs=0.05)
     assert 0.04 < res["ssi"]["zeta"] < 0.07                       # about 5 %, as lesson 1 finds
     assert res["stiff"]["f"] == pytest.approx(res["fb"]["f"], abs=0.01)   # a rigid site is a fixed base
