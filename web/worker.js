@@ -9,6 +9,11 @@
  * the request queued (RUN<MODULE>, VERIFY) are run by Bridge.run_pending.  While Python is busy the worker
  * cannot answer, so the bridge pushes the new events and the job output to the page ({push}).
  *
+ * Python kept between visits: the files Pyodide fetches (the runtime's WebAssembly, the standard library, NumPy,
+ * SciPy and their libraries) are read from and stored in the Cache Storage of the site ("sassi-edu-pyodide-<version>",
+ * the cache web/sw.js fills too) by keptFetch, so a later visit downloads none of them -- also in a browser where
+ * the service worker does not run.  info.cache reports what came from this computer and what was downloaded.
+ *
  * Files kept between visits: the workspace and the settings folder are IndexedDB file systems (Emscripten
  * IDBFS): restored before the session starts, saved at most every SAVE_DELAY ms after a request that may
  * write (not GET) or a job, and when the page is hidden or closed ({type: "flush"}).  File > Clear Saved Files
@@ -19,6 +24,8 @@
 const PYODIDE_VERSION = "314.0.7";
 const PYODIDE_URL = `https://cdn.jsdelivr.net/pyodide/v${PYODIDE_VERSION}/full/`;
 const BUILD = "__SASSI_BUILD__";
+const ZIP_V = "__ZIP_V__";                     // web/build.py: the version (content hash) of web/sassi-edu.zip
+const PY_CACHE = `sassi-edu-pyodide-${PYODIDE_VERSION}`;
 const ROOT = "/home/pyodide/sassi-edu";        // the unpacked bundle (sassi/, docs/, examples/, README.md)
 const WORK = "/home/pyodide/work";             // the workspace (sassi.web.bridge.WORK_DIR)
 const SETTINGS = "/home/pyodide/.sassi-edu";   // SASSIini.xml, SASSIdb.xml, SASSIani.xml (bridge.SETTINGS_DIR)
@@ -31,6 +38,37 @@ const early = [];                              // requests that arrived before P
 let timer = null;
 
 function status(text, fraction) { self.postMessage({type: "status", text, fraction}); }
+
+// ------------------------------------------------------------------ Python kept between visits (Cache Storage)
+const fetched = {kept: 0, keptBytes: 0, downloaded: 0, downloadedBytes: 0, storable: typeof caches !== "undefined"};
+const networkFetch = self.fetch.bind(self);
+const sizeOf = (res) => Number(res.headers.get("content-length")) || 0;
+/** fetch for the Pyodide files: the stored copy when there is one, else the network (and the copy is stored).
+ *  Other requests, and a browser without Cache Storage (a private window may refuse it), use the network. */
+async function keptFetch(input, init) {
+  const url = typeof input === "string" ? input : (input && input.url) || String(input);
+  const method = (init && init.method) || (input && input.method) || "GET";
+  if (!fetched.storable || method !== "GET" || !url.startsWith(PYODIDE_URL)) return networkFetch(input, init);
+  let cache = null;
+  try {
+    cache = await caches.open(PY_CACHE);
+    const hit = await cache.match(url);
+    if (hit) { fetched.kept += 1; fetched.keptBytes += sizeOf(hit); return hit; }
+  } catch (err) {
+    fetched.storable = false;
+  }
+  const res = await networkFetch(input, init);
+  fetched.downloaded += 1;
+  fetched.downloadedBytes += sizeOf(res);
+  if (cache && res.ok && res.status === 200) cache.put(url, res.clone()).catch(() => {});
+  return res;
+}
+self.fetch = keptFetch;
+/** Number of Pyodide files an earlier visit stored (0 without Cache Storage). */
+async function storedCount() {
+  try { return fetched.storable && (await caches.has(PY_CACHE)) ? (await (await caches.open(PY_CACHE)).keys()).length : 0; }
+  catch (err) { return 0; }
+}
 
 self.onmessage = (ev) => {
   const m = ev.data || {};
@@ -114,7 +152,10 @@ function fatal(err, what) {
 
 async function start() {
   const t0 = performance.now();
-  status(`Loading the Python runtime (Pyodide ${PYODIDE_VERSION}) ...`, 0.05);
+  const stored = await storedCount();
+  const where = stored >= 4 ? " from this computer" : "";
+  status(stored >= 4 ? `Starting the Python runtime (Pyodide ${PYODIDE_VERSION}) from this computer ...`
+    : `Downloading the Python runtime (Pyodide ${PYODIDE_VERSION}; first visit) ...`, 0.05);
   let loadPyodide;
   try {
     ({loadPyodide} = await import(`${PYODIDE_URL}pyodide.mjs`));
@@ -122,10 +163,10 @@ async function start() {
     throw new Error(`Pyodide could not be loaded from ${PYODIDE_URL} (${err.message || err})`);
   }
   const py = await loadPyodide({indexURL: PYODIDE_URL});
-  status("Loading NumPy and SciPy ...", 0.3);
+  status(stored >= 4 ? `Loading NumPy and SciPy${where} ...` : "Downloading NumPy and SciPy (first visit) ...", 0.3);
   await py.loadPackage(["numpy", "scipy"], {messageCallback: () => {}});
   status("Loading SASSI-EDU ...", 0.85);
-  const url = new URL(`sassi-edu.zip?v=${BUILD}`, self.location.href);
+  const url = new URL(`sassi-edu.zip?v=${ZIP_V}`, self.location.href);
   const r = await fetch(url);
   if (!r.ok) throw new Error(`${url.pathname}: HTTP ${r.status}`);
   py.unpackArchive(await r.arrayBuffer(), "zip", {extractDir: ROOT});
@@ -154,7 +195,9 @@ json.dumps({"python": sys.version.split()[0], "numpy": numpy.__version__, "scipy
             "sassi": sassi.__version__, "kept": {"files": n, "bytes": size}})
 `));
   info.kept.on = kept;
+  info.cache = Object.assign({storedBefore: stored}, fetched);
   info.pyodide = PYODIDE_VERSION;
+  info.build = BUILD;
   info.seconds = (performance.now() - t0) / 1000;
   // what the worker downloaded (bytes over the network: 0 when the browser cache had the file)
   info.downloads = performance.getEntriesByType("resource").map((e) => ({

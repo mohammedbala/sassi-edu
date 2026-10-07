@@ -2304,7 +2304,8 @@ after an analysis Load Frame Data was empty; a deformed shape needed `HARMFRAME`
 hand (only the lessons' Animate buttons did it). Finally the user asked for plots and results beside the work
 instead of a tab in front of it, and found that files did not work like a desktop program in the browser version:
 the workspace was lost on a reload, a file of the visitor's computer had to be uploaded in a separate step, and
-Output and Export Table wrote into the browser's workspace only.
+Output and Export Table wrote into the browser's workspace only. Then the user found that the browser version
+still downloaded its packages when opened again.
 
 | ID | Subject | Decision | Evidence |
 |---|---|---|---|
@@ -2318,6 +2319,7 @@ Output and Export Table wrote into the browser's workspace only.
 | D-W6-08 | Browser workspace kept | `web/worker.js` mounts `/home/pyodide/work` and `/home/pyodide/.sassi-edu` on IDBFS, restores them before the session starts and saves at most 1 s after a non-GET request or a job, and at once when the page is hidden or closed; without IndexedDB the files stay in memory. File > Clear Saved Files (web) terminates the worker, deletes the two databases and reloads; the course progress and the stored app files stay. The models in memory are not kept (Model > Save, Output) | `tests/unit/test_split_view_web_files.py`; browser check: 176 files (11.8 MB) of example 1 restored, ready in 6.4 s |
 | D-W6-09 | Files of the visitor's computer | Every file dialog of the browser version (`D.pickFile`, not folder pickers or Download) has **From your computer…**: text files (at most 8 MB, no NUL in the first 4 kB) copied into the folder shown and the first selected, so Model > Input, File > Open and the file fields read the visitor's decks in one step | `tests/unit/test_split_view_web_files.py` |
 | D-W6-10 | Downloads | In the browser version Model > Output (WRITE) and Export Table also download the file they wrote (`GET /api/file`), as Export to ANSYS and Export Image already did | `tests/unit/test_split_view_web_files.py` |
+| D-W6-11 | Downloads kept | The browser version downloads Python, NumPy, SciPy and the site once: `web/worker.js` reads and fills the Pyodide Cache Storage itself (`keptFetch`; also without a service worker); the site's scripts, style sheets and bundle carry the hash of their own content in their URL, and the service worker stores at install the page and every file of the build it lacks and drops files no longer listed in its manifest, so a deployment re-downloads only the changed files. The loading panel and the Command History report what the start downloaded | user report; `tests/unit/test_web.py`; Chrome: offline second visit in 3.0 s, no server request; Claude browser pane (no service worker): 22.8 MB from Cache Storage |
 ---
 
 ## 8. Implementation order and acceptance gates (informative)

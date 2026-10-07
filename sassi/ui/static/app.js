@@ -903,6 +903,9 @@ const SASSI = (() => {
     S.lastEvent = S.state.events;
     P().restorePlots(S.state.plots);
     if (S.state.job) { onJobEvent(S.state.job); S.openJobTab(S.state.job); }
+    // browser version: how Python started (web/boot.js) -- from this computer, or what was downloaded
+    const web = window.SASSI_WEB;
+    if (S.web && web && web.readyTime) S.local("LOCAL", `Python ready in ${web.readyTime.toFixed(1)} s. ${web.startNote || ""}`.trim());
     S.updateToolbars();
     S.status("Ready");
     if (S.web) S.local("INFO", "SASSI-EDU in the browser: Python runs in this tab (Pyodide). The workspace " +

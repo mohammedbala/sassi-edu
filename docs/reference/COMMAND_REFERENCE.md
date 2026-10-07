@@ -1,6 +1,6 @@
 # SASSI-EDU Command Reference
 
-> Generated on 2026-10-06 by `python -m sassi.verify.report --commands-only` from the command catalogue of the interpreter (`sassi/prep/registry.py`) and the docstrings of the command handlers (`sassi/prep/commands/`). Do not edit by hand.
+> Generated on 2026-10-07 by `python -m sassi.verify.report --commands-only` from the command catalogue of the interpreter (`sassi/prep/registry.py`) and the docstrings of the command handlers (`sassi/prep/commands/`). Do not edit by hand.
 
 Every command of the ACS SASSI V3 manual and of the SASSI-EDU dialect is listed with its syntax, its documented abbreviation or alias, its priority tier and whether this build implements it. The rules of the command language (comma-separated fields, blank fields take defaults, `*` comment lines, abbreviations, variables and loops) are explained in the [User Guide](../user/USER_GUIDE.md#4-the-command-language); the normative detail of every command is in [requirements section 3](../spec/00_requirements.md) and the manual-derived specifications `docs/spec/07` to `11`.
 

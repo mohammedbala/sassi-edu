@@ -950,12 +950,14 @@ Python runs in the page itself: [Pyodide](https://pyodide.org) (CPython compiled
 NumPy and SciPy) in a Web Worker runs the same `sassi` package, the same API and the same front end as
 `sassi-gui`. No server computes anything and nothing you type leaves your computer.
 
-* **First start.** The first visit downloads about 27 MB (Python, NumPy, SciPy, Plotly.js and SASSI-EDU).
-  A service worker (`sw.js`) keeps all of it on your computer, so the next visits download nothing --
-  the site even works offline -- and only start Python (a few seconds). A new version of the site
-  replaces only the SASSI-EDU files; Python, NumPy and SciPy stay stored. A progress panel shows what is
-  loading (and whether it comes from this computer), with the disclaimer. A current desktop browser
-  (Chrome, Edge, Firefox, Safari) is needed; in a private window the files are not kept.
+* **First start.** The first visit downloads about 27 MB (Python, NumPy, SciPy, Plotly.js and SASSI-EDU)
+  and keeps it on your computer, so the next visits download nothing -- the site even works offline -- and
+  only start Python (about 3 s). Python, NumPy and SciPy are kept by the Python engine itself, also in a
+  browser where the site's service worker cannot run. A new version of the site downloads only the files
+  that changed (usually the SASSI-EDU bundle, about 2 MB). A progress panel shows what is loading, with the
+  disclaimer; the Command History then says how Python started ("came from this computer: nothing was
+  downloaded", or what was downloaded). A current desktop browser (Chrome, Edge, Firefox, Safari) is
+  needed; a private window may refuse to keep files, and then downloads them at every visit.
 * **Same course and tools.** The Learn tab, the lessons with their module runs, the examples, plots,
   Help (with the formulas and figures), the command explainer, the Options dialogs and Command Entry
   work as described above. Module runs show their listing and the status-bar progress while they run.

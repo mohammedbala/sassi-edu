@@ -32,11 +32,19 @@ virtual environment has both):
 It prints the size of the site (about 7.7 MB: Plotly.js 4.8 MB, the Python bundle `web/sassi-edu.zip`
 1.9 MB, KaTeX 0.6 MB; about 3.9 MB over the network, as GitHub Pages compresses text files). Visitors
 also download Pyodide, NumPy and SciPy from cdn.jsdelivr.net at their first visit (23 MB compressed,
-32 MB unpacked): about 27 MB in all. The service worker `sw.js` (from `web/sw.js`, written at the site
-root so that its scope is the whole site) keeps these files in the browser's Cache Storage: the Pyodide
-files in `sassi-edu-pyodide-<version>` (kept across deployments), the site's files in
-`sassi-edu-site-<build>` (replaced by the next build). Visits after the first download nothing and work
-offline; `web/boot.js` waits for the service worker on the first visit so the one download is stored.
+32 MB unpacked): about 27 MB in all. They are downloaded once:
+
+* **Python.** The Python engine (`web/worker.js`) reads the Pyodide files (the WebAssembly runtime, the
+  standard library, NumPy, SciPy and their libraries) from the browser's Cache Storage
+  (`sassi-edu-pyodide-<version>`, kept across deployments) and stores what it downloads there -- also in a
+  browser where the service worker cannot run (a private window that refuses storage downloads them at
+  every visit). The loading panel and the Command History say what the start downloaded.
+* **The site.** Every script, style sheet and the bundle carry the hash of their own content in their URL
+  (`?v=<hash>`, `web/build.py`). The service worker `sw.js` (from `web/sw.js`, at the site root so that its
+  scope is the whole site) keeps them in `sassi-edu-site`: at its install it stores the page and every file
+  of the build it does not have yet, so a new deployment downloads only the files that changed (typically
+  the bundle and the two small boot scripts, not Plotly.js); files of earlier builds are deleted (its
+  manifest lists the current ones). Visits after the first download nothing and work offline.
 
 The front end `sassi/ui/static/` is copied with its subfolders: `katex/` and `examples/`, the pictures of
 the examples gallery (eight PNGs, about 50 kB, written by `python -m sassi.ui.thumbnails`; regenerate them

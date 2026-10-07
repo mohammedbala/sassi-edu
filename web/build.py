@@ -20,8 +20,10 @@ The site (see ``web/README.md`` and ``docs/internal/web_version.md``)::
 Never bundled: ``reference/`` (the ACS SASSI manual text), ``docs/spec/``, ``docs/internal/``, ``tests/``,
 ``examples/sassi-course/`` (the course workspaces of local GUI runs), virtual environments and caches --
 :data:`FORBIDDEN` is checked for every file written.  The build is reproducible (sorted files, fixed zip
-time stamps); its id (a hash of the content) is put into the URLs of the page so that a browser never mixes
-files of two builds.
+time stamps).  Every script, style sheet and the bundle carry the hash of their own content in their URL
+(``?v=<hash>``): a browser never mixes files of two builds, and after a new deployment it downloads only the
+files that changed -- the service worker (web/sw.js) keeps the others (its manifest lists the current URLs).
+The build id (a hash of everything) names the build.
 """
 from __future__ import annotations
 
@@ -29,6 +31,7 @@ import argparse
 import hashlib
 import importlib.util
 import io
+import json
 import re
 import shutil
 import sys
@@ -117,9 +120,15 @@ def plotly_js() -> Path:
     return p
 
 
-def page(build_id: str) -> str:
-    """``index.html`` of the site: the GUI page without the session token, with web/boot.js first and the build
-    id on every local URL."""
+def file_version(data: bytes) -> str:
+    """The version of one file of the site in its URL: a hash of its content (it changes only with the file)."""
+    return hashlib.sha256(data).hexdigest()[:10]
+
+
+def page(build_id: str, versions: Dict[str, str] = None) -> str:
+    """``index.html`` of the site: the GUI page without the session token, with web/boot.js first and the version
+    of each file (``versions``: site path -> hash; the build id for a path without one) on every local URL."""
+    versions = versions or {}
     html = (STATIC / "index.html").read_text(encoding="utf-8")
     html, n = re.subn(r'\s*<meta name="sassi-token" content="\{\{TOKEN\}\}">', "", html)
     if n != 1:
@@ -129,9 +138,10 @@ def page(build_id: str) -> str:
             'method) with a guided course, examples and plots; Python runs in your browser.">')
     html = html.replace('<meta name="viewport" content="width=device-width, initial-scale=1">',
                         '<meta name="viewport" content="width=device-width, initial-scale=1">' + head, 1)
-    html = re.sub(r'((?:src|href)="static/[^"?]+)"', lambda m: f'{m.group(1)}?v={build_id}"', html)
+    html = re.sub(r'((?:src|href)=")(static/[^"?]+)"',
+                  lambda m: f'{m.group(1)}{m.group(2)}?v={versions.get(m.group(2), build_id)}"', html)
     first = html.index('<script src="static/')
-    html = html[:first] + f'<script src="web/boot.js?v={build_id}"></script>\n' + html[first:]
+    html = html[:first] + f'<script src="web/boot.js?v={versions.get("web/boot.js", build_id)}"></script>\n' + html[first:]
     if "{{" in html or 'src="/' in html or 'href="/' in html:
         raise BuildError("index.html: a placeholder or a root-absolute URL is left")
     return html
@@ -169,20 +179,39 @@ def build(out: Path = DEFAULT_OUT) -> Dict[str, object]:
         dest.write_bytes(data)
         written[name] = len(data)
 
-    put("index.html", page(build_id).encode("utf-8"))
+    # the version of every file in its URL: the bundle, then worker.js (which names the bundle's version), then
+    # boot.js (which names worker.js's), the front-end files
+    versions: Dict[str, str] = {name: file_version(p.read_bytes()) for name, p in statics}
+    versions["web/sassi-edu.zip"] = file_version(zbytes)
+    worker = (WEB / "worker.js").read_text(encoding="utf-8").replace("__SASSI_BUILD__", build_id)
+    worker = worker.replace("__ZIP_V__", versions["web/sassi-edu.zip"]).encode("utf-8")
+    versions["web/worker.js"] = file_version(worker)
+    boot = (WEB / "boot.js").read_text(encoding="utf-8").replace("__SASSI_BUILD__", build_id)
+    boot = boot.replace("__WORKER_V__", versions["web/worker.js"]).encode("utf-8")
+    versions["web/boot.js"] = file_version(boot)
+    html = page(build_id, versions)
+    for left in ("__SASSI_BUILD__", "__ZIP_V__", "__WORKER_V__"):
+        if left.encode() in worker + boot:
+            raise BuildError(f"web/boot.js or web/worker.js: {left} left")
+    put("index.html", html.encode("utf-8"))
     put(".nojekyll", b"")
     for name, p in statics + images:
         put(name, p.read_bytes())
-    for name in ("boot.js", "worker.js"):
-        text = (WEB / name).read_text(encoding="utf-8").replace("__SASSI_BUILD__", build_id)
-        put("web/" + name, text.encode("utf-8"))
+    put("web/boot.js", boot)
+    put("web/worker.js", worker)
     # the service worker at the root of the site (its scope is the folder it is served from): it keeps the
-    # files of the app on the visitor's computer (web/sw.js)
+    # files of the app on the visitor's computer (web/sw.js); its manifest is the list of the versioned URLs of
+    # this build -- what an earlier build stored and this one no longer uses is deleted
+    manifest = sorted(f"{name}?v={v}" for name, v in versions.items()
+                      if name.startswith("web/") or f'"{name}?v={v}"' in html)
     sw = (WEB / "sw.js").read_text(encoding="utf-8")
-    put("sw.js", sw.replace("__SASSI_BUILD__", build_id).replace("__PYODIDE_VERSION__", pyodide_version()).encode("utf-8"))
+    sw = (sw.replace("__SASSI_BUILD__", build_id).replace("__PYODIDE_VERSION__", pyodide_version())
+          .replace("__SASSI_MANIFEST__", json.dumps(manifest, indent=0).replace("\n", "")))
+    put("sw.js", sw.encode("utf-8"))
     put("web/sassi-edu.zip", zbytes)
     total = sum(written.values())
-    return {"out": str(out), "build": build_id, "files": sorted(written), "bytes": total, "zip_bytes": len(zbytes),
+    return {"out": str(out), "build": build_id, "versions": versions, "manifest": manifest,
+            "files": sorted(written), "bytes": total, "zip_bytes": len(zbytes),
             "zip_files": len(rels), "sizes": written}
 
 

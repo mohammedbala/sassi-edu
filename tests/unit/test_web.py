@@ -241,14 +241,20 @@ def test_site_page_references_exist(site):
     refs = re.findall(r'(?:src|href)="([^"]+)"', html)
     assert refs and not [r for r in refs if r.startswith(("/", "http"))]                # relative URLs only
     for r in refs:
-        assert (out / r.split("?")[0]).is_file(), r
-        assert r.endswith(f"?v={summary['build']}"), r                                  # cache busting
+        path, _, v = r.partition("?v=")
+        assert (out / path).is_file(), r
+        # each file carries the hash of its own content: a new deployment re-downloads only what changed
+        assert v and v == summary["versions"][path] == _load_build().file_version((out / path).read_bytes()), r
     assert html.index("web/boot.js") < html.index("static/plotly.min.js") < html.index("static/app.js")
     boot = (out / "web" / "boot.js").read_text(encoding="utf-8")
     worker = (out / "web" / "worker.js").read_text(encoding="utf-8")
     assert "__SASSI_BUILD__" not in boot + worker and summary["build"] in boot and summary["build"] in worker
-    assert 'new Worker(`web/worker.js?v=${BUILD}`, {type: "module"})' in boot
-    assert "sassi-edu.zip?v=${BUILD}" in worker and "cdn.jsdelivr.net/pyodide/v${PYODIDE_VERSION}" in worker
+    assert 'new Worker(`web/worker.js?v=${WORKER_V}`, {type: "module"})' in boot
+    assert f'const WORKER_V = "{summary["versions"]["web/worker.js"]}";' in boot
+    assert "sassi-edu.zip?v=${ZIP_V}" in worker and "cdn.jsdelivr.net/pyodide/v${PYODIDE_VERSION}" in worker
+    assert f'const ZIP_V = "{summary["versions"]["web/sassi-edu.zip"]}";' in worker
+    for name in ("web/worker.js", "web/sassi-edu.zip", "web/boot.js"):
+        assert summary["versions"][name] == _load_build().file_version((out / name).read_bytes()), name
     assert 'PYODIDE_VERSION = "314.0.7"' in worker and 'PYODIDE_VERSION = "314.0.7"' in boot
     css = (out / "static" / "katex" / "katex.min.css").read_text(encoding="utf-8")
     for font in set(re.findall(r"url\((fonts/[^)]+)\)", css)):
@@ -292,7 +298,13 @@ def test_site_service_worker_keeps_the_app_on_the_computer(site):
     assert f'const BUILD = "{summary["build"]}";' in sw
     version = re.search(r'const PYODIDE_VERSION = "([0-9.]+)"', (WEB / "worker.js").read_text(encoding="utf-8")).group(1)
     assert f'const PYODIDE_VERSION = "{version}";' in sw
-    assert "sassi-edu-pyodide-${PYODIDE_VERSION}" in sw and "sassi-edu-site-${BUILD}" in sw
+    assert "sassi-edu-pyodide-${PYODIDE_VERSION}" in sw and 'const SITE_CACHE = "sassi-edu-site";' in sw
+    # the manifest: every versioned URL of the page and of the web scripts, nothing else
+    manifest = json.loads(re.search(r"const MANIFEST = new Set\((\[.*?\])\);", sw).group(1))
+    html = (out / "index.html").read_text(encoding="utf-8")
+    page_refs = sorted(r for r in re.findall(r'(?:src|href)="([^"]+)"', html) if "?v=" in r)
+    assert set(page_refs) <= set(manifest) and manifest == summary["manifest"]
+    assert {f"{n}?v={summary['versions'][n]}" for n in ("web/worker.js", "web/sassi-edu.zip", "web/boot.js")} <= set(manifest)
     boot = (out / "web" / "boot.js").read_text(encoding="utf-8")
     assert 'navigator.serviceWorker.register("sw.js", {scope: "./"})' in boot
     assert f'const PYODIDE_VERSION = "{version}";' in boot          # boot.js reads the same Pyodide cache name
@@ -348,3 +360,24 @@ def test_bundle_in_pyodide(site):
     assert r.returncode == 0 and res["ok"], res["failures"]
     assert res["plots"] > 0 and [j["line"] for j in res["jobs"]][:5] == ["RUNSITE", "RUNPOINT", "RUNHOUSE",
                                                                          "RUNANALYS", "RUNMOTION"]
+
+
+def test_downloads_are_kept_without_the_service_worker_too():
+    """Python is downloaded once (requirements D-W6-11): the worker reads and fills the Pyodide cache itself (the
+    service worker may not run, e.g. in an embedded browser), under the cache name the service worker uses; the
+    service worker stores the page and the build's missing files at install and prunes to its manifest."""
+    worker = (WEB / "worker.js").read_text(encoding="utf-8")
+    sw = (WEB / "sw.js").read_text(encoding="utf-8")
+    assert "self.fetch = keptFetch;" in worker and "url.startsWith(PYODIDE_URL)" in worker
+    assert "const PY_CACHE = `sassi-edu-pyodide-${PYODIDE_VERSION}`;" in worker
+    assert "const PY_CACHE = `sassi-edu-pyodide-${PYODIDE_VERSION}`;" in sw            # one copy of the files
+    assert worker.index("self.fetch = keptFetch;") < worker.index("import(`${PYODIDE_URL}pyodide.mjs`)")
+    assert "info.cache = Object.assign({storedBefore: stored}, fetched);" in worker
+    install = sw[sw.index('self.addEventListener("install"'):sw.index('self.addEventListener("activate"')]
+    assert "want.filter((u) => u === page || !have.has(u))" in install and "ev.waitUntil(" in install
+    assert "!MANIFEST.has(u.pathname.slice(SCOPE.length) + u.search)" in sw
+    boot = (WEB / "boot.js").read_text(encoding="utf-8")
+    assert "note.textContent = !window.caches ? NO_STORE : stored >= 4 ? FROM_CACHE : FIRST_VISIT;" in boot
+    assert "nothing was downloaded" in boot and "window.SASSI_WEB.startNote = note.textContent;" in boot
+    app = (STATIC / "app.js").read_text(encoding="utf-8")
+    assert 'S.local("LOCAL", `Python ready in ${web.readyTime.toFixed(1)} s. ${web.startNote || ""}`.trim());' in app

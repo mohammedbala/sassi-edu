@@ -162,7 +162,9 @@ def test_web_build_ships_figures(tmp_path):
     summary = b.build(out)
     assert "static/figures.js" in summary["files"]
     assert (out / "static" / "figures.js").read_bytes() == FIGJS.read_bytes()
-    assert f'src="static/figures.js?v={summary["build"]}"' in (out / "index.html").read_text(encoding="utf-8")
+    v = b.file_version(FIGJS.read_bytes())                     # the version of the file itself (D-W6-11)
+    assert summary["versions"]["static/figures.js"] == v
+    assert f'src="static/figures.js?v={v}"' in (out / "index.html").read_text(encoding="utf-8")
     shutil.rmtree(out, ignore_errors=True)
 
 

@@ -130,3 +130,21 @@ sassi/web/bridge.py  -- Bridge(push): GuiSession(web mode) + route() + run_pendi
   computer…**: text files (<= 8 MB, no NUL in the first 4 kB) copied into the folder shown (`POST
   /api/file`), the first selected. Model > Output and Export Table download the file they wrote
   (`GET /api/file`), as Export to ANSYS already did.
+
+## Downloads kept (2026-10-06)
+
+The user still saw downloads at every start. Measured with Chrome (persistent profile, network blocked on
+the second visit): the service worker worked for an unchanged build, but (1) every deployment changed the one
+build id in every URL, so all site files (Plotly.js 4.8 MB, the bundle ...) were downloaded again, and the
+per-build site cache was dropped; (2) a browser without a working service worker (the Claude app's browser
+pane refuses it; Safari may not route a module worker's requests through it) kept nothing, and the loading
+panel then said "the first visit downloads about 27 MB" at every start; (3) the page's scripts of the first
+visit were loaded before the service worker ran, so an offline second visit failed where the HTTP cache did
+not keep them. Now: per-file versions (`?v=<content hash>`, `web/build.py` `file_version`, the manifest in
+`sw.js`); one site cache `sassi-edu-site`, filled at install with the files it lacks and pruned to the
+manifest at activation; `web/worker.js` `keptFetch` reads and fills the Pyodide cache itself; `info.cache`
+(kept / downloaded files and bytes) drives the panel's note and a Command History line. Checked: second
+visit offline in 3.0 s with no request to the server; after a build changing styles.css only, the page,
+styles.css and the two boot scripts were fetched; in the Claude browser pane (no service worker) the second
+start took the 5 Pyodide files (22.8 MB) from Cache Storage.
+

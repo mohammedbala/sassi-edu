@@ -17,7 +17,8 @@
 
 (function () {
   const PYODIDE_VERSION = "314.0.7";
-  const BUILD = "__SASSI_BUILD__";            // web/build.py: a hash of the bundle (cache busting)
+  const BUILD = "__SASSI_BUILD__";            // web/build.py: a hash of the whole site (its name)
+  const WORKER_V = "__WORKER_V__";             // web/build.py: the version (content hash) of web/worker.js
   const DISCLAIMER = "SASSI-EDU is an educational re-implementation of the ACS SASSI soil-structure-interaction " +
     "methodology. It is not affiliated with or endorsed by ACS SASSI or its vendor, and it is not qualified for " +
     "design or licensing work.";
@@ -70,8 +71,8 @@
     "and keeps it on this computer: the next visits start without downloading anything.";
   const FROM_CACHE = "Loading from this computer: an earlier visit stored the Python runtime, NumPy, SciPy and " +
     "SASSI-EDU, so nothing is downloaded. Starting Python still takes a few seconds.";
-  const NO_SW = "The first visit downloads about 27 MB (the Python runtime, NumPy, SciPy, Plotly and SASSI-EDU); the " +
-    "browser caches it for the next visits.";
+  const NO_STORE = "This browser does not let the site keep files (a private window?): Python, NumPy and SciPy " +
+    "(about 25 MB) are downloaded at every visit.";
   card.append(node("h1", "", "SASSI-EDU — soil-structure interaction in your browser"),
     node("p", "sub", "The guided course, the examples, the plots and Help of the SASSI-EDU GUI, with Python running in this tab."),
     stage, bar, time, note,
@@ -185,11 +186,13 @@
     setStage("Preparing ...", 0.01);
     (async () => {
       const [sw, stored] = await Promise.all([serviceWorker(), storedFiles()]);
-      note.textContent = !sw ? NO_SW : stored >= 4 ? FROM_CACHE : FIRST_VISIT;
+      // the Python engine keeps the Pyodide files itself (web/worker.js keptFetch): the service worker is not
+      // needed for that, only Cache Storage
+      note.textContent = !window.caches ? NO_STORE : stored >= 4 ? FROM_CACHE : FIRST_VISIT;
       window.SASSI_WEB.storage = {serviceWorker: sw, storedFiles: stored};
       setStage("Starting the Python engine (Web Worker) ...", 0.02);
       try {
-        worker = new Worker(`web/worker.js?v=${BUILD}`, {type: "module"});
+        worker = new Worker(`web/worker.js?v=${WORKER_V}`, {type: "module"});
       } catch (e) {
         stop(`The Web Worker could not be created: ${e.message || e}`);
         return;
@@ -221,6 +224,15 @@
         setStage(m.text, m.fraction);
       } else if (m.type === "ready") {
         window.SASSI_WEB.info = m.info || null;
+        const c = m.info && m.info.cache;
+        if (c) {                                      // what this start really fetched
+          const mb = (b) => `${(b / 1e6).toFixed(1)} MB`;
+          note.textContent = !c.storable ? NO_STORE
+            : c.downloaded ? `Downloaded ${c.downloaded} Python file(s)${c.downloadedBytes ? ` (${mb(c.downloadedBytes)})` : ""}; ` +
+              "they are kept on this computer for the next visits."
+            : `Python, NumPy and SciPy came from this computer (${c.kept} files): nothing was downloaded.`;
+        }
+        window.SASSI_WEB.startNote = note.textContent;
         readyResolve();
         done();
       } else if (m.type === "fatal") {
