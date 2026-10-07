@@ -178,6 +178,7 @@ def run(ctx: ModuleContext) -> int:
         lst.write("")
         lst.write(" Data check only (<opmode> = 1): FILE9 not written")
         return 0
+    ctx.announce("FORCE.loads", nloads=len(keys), nnodes=int(np.unique(node).size), nF=int(len(freq)))
     arrays = {"fnum": fnum_a, "freq": freq, "load_node": node, "load_dof": dof, "P": P,
               "x_factor": fac, "x_arrival": tarr}
     meta = {"df": df, "mforce": mforce, "nft": nft, "delt": delt, "model": ctx.model, "title": str(d["title"]),

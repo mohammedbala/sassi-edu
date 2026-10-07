@@ -30,7 +30,7 @@ import time
 import traceback
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Callable, List, Optional, Sequence, TextIO, Union
+from typing import Any, Callable, Dict, List, Optional, Sequence, TextIO, Union
 
 from .. import PRODUCT, __version__
 
@@ -104,6 +104,16 @@ class ModuleContext:
     listing: Listing
     progress: Callable[[float, str], None] = field(default=lambda frac, msg: None)
     cancelled: Callable[[], bool] = field(default=lambda: False)
+    #: step(key, data): the computation step the module enters, with its sizes (the GUI's activity panel shows the
+    #: step's equation and these numbers; keys are "<MODULE>.<step>", see sassi/ui/static/activity.js STEPS)
+    step: Callable[[str, Dict[str, Any]], None] = field(default=lambda key, data: None)
+
+    def announce(self, key: str, **data: Any) -> None:
+        """Report the computation step entered (never fails the run)."""
+        try:
+            self.step(key, {k: (v.item() if hasattr(v, "item") else v) for k, v in data.items()})
+        except Exception:                       # noqa: BLE001 -- a display aid
+            pass
 
     def path(self, name: str) -> Path:
         return self.workdir / name
@@ -119,7 +129,8 @@ class ModuleContext:
 def run_module(module: str, model: str, workdir: Union[str, Path], deck_path: Optional[Union[str, Path]] = None,
                listing_path: Optional[Union[str, Path]] = None, echo: Optional[Callable[[str], None]] = None,
                progress: Optional[Callable[[float, str], None]] = None,
-               cancelled: Optional[Callable[[], bool]] = None, notes: Optional[Sequence[str]] = None) -> int:
+               cancelled: Optional[Callable[[], bool]] = None, notes: Optional[Sequence[str]] = None,
+               step: Optional[Callable[[str, Dict[str, Any]], None]] = None) -> int:
     """Run SSI module ``module`` for ``model`` in ``workdir``; return 0 on success.
 
     ``notes``: the built-in defaults of blank inputs the run uses (RUN<MODULE> passes them, requirements
@@ -135,7 +146,8 @@ def run_module(module: str, model: str, workdir: Union[str, Path], deck_path: Op
     listing = Listing(Path(listing_path), echo=echo)
     ctx = ModuleContext(module=module, model=model, workdir=workdir,
                         deck_path=Path(deck_path) if deck_path else None, listing=listing,
-                        progress=progress or (lambda f, m: None), cancelled=cancelled or (lambda: False))
+                        progress=progress or (lambda f, m: None), cancelled=cancelled or (lambda: False),
+                        step=step or (lambda key, data: None))
     t0 = time.time()
     try:
         mod = importlib.import_module(f"sassi.modules.{module.lower()}")

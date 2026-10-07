@@ -1463,6 +1463,7 @@ def run(ctx: ModuleContext) -> int:
         w = 2.0 * np.pi * f
         rec = FreqRecord(q=order, fnum=fn, f=f, nf=part.nf, nn=part.nn)
         # -- impedance X_ff (steps 2-3)
+        ctx.announce("ANALYS.impedance", q=order, nF=nF, f=f, n=n3, restart=int(opt.mode != 0))
         if opt.mode == 0:
             try:
                 if md.nint and md.reduced:                 # 2D in-plane block and / or SYMM image sums
@@ -1487,7 +1488,9 @@ def run(ctx: ModuleContext) -> int:
         C = None
         try:
             if opt.solver_mode in (1, 2):
+                ctx.announce("ANALYS.dynamic", q=order, nF=nF, f=f, neq=int(md.neq), nnz=int(md.Ks.nnz))
                 C = ss.dynamic_matrix(md.Ks, md.Ms, md.Ke, md.Me, w)
+                ctx.announce("ANALYS.factor", q=order, nF=nF, f=f, nn=int(part.nn), nf=int(part.nf))
                 fac = ss.factorize(C, ss.restrict(X, part), part, rcond_min=ss.RCOND_MIN)
             else:
                 fac = ss.SSIFactor.from_arrays(_restart_record(ctx, cootk, fn, md, opt), md.neq)
@@ -1501,6 +1504,8 @@ def run(ctx: ModuleContext) -> int:
                 if fac.path == "full" and part.nf:
                     lst.warning(f"frequency {f:.6g} Hz: {fac.note}")
             # -- loads and solution (steps 5, 6)
+            ctx.announce("ANALYS.solve", q=order, nF=nF, f=f, nf=int(part.nf), neq=int(md.neq), ncases=len(cases),
+                         seismic=int(bool(opt.seismic)), path=str(fac.path))
             if opt.seismic:
                 Up = np.stack([free_field_at_nodes(c.data, c.rows[fn], xyz_ff, iface, opt.ang, opt.xc, opt.yc)
                                .reshape(-1) for c in cases], axis=1)                    # (3 nInt, ncases)

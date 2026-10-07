@@ -329,6 +329,8 @@ def run_mode1(inp: SiteInput, ctx: ModuleContext) -> Dict[str, np.ndarray]:
         h_gen[q] = hg
         law_used.append(law)
         col = column(inp, hg)
+        ctx.announce("SITE.modes", q=q + 1, nF=nF, f=float(f), n=int(len(col.h)), ngen=int(col.n_gen),
+                     base=str(col.base))
         md = tlm.column_modes(col, 2 * np.pi * float(f), MASS)
         if not (np.all(np.isfinite(md.kR)) and np.all(np.isfinite(md.kL))):
             raise ModuleError(f"eigen-solution failed at frequency {f:.6g} Hz")
@@ -446,6 +448,8 @@ def run_mode2(inp: SiteInput, ctx: ModuleContext, sol) -> None:
         ratio[iw] = ff.wave_ratio(inp.fnum, inp.freq1, inp.freq2, w.ratio1, w.ratio2)
         for q, f in enumerate(inp.freq):
             try:
+                ctx.announce("SITE.field", wave=w.name, q=q + 1, nF=nF, f=float(f), nI=int(nI), cl=int(inp.cl),
+                             cm="XYZ"[int(inp.cm)])
                 fld = wave_field(inp, sol["cols"][q], sol["modes"][q], w, float(f))
                 U[iw, q], ucp[iw, q] = ff.normalise(fld, inp.cl, inp.cm)
                 if w.type in (ff.WAVE_R, ff.WAVE_L):

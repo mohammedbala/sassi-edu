@@ -392,6 +392,8 @@ def run(ctx: ModuleContext) -> int:
 
     # ---------------- analysis ---------------------------------------------------------
     ctx.progress(0.05, "SOIL: equivalent-linear iterations")
+    ctx.announce("SOIL.iterate", niter=int(niter if indir == 0 else 0), nsub=int(len(col.thick)) - 1, nfft=int(nfft),
+                 ratio=float(ratio), vertical=int(indir))
     try:
         res = SH.run_shake(acc_g * grav, dt, nfft, col, curves, cl, outcrop, ratio, niter, form=form,
                            cutoff=cutoff, iterate=(indir == 0))

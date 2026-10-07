@@ -266,9 +266,11 @@ def run_command(c, module: str) -> None:
     from ...modules.base import run_module
     c.info(f"RUN{module}: model {m.name} in {mdir}")
     hook = c.interp.module_progress          # the GUI's progress panel (a worker process passes its own)
+    shook = c.interp.module_step             # ... and the computation steps it shows
     notes = defaults_notes(m, module, search_dirs(c))
     rc = run_module(module, m.name, mdir, echo=lambda line: c.info(line),
                     progress=(lambda f, msg: hook(module, f, msg)) if hook is not None else None,
+                    step=(lambda key, data: shook(module, key, data)) if shook is not None else None,
                     **({"notes": notes} if notes else {}))
     listing = mdir / f"{m.name}_{module}.out"
     if rc != 0:

@@ -922,11 +922,14 @@ def run(ctx: ModuleContext) -> int:
         _fail(lst, hm)
     # ---- assembly and checks, in the numbering of the model ---------------------------------------
     ctx.progress(0.2, "HOUSE: element matrices and assembly")
+    ctx.announce("HOUSE.elements", ne=len(hm.records), dim=dim)
     try:
         res = assemble_house(hm)
     except ElementError as exc:
         raise ModuleError(str(exc)) from None
     interaction_set(hm, res)
+    ctx.announce("HOUSE.assembled", ne=len(hm.records), neq=int(res.Ks.shape[0]), nnz=int(res.Ks.nnz),
+                 nnze=int(res.Ke.nnz), nint=int(len(res.int_node)))
     _dimension_checks(hm)
     _rotation_checks(hm, res)
     inco = _incoherency_plan(ctx, d, hm, res)          # incoherency / wave passage / ME (None when off)

@@ -41,6 +41,7 @@ from __future__ import annotations
 
 import functools
 import importlib
+import inspect
 import json
 import subprocess
 import sys
@@ -57,10 +58,18 @@ def _send(obj: Dict[str, Any]) -> None:
 
 
 def _with_progress(original, send: Send = _send):
-    """``original`` (a module runner with a ``progress`` keyword) reporting its progress to the GUI."""
+    """``original`` (a module runner with a ``progress`` keyword) reporting its progress -- and, when it takes a
+    ``step`` keyword, the computation steps of the module -- to the GUI."""
+    try:
+        takes_step = "step" in inspect.signature(original).parameters
+    except (TypeError, ValueError):
+        takes_step = False
+
     def run(*args, **kw):
         if kw.get("progress") is None:
             kw["progress"] = lambda frac, msg: send({"t": "progress", "fraction": float(frac), "text": str(msg)})
+        if takes_step and kw.get("step") is None:
+            kw["step"] = lambda key, data: send({"t": "step", "key": str(key), "data": dict(data or {})})
         return original(*args, **kw)
 
     functools.update_wrapper(run, original)

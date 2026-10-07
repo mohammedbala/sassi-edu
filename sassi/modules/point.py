@@ -107,6 +107,8 @@ def _point3(f2, rows, R0, load_iface, load_idx, mass, ctx):
         f = float(f2["freq"][q])
         col = tlm.column_from_file2(f2, int(q))
         md = tlm.modes_from_file2(f2, int(q))
+        ctx.announce("POINT.green", q=i + 1, nF=nF, f=f, nL=int(nL), R0=float(R0), nR=int(len(md.kR)),
+                     nLove=int(len(md.kL)))
         try:
             sol = axisym.solve_point3(col, md, 2 * np.pi * f, R0, load_idx, mass)
         except (FloatingPointError, np.linalg.LinAlgError) as exc:

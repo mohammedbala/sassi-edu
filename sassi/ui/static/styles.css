@@ -665,6 +665,23 @@ button.linkish { border: 0; background: none; color: var(--learn-accent); cursor
 .act-mod-bar > div { height: 100%; width: 0; background: #e08a00; transition: width .25s ease; }
 .act-mod-t { font-size: 11.5px; color: #3d4a5a; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .act-chain { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 8px; }
+/* the computation step of the running module: its place in the module's steps, its equation, its sizes */
+.activity.with-math { width: min(480px, calc(100vw - 32px)); }
+.act-math { margin: 8px 0 0; padding: 6px 8px 6px; background: #f6f8fc; border: 1px solid #e1e7f1; border-radius: 6px; }
+.act-math[hidden] { display: none; }
+.act-math-strip { display: flex; flex-wrap: wrap; gap: 3px; margin-bottom: 5px; }
+.act-math-s { font-size: 10.5px; padding: 1px 6px; border-radius: 9px; background: #e7ecf4; color: #5d6774; white-space: nowrap; }
+.act-math-s.past { background: #dfeedd; color: #2e6b32; }
+.act-math-s.on { background: var(--learn-accent, #1f5fbf); color: #fff; }
+.act-math-head { display: flex; align-items: baseline; gap: 8px; }
+.act-math-t { flex: 1; font-weight: 600; font-size: 12.5px; line-height: 1.3; }
+.act-math-ref { border: 0; background: none; color: var(--learn-accent, #1f5fbf); font-size: 11px; cursor: pointer; padding: 0; white-space: nowrap; }
+.act-math-ref:hover { text-decoration: underline; }
+.act-math-eq { overflow-x: auto; overflow-y: hidden; margin: 2px 0; font-size: 12px; }
+.act-math-eq .katex-display { margin: 4px 0; }
+.act-math-d { font-size: 11.5px; color: #3d4a5a; font-variant-numeric: tabular-nums; line-height: 1.35; }
+.act-math-toggle { font-size: 14px; color: #9aa4b1; }
+.act-math-toggle.on { color: var(--learn-accent, #1f5fbf); }
 .act-chain:empty { display: none; }
 .act-chip { display: inline-flex; align-items: center; gap: 4px; padding: 2px 7px 2px 6px; border-radius: 11px; font-size: 11px;
   border: 1px solid var(--border-2, #dde1e6); background: var(--panel-2, #f6f7f9); animation: act-pop .25s ease; }

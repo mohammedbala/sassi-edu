@@ -187,6 +187,8 @@ class GuiSession:
         self.interp.sink.subscribe(self._on_message)
         self.interp.progress = self._on_progress
         self.interp.module_progress = self._on_module_progress
+        self.interp.module_step = self._on_module_step
+        self._last_step: Tuple[str, float] = ("", 0.0)
         self.plots = plot_state(self.interp)
         self.plots.auto_render = False            # the browser draws the plots (Plotly)
         self.plots.dialog_handler = self._dialog_handler
@@ -254,6 +256,16 @@ class GuiSession:
             self._last_module_progress = now
             self.events.push("progress", kind="module", module=str(module).upper(),
                              fraction=max(0.0, min(1.0, float(fraction))), text=str(text))
+
+    def _on_module_step(self, module: str, key: str, data: Dict[str, Any]) -> None:
+        """A module run in this interpreter enters a computation step (``ctx.announce``: ANALYS.impedance ...): a
+        progress event of kind "step" with its sizes -- at once when the step changes, else at most every 0.12 s
+        (a step repeated at every frequency)."""
+        now = time.time()
+        last_key, last_t = self._last_step
+        if key != last_key or now - last_t > 0.12:
+            self._last_step = (key, now)
+            self.events.push("progress", kind="step", module=str(module).upper(), key=str(key), data=jsonable(data))
 
     def _on_plot(self, ev) -> None:
         self.events.push("plot", **ev.to_dict())

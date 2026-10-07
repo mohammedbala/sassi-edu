@@ -65,6 +65,7 @@ class Job:
         self.messages: List[Dict[str, Any]] = []
         self.progress = 0.0
         self.progress_text = ""
+        self.step: Optional[Dict[str, Any]] = None    # the computation step the module reports {key, data}
         self.started = time.time()
         self.finished: Optional[float] = None
         self.returncode: Optional[int] = None
@@ -90,7 +91,7 @@ class Job:
             msgs = self.messages[since:] if with_messages else []
             n = len(self.messages)
         d = {"id": self.id, "kind": self.kind, "line": self.line, "module": self.module, "state": self.state,
-             "ok": self.ok, "progress": self.progress, "progress_text": self.progress_text,
+             "ok": self.ok, "progress": self.progress, "progress_text": self.progress_text, "step": self.step,
              "started": self.started, "finished": self.finished, "returncode": self.returncode,
              "listing": self.listing, "external": self.external, "messages": msgs, "next": n,
              "elapsed": (self.finished or time.time()) - self.started, "pending": list(self.pending)}
@@ -261,6 +262,13 @@ class JobManager(_Jobs):
                 if now - last_progress > 0.2 or job.progress >= 1.0:
                     last_progress = now
                     self._on_progress(job)
+            elif obj["t"] == "step":
+                new = (job.step or {}).get("key") != obj.get("key")
+                job.step = {"key": str(obj.get("key", "")), "data": obj.get("data") or {}}
+                now = time.time()
+                if new or now - last_progress > 0.2:
+                    last_progress = now
+                    self._on_progress(job)
             elif obj["t"] == "done":
                 ok = bool(obj.get("ok"))
         rc = proc.wait()
@@ -347,6 +355,13 @@ class InlineJobManager(_Jobs):
                 job.progress_text = str(obj.get("text", ""))
                 now = time.time()
                 if now - last_progress[0] > self.PROGRESS_INTERVAL or job.progress >= 1.0:
+                    last_progress[0] = now
+                    self._on_progress(job)
+            elif obj.get("t") == "step":
+                new = (job.step or {}).get("key") != obj.get("key")
+                job.step = {"key": str(obj.get("key", "")), "data": obj.get("data") or {}}
+                now = time.time()
+                if new or now - last_progress[0] > self.PROGRESS_INTERVAL:
                     last_progress[0] = now
                     self._on_progress(job)
             elif obj.get("t") == "done":

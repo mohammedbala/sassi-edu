@@ -726,6 +726,7 @@ class _StressRun:
                     if self.ctx.cancelled():
                         raise ModuleError("run cancelled")
                     rb = rows[b0:b0 + per]
+                    self.ctx.announce("STRESS.elements", type=str(t), done=done, total=total, mb=len(rb))
                     self._batch(plan, rb, req_by_type.get(t, {}), fh14, fh15)
                     done += len(rb)
                     self.ctx.progress(min(1.0, done / max(total, 1)), f"STRESS: {done}/{total} elements")

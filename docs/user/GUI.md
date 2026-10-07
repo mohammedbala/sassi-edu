@@ -183,7 +183,7 @@ that the folder stays one argument when the history is replayed.
 | Command Display > Command Echo / Output Confirmation / Comments / Warnings & Errors | show or hide these message classes in the Command History (information is always shown); saved in `SASSIini.xml` |
 | Toolbars > Main Toolbar / Plot Toolbar | show or hide the toolbars (not saved, UI-07) |
 | Split View | plots and the Results browser in a pane of their own beside the work (on by default; section 2); kept by the browser |
-| Run Summary | the summary window of the active model's run (section 7.1) |
+| Run Summary | the summary window of the active model's run (section 7.2) |
 | Results Browser | as File > Results Browser |
 
 ### 3.7 Learn
@@ -519,6 +519,16 @@ seconds; with errors the panel stays, and **Command History** jumps to the first
 run goes on). The panel only reads the session's events (it sends no command). Long module listings are
 added to the Command History in batches, so the page stays responsive during long runs.
 
+**The computation being done.** Below the module's progress the panel shows the step the module is in and
+its mathematics, with the sizes of the model being solved: a strip of the module's steps (ANALYS:
+*Impedance*, *Dynamic stiffness*, *Condense + factorise*, *Solve*, repeated at every frequency; MOTION:
+*FFT*, *Interpolate*, *Convolve*, *Spectra*; SITE, POINT, HOUSE, FORCE, STRESS, RELDISP, SOIL and EQUAKE
+likewise), the equation in the notation of the Theory Manual -- for example
+S = C_ff − C_fn C_nn⁻¹ C_nf and LU(S + X_ff) -- and the numbers of this run (*frequency 14/97 · 3.589 Hz ·
+sparse LU of C_nn (960 DOFs) · dense LU of S + X (495 × 495)*). **Theory §…** opens that section of the
+Theory Manual in Help; **∑** in the panel's title bar hides or shows the equations (kept by the browser).
+The modules report the steps as they enter them (a display aid: nothing of the run depends on it).
+
 ### 7.1 ANSYS Eq. Static Load and ANSYS Dynamic Load (Option A, LOADGEN)
 
 The two Modules-menu dialogs of spec 04 section 15.6 (manual 6.4.15), with the SASSI-EDU settings of
@@ -554,7 +564,7 @@ a missing input ends the job with LOADGEN's message in its output tab. A changed
 WRITE writes it: `LGNODE,M,0` (clear), then the nodes.
 
 
-### 7.1 The run summary window
+### 7.2 The run summary window
 
 When a run that ran modules ends -- an input file (`INP`, an example's **Run all**) or a module run from the
 Modules menu or Command Entry that produces results (MOTION, STRESS, RELDISP, SOIL, EQUAKE, COMBIN,

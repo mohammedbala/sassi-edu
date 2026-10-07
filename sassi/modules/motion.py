@@ -633,6 +633,7 @@ def run(ctx: ModuleContext) -> int:
     if need_motion or (int(d["opmode"]) == 1 and thpath is not None):
         if thpath is None:
             raise ModuleError("Error 73: no time-history file (THFILE) given")
+        ctx.announce("MOTION.fft", nfft=int(nfft), dt=float(dt), seismic=int(bool(seismic)))
         cmot = read_control_motion(thpath, int(d["fopt"]), int(d["rec1"]), int(d["rec2"]), dt, nfft,
                                    float(d["mult"]), float(d["max"]))
         lst.section("Control motion" if seismic else "Reference load history")
@@ -901,6 +902,8 @@ def _process(ctx: ModuleContext, d, src: _TFSource, plan: _Plan, cmot: Optional[
             need = (plan.th[sl] | plan.mx[sl] | plan.rs[sl] | plan.frame[sl]) if full else np.zeros(len(cols), bool)
             if not (plan.tf[sl].any() or plan.listing_tf[sl].any() or need.any()):
                 continue                                               # e.g. columns kept only for TFU frames
+            ctx.announce("MOTION.interp", done=b0, ncol=ncol, mb=len(cols), nF=int(len(f_ssi)), nK=int(kmax),
+                         option=int(getattr(src, "option", -1)))
             Hc = src.computed(cols)                                    # (nF, mb)
             if seismic:                                                # EDU-18 / G-19 low-frequency check
                 h0 = src.anchors(cols)
@@ -927,6 +930,7 @@ def _process(ctx: ModuleContext, d, src: _TFSource, plan: _Plan, cmot: Optional[
             # ---- convolution
             if not need.any():
                 continue
+            ctx.announce("MOTION.convolve", done=b0, ncol=ncol, mb=len(cols), nfft=int(nfft), seismic=int(bool(seismic)))
             if seismic:
                 Racc = Hg * cmot.A[:, None]                             # acceleration in g
                 Rreq = Racc
@@ -972,6 +976,8 @@ def _process(ctx: ModuleContext, d, src: _TFSource, plan: _Plan, cmot: Optional[
                 if plan.frame[i] and int(d["rstacc"]):
                     fr_acc[int(c)] = r_out.copy()
                 if need_rs and (plan.rs[i] or (plan.frame[i] and int(d["rstrs"]) and dof <= 3)):
+                    ctx.announce("MOTION.spectra", node=node, dof=tag, nfreq=int(len(rs_f)), ndamp=int(len(damps)),
+                                 done=i, ncol=ncol)
                     rs = response_spectrum(a_full, dt, rs_f, damps)
                     if plan.rs[i]:
                         for idd in range(len(damps)):

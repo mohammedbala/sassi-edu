@@ -280,6 +280,8 @@ class Interpreter:
         #: GUI hook for module runs in this interpreter (RUN<MODULE> inside an INP file):
         #: module_progress(module, fraction, text), the progress the module reports (ANALYS: frequency k/n ...)
         self.module_progress: Optional[Callable[[str, float, str], None]] = None
+        #: module_step(module, key, data): the computation step a module enters, with its sizes (GUI)
+        self.module_step: Optional[Callable[[str, str, Dict[str, Any]], None]] = None
         self.write_options: Dict[str, Any] = {"mdl": False, "afwr": False}
         self._summaries: List[RunSummary] = []
         self._direct = False

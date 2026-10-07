@@ -39,7 +39,7 @@ def test_input_file_reports_commands_and_module_progress(tmp_path):
     st, r = S.route("POST", "/api/command", {}, {"lines": ["INP,act.pre"]})
     assert st == 200 and r["ok"], [m["text"] for m in r["messages"] if m["kind"] == "ERROR"]
     evs = _events(S)
-    prog = [e for e in evs if e["type"] == "progress" and e.get("kind") != "module"]
+    prog = [e for e in evs if e["type"] == "progress" and e.get("kind") not in ("module", "step")]
     assert prog and prog[0]["line"] == 1 and prog[0]["source"] == "act.pre" and prog[-1]["line"] == prog[-1]["total"]
     by_name = {e["name"]: e for e in prog if e["name"]}
     # the commands that start a module or write / check the decks are always reported, with their meaning
@@ -50,6 +50,9 @@ def test_input_file_reports_commands_and_module_progress(tmp_path):
     mod = [e for e in evs if e["type"] == "progress" and e.get("kind") == "module"]
     assert mod and {e["module"] for e in mod} == {"SITE"} and mod[-1]["fraction"] == 1.0
     assert any("frequency" in e["text"] for e in mod)
+    # ... and the computation steps it enters, with their sizes (D-W6-13)
+    steps = [e for e in evs if e["type"] == "progress" and e.get("kind") == "step"]
+    assert steps and {e["module"] for e in steps} == {"SITE"} and {e["key"] for e in steps} >= {"SITE.modes", "SITE.field"}
     # the panel's start / end markers: the module start, its listing's last line, the file summary
     texts = [e["text"] for e in evs if e["type"] == "message"]
     assert any(t.startswith("RUNSITE: model act") for t in texts)

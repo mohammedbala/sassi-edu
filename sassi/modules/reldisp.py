@@ -278,6 +278,8 @@ def run(ctx: ModuleContext) -> int:
             H_ref = np.full(nK, I.rigid_body_anchor(dof, cm, ang) if seismic else 0.0, dtype=complex)
         else:
             H_ref = H_ref_file
+        ctx.announce("RELDISP.relative", node=node, dof=C.DOF_TAGS[dof], i=i + 1, n=len(req), nfft=int(nfft),
+                     freefield=int(bool(freefield)))
         H_rel = H_node - H_ref
         D = H_rel * drive
         dth = np.fft.irfft(S.hermitian_bins(D, nfft), n=nfft)

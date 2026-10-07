@@ -206,6 +206,8 @@ def run(ctx: ModuleContext) -> int:
     for k, r in enumerate(rows):
         no = int(r["no"])
         ctx.progress(0.05 + 0.85 * k / max(len(rows), 1), f"EQUAKE: spectrum {no}")
+        ctx.announce("EQUAKE.fit", no=no, k=k + 1, n=len(rows), dur=float(dur), dt=float(dt), zeta=float(zeta),
+                     accopt=int(accopt))
         comp = _one_spectrum(ctx, d, r, accopt, dt, dur, n, zeta, g_len, ulen, seeds, opts, comps)
         comps.append(comp)
 
