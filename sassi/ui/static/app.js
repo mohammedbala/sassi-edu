@@ -482,6 +482,7 @@ const SASSI = (() => {
           {label: "Main Toolbar", check: () => S.toolbarsVisible.main, action: () => S.toggleToolbar("main")},
           {label: "Plot Toolbar", check: () => S.toolbarsVisible.plot, action: () => S.toggleToolbar("plot")}]},
         {label: "Split View", check: () => S.split, action: () => S.setSplit(!S.split), tip: "plots and results beside the work instead of a tab in front of it"},
+        {label: "Run Summary", action: () => S.openRunSummary && S.openRunSummary(), tip: "key inputs, key outputs and graphs of the active model's run"},
         "-",
         {label: "Results Browser", action: () => S.openResults()}]},
       // Learn: the guided course (static/learn.js); its lessons are read from the server

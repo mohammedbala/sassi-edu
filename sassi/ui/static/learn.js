@@ -724,6 +724,8 @@
     rz.addEventListener("dblclick", () => { store.set("dockWidth", 0); applyDockWidth(); });
   }
   L.closeLesson = function () { dockVisible(false); if (S.rebuildMenus) S.rebuildMenus(); };
+  /** Is a lesson open (its tab or its side panel)?  The run summary window does not open by itself then. */
+  L.isLessonOpen = () => !!(P.lesson && dock() && !dock().hidden);
   L.toggleCollapse = function () { store.set("dockCollapsed", !store.get("dockCollapsed", false)); applyDockWidth(); };
 
   /** Open lesson id in the dock.  opts.step: the page to show (0 = introduction); opts.fresh: always start

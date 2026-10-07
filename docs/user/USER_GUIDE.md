@@ -1116,6 +1116,11 @@ the control displacement spectrum. Files: `BEAMS_002_00001_MZI.THS` (history), `
 
 ### 11.4 Plots
 
+After a run the GUI opens a **Run Summary** window: the model's key inputs (from the decks the modules read),
+its key outputs (the transfer-function peaks, peak accelerations, in-structure response spectra, relative
+displacements and element forces of the result files) and their graphs, each of which opens as a plot tab
+([GUI §7.1](GUI.md#71-the-run-summary-window)). View > Run Summary shows it at any time.
+
 In the GUI, the Plot menu draws the model (3D), transfer functions (TFU against TFI), histories,
 spectra, soil layers and soil-property curves; plots can be exported as PNG. The same plots are
 available as commands: `MODELPLOT`, `NODEPLOT`, `LAYERPLOT`, `SOILPROPPLOT,<label>`, `SPECPLOT,<lines>`,

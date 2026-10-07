@@ -2305,7 +2305,8 @@ hand (only the lessons' Animate buttons did it). Finally the user asked for plot
 instead of a tab in front of it, and found that files did not work like a desktop program in the browser version:
 the workspace was lost on a reload, a file of the visitor's computer had to be uploaded in a separate step, and
 Output and Export Table wrote into the browser's workspace only. Then the user found that the browser version
-still downloaded its packages when opened again.
+still downloaded its packages when opened again, and asked for a summary window of the key inputs, outputs and
+graphs after a run.
 
 | ID | Subject | Decision | Evidence |
 |---|---|---|---|
@@ -2320,6 +2321,7 @@ still downloaded its packages when opened again.
 | D-W6-09 | Files of the visitor's computer | Every file dialog of the browser version (`D.pickFile`, not folder pickers or Download) has **From your computer…**: text files (at most 8 MB, no NUL in the first 4 kB) copied into the folder shown and the first selected, so Model > Input, File > Open and the file fields read the visitor's decks in one step | `tests/unit/test_split_view_web_files.py` |
 | D-W6-10 | Downloads | In the browser version Model > Output (WRITE) and Export Table also download the file they wrote (`GET /api/file`), as Export to ANSYS and Export Image already did | `tests/unit/test_split_view_web_files.py` |
 | D-W6-11 | Downloads kept | The browser version downloads Python, NumPy, SciPy and the site once: `web/worker.js` reads and fills the Pyodide Cache Storage itself (`keptFetch`; also without a service worker); the site's scripts, style sheets and bundle carry the hash of their own content in their URL, and the service worker stores at install the page and every file of the build it lacks and drops files no longer listed in its manifest, so a deployment re-downloads only the changed files. The loading panel and the Command History report what the start downloaded | user report; `tests/unit/test_web.py`; Chrome: offline second visit in 3.0 s, no server request; Claude browser pane (no service worker): 22.8 MB from Cache Storage |
+| D-W6-12 | Run summary window | After a run that ran modules (an INP, or a single module run of MOTION, STRESS, RELDISP, SOIL, EQUAKE, COMBIN or NONLINEAR; the activity panel reports its end), unless a lesson is open or the visitor switched it off: a window with the module chips, the key inputs (from the decks AFWRITE wrote, which the modules read), the key outputs (from the result files: TF peak and its frequency, peak accelerations and their ratio to the input, ISRS at 5 % damping when computed with peak, frequency and ZPA, relative displacements, the largest element forces; SOIL / EQUAKE results) and graphs (TF amplitudes, the largest acceleration with the input, the spectra with the input motion's spectrum computed for the window, the soil profile). `GET /api/run_summary[?model=]`, `POST /api/run_summary/plot` (READSPEC / READTH and SPECPLOT / THPLOT, L17); View > Run Summary; a selector for the other models with listings | user request; `tests/unit/test_run_summary.py` (example 1: 13.08 at 3.491 Hz at node 85 X) |
 ---
 
 ## 8. Implementation order and acceptance gates (informative)

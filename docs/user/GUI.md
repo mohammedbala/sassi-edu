@@ -183,6 +183,7 @@ that the folder stays one argument when the history is replayed.
 | Command Display > Command Echo / Output Confirmation / Comments / Warnings & Errors | show or hide these message classes in the Command History (information is always shown); saved in `SASSIini.xml` |
 | Toolbars > Main Toolbar / Plot Toolbar | show or hide the toolbars (not saved, UI-07) |
 | Split View | plots and the Results browser in a pane of their own beside the work (on by default; section 2); kept by the browser |
+| Run Summary | the summary window of the active model's run (section 7.1) |
 | Results Browser | as File > Results Browser |
 
 ### 3.7 Learn
@@ -552,6 +553,34 @@ message. Run needs the SSI results LOADGEN reads (HOUSE, MOTION, RELDISP or FILE
 a missing input ends the job with LOADGEN's message in its output tab. A changed node list is written as
 WRITE writes it: `LGNODE,M,0` (clear), then the nodes.
 
+
+### 7.1 The run summary window
+
+When a run that ran modules ends -- an input file (`INP`, an example's **Run all**) or a module run from the
+Modules menu or Command Entry that produces results (MOTION, STRESS, RELDISP, SOIL, EQUAKE, COMBIN,
+NONLINEAR) -- the **Run Summary** window shows the model's key inputs, its key outputs and their graphs:
+
+* **Modules**: one chip per module listing in the model folder, with its status, time and warnings.
+* **Key inputs**, from the decks the modules read (`<model>.sit`, `.hou`, `.anl`, `.mot` ...): the model
+  (nodes, elements by type, interaction nodes and DOFs, embedment, method, the structure and excavated-soil
+  masses of the HOUSE listing), the soil profile (layers, Vs and damping ranges, half-space, waves, control
+  point), the frequencies (number and range, NFFT, Δt, Δf), the analysis, the input motion (file, scaling, peak,
+  duration) or the load history, the spectrum damping, the output requests; SOIL and EQUAKE inputs for a
+  free-field run.
+* **Key outputs**, from the result files: the transfer functions (`.TFI`: the largest amplitude and its
+  frequency, the SSI resonance), the peak accelerations (`.ACC`, also as a multiple of the input's), the
+  in-structure response spectra at 5 % damping when computed (`.RS`: peak, frequency, ZPA), the relative
+  displacements (`.THD`) and the largest element forces (`.THS`); the SOIL / EQUAKE spectra and histories.
+* **Graphs**: the transfer-function amplitudes, the largest acceleration history with the input over it, the
+  response spectra with the input motion's spectrum (dashed, computed for the window), the soil profile.
+  **Open as plot** opens a graph's result files as a plot tab (`READSPEC` / `READTH` and `SPECPLOT` / `THPLOT`
+  in the Command History).
+
+With several models in memory (an example with a fixed-base reference, or FV and subtraction variants) a
+selector switches between them. The window does not open by itself while a lesson is open (the lesson has its
+own result buttons) or after a single intermediate module (SITE, POINT, HOUSE, FORCE, ANALYS); **Show this
+summary after every run** switches it off (kept by the browser), and **View > Run Summary** opens it at any
+time.
 ---
 
 ## 8. Help (F1)

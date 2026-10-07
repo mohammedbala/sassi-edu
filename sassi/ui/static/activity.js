@@ -104,7 +104,7 @@ const SASSI_ACTIVITY = (function () {
   }
 
   function start(kind, source) {
-    run = {kind, source, t0: Date.now(), line: 0, total: 0, warnings: 0, errors: 0, modules: new Map(), current: null, dismissed: false};
+    run = {kind, source, t0: Date.now(), line: 0, total: 0, warnings: 0, errors: 0, modules: new Map(), models: [], current: null, dismissed: false};
     show();
     ui.chain.innerHTML = "";
     ui.mod.hidden = true;
@@ -226,6 +226,13 @@ const SASSI_ACTIVITY = (function () {
     run = null;
     // a clean run fades out on its own; with errors the panel stays until it is closed
     if (!bad) hideTimer = setTimeout(() => { if (!run && ended) hide(); }, 4500);
+    // the run summary window (static/summary.js) after a run that ran modules
+    if (S.onRunFinished && ended.modules.size) {
+      try {
+        S.onRunFinished({kind: ended.kind, source: ended.source, modules: [...ended.modules.keys()], models: ended.models.slice(),
+          warnings: ended.warnings, errors: ended.errors, seconds: (Date.now() - ended.t0) / 1000});
+      } catch (e) { console.error(e); }
+    }
   }
 
   // ---------------------------------------------------------------- the session's events
@@ -256,7 +263,13 @@ const SASSI_ACTIVITY = (function () {
     else if (ev.kind === "ERROR") run.errors++;
     else if (ev.kind === "INFO") {
       let m = RE_RUN.exec(text);
-      if (m && MODULES[m[1]] !== undefined) { moduleStart(m[1]); paint(); return; }
+      if (m && MODULES[m[1]] !== undefined) {
+        const mm = /^RUN[A-Z]+: model (\S+)/.exec(text);          // the models the run ran, in order
+        if (mm && !run.models.includes(mm[1])) run.models.push(mm[1]);
+        moduleStart(m[1]);
+        paint();
+        return;
+      }
       m = RE_DONE.exec(text);
       if (m && run.modules.has(m[1])) { moduleDone(m[1], /^OK$/i.test(m[2]) ? "ok" : "fail", Number(m[3])); paint(); return; }
       m = RE_INP.exec(text);

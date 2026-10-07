@@ -38,6 +38,8 @@ Routes (``route(method, path, query, body)``; all answers are JSON)::
     GET  /api/harmonic                  FILE8-type files of the active model: frequencies, largest response
     POST /api/harmonic/plan             {"file", "freq", "relative"} -> {"lines": [HARMFRAME ...], "folder"}
     POST /api/harmonic/show             {"folder", "title"} -> {"lines": [PROCFRAME ..., DEFORMPLOT ...]}
+    GET  /api/run_summary[?model=]      key inputs, key outputs and charts of a model's run (sassi/ui/runsummary.py)
+    POST /api/run_summary/plot          {"model", "chart"} -> {"lines": [READSPEC ..., SPECPLOT ...]}
                                         (/api/dynp: the model's DYNP properties and the built-in library
                                         curves; /api/file and /api/fileinfo also read built-in @ names)
     POST /api/export_table {name}       File > Export Table (CSV of the active 2D plot, D-UI-17)
@@ -93,7 +95,7 @@ from ..prep import Interpreter
 from ..prep.lexer import LexError, is_comment, join_command, split_args, split_head
 from ..prep.messages import Kind
 from ..prep.registry import CommandError, lookup
-from . import dialogs, files, harmonic, learn, modeldata
+from . import dialogs, files, harmonic, learn, modeldata, runsummary
 from . import explain as explainer
 from . import lessons as lessonfiles
 from .events import EventLog
@@ -764,6 +766,22 @@ class GuiSession:
         except harmonic.HarmonicError as exc:
             raise ApiError(exc.status, str(exc)) from None
 
+    def run_summary(self, query: Dict[str, Any], body: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        """The summary window after a run (:mod:`sassi.ui.runsummary`); with ``body`` the command text that opens
+        one of its charts as a plot."""
+        try:
+            with self.locked():
+                if body is None:
+                    model = _q(query, "model")
+                    return jsonable(runsummary.summary(self.interp, model))
+                lines = runsummary.plot_lines(self.interp, body.get("model"), str(body.get("chart", "")),
+                                              self.helpdocs, list(self.plots.lines))
+                return {"lines": lines}
+        except runsummary.SummaryError as exc:
+            raise ApiError(exc.status, str(exc)) from None
+        except learn.LearnError as exc:
+            raise ApiError(exc.status, str(exc)) from None
+
     def animation_remove(self, body: Dict[str, Any]) -> Dict[str, Any]:
         """Load Frame Data > Remove Animation: drop the SASSIani.xml entry and (optionally) the frame
         store files PROCFRAME wrote (``frame_*.npy``, ``nodes*.npy``, ``index.json``) -- other files of
@@ -1248,6 +1266,8 @@ class GuiSession:
         add("GET", r"/api/animations", lambda m, q, b: self.animations())
         add("POST", r"/api/animations/remove", lambda m, q, b: self.animation_remove(b))
         add("GET", r"/api/harmonic", lambda m, q, b: self.harmonic("sources", {}))
+        add("GET", r"/api/run_summary", lambda m, q, b: self.run_summary(q))
+        add("POST", r"/api/run_summary/plot", lambda m, q, b: self.run_summary(q, b or {}))
         add("POST", r"/api/harmonic/plan", lambda m, q, b: self.harmonic("plan", b))
         add("POST", r"/api/harmonic/show", lambda m, q, b: self.harmonic("show", b))
         add("GET", r"/api/cuts", lambda m, q, b: self.cuts())
