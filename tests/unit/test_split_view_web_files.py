@@ -36,8 +36,8 @@ def test_two_tab_groups_in_the_page():
 
 def test_tab_groups_in_app_js():
     js = _read(STATIC / "app.js")
-    # plots and the Results browser go right while the view is split; everything else stays in the work group
-    assert 'S.groupFor = (t) => (S.split && (t.kind === "plot" || t.kind === "results") ? "view" : "main");' in js
+    # plots, the Results browser and the Run view go right while the view is split; everything else stays in the work group
+    assert 'S.groupFor = (t) => (S.split && (t.kind === "plot" || t.kind === "results" || t.kind === "runview") ? "view" : "main");' in js
     assert "S.isShown = (t) =>" in js and "S.layoutSplit = function" in js and "S.setSplit = function" in js
     assert '{label: "Split View", check: () => S.split, action: () => S.setSplit(!S.split)' in js
     assert 'lsGet(SPLIT_KEY) !== "0"' in js                       # on by default, kept by the browser

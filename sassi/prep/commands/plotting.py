@@ -797,14 +797,25 @@ def cmd_rstcenter(c):
     _done(c, plot, "RSTCENTER", "3D")
 
 
+def _id_args(c, first: int) -> List[int]:
+    """Numbers and ``a-b`` ranges of arguments ``first`` ... (SASSI-EDU: ranges in the selection commands)."""
+    from ..lexer import LexError, parse_id_list
+    toks = [c.raw(k) for k in range(first, c.nargs + 1) if c.given(k)]
+    try:
+        return parse_id_list(toks)
+    except (LexError, ValueError) as exc:
+        raise CommandError(str(exc)) from None
+
+
 @plot_command("NODESEL", max_args=20)
 def cmd_nodesel(c):
     """NODESEL,<N1>,...,<N20>: toggle the selection of nodes (model level: all current and future plots).
 
-    The model is the one of the active 3D plot, else the active model (:func:`_display_model`).
+    The model is the one of the active 3D plot, else the active model (:func:`_display_model`).  SASSI-EDU:
+    an argument can also be a range ``a-b`` (the Properties panel selects many nodes at once).
     """
     num, m = _display_model(c)
-    ids = [c.int(k) for k in range(1, c.nargs + 1) if c.given(k)]
+    ids = _id_args(c, 1)
     if not ids:
         raise CommandError("node numbers required")
     sel = list(m.ui_state.get("nodesel", []))
@@ -825,6 +836,58 @@ def cmd_nodesel(c):
     st.emit("nodesel", None, model=num, selected=list(sel))
     c.confirm(f"model {num}: {len(sel)} node(s) selected" + (f"; added {added}" if added else "") +
               (f"; deselected {removed}" if removed else ""))
+    _refresh_model_plots(c, num)
+
+
+@plot_command("ELEMSEL", max_args=20)
+def cmd_elemsel(c):
+    """ELEMSEL,<group>,<E1>,...,<E19>: toggle the selection of elements of a group, as NODESEL does for nodes
+    (numbers or ranges ``a-b``; SASSI-EDU extension).  Selected elements are drawn blue in the 3D plots and their
+    properties shown in the GUI's Properties panel."""
+    num, m = _display_model(c)
+    gid = c.int(1, required=True, what="group")
+    g = m.groups.get(gid)
+    if g is None:
+        raise CommandError(f"group {gid} does not exist")
+    ids = _id_args(c, 2)
+    if not ids:
+        raise CommandError("element numbers required")
+    sel = [list(x) for x in m.ui_state.get("elemsel", [])]
+    added, removed, unknown = [], [], []
+    for e in ids:
+        key = [gid, e]
+        if e not in g.elements:
+            unknown.append(e)
+        elif key in sel:
+            sel.remove(key)
+            removed.append(e)
+        else:
+            sel.append(key)
+            added.append(e)
+    if unknown:
+        c.warn(f"element(s) {', '.join(str(e) for e in unknown)} of group {gid} not defined; ignored")
+    m.ui_state["elemsel"] = sel
+    _state(c).emit("elemsel", None, model=num, selected=[list(x) for x in sel])
+    c.confirm(f"model {num}: {len(sel)} element(s) selected" + (f"; added group {gid} {added}" if added else "") +
+              (f"; deselected group {gid} {removed}" if removed else ""))
+    _refresh_model_plots(c, num)
+
+
+@plot_command("SELCLR", max_args=1)
+def cmd_selclr(c):
+    """SELCLR,[NODE|ELEM]: clear the node selection (NODESEL), the element selection (ELEMSEL) or both (blank;
+    SASSI-EDU extension)."""
+    num, m = _display_model(c)
+    what = (c.raw(1) or "").strip().upper() if c.given(1) else ""
+    if what not in ("", "NODE", "ELEM"):
+        raise CommandError("SELCLR takes NODE, ELEM or nothing (both)")
+    if what in ("", "NODE"):
+        m.ui_state["nodesel"] = []
+        _state(c).emit("nodesel", None, model=num, selected=[])
+    if what in ("", "ELEM"):
+        m.ui_state["elemsel"] = []
+        _state(c).emit("elemsel", None, model=num, selected=[])
+    c.confirm(f"model {num}: " + {"": "selection", "NODE": "node selection", "ELEM": "element selection"}[what] + " cleared")
     _refresh_model_plots(c, num)
 
 

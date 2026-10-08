@@ -225,7 +225,7 @@ const SASSI = (() => {
   S.groups = {main: {id: "main", active: null}, view: {id: "view", active: null}};
   const groupEls = (g) => g === "view" ? {bar: $("#tabbar2"), content: $("#tabcontent2")} : {bar: $("#tabbar"), content: $("#tabcontent")};
   /** The group of a tab: plots and results right while the view is split, everything else left. */
-  S.groupFor = (t) => (S.split && (t.kind === "plot" || t.kind === "results") ? "view" : "main");
+  S.groupFor = (t) => (S.split && (t.kind === "plot" || t.kind === "results" || t.kind === "runview") ? "view" : "main");
   /** Is tab t on the screen (the front tab of its group)? */
   S.isShown = (t) => !!t && S.groups[t.group] && S.groups[t.group].active === t;
   function placeTab(t) {
@@ -483,6 +483,8 @@ const SASSI = (() => {
           {label: "Plot Toolbar", check: () => S.toolbarsVisible.plot, action: () => S.toggleToolbar("plot")}]},
         {label: "Split View", check: () => S.split, action: () => S.setSplit(!S.split), tip: "plots and results beside the work instead of a tab in front of it"},
         {label: "Run Summary", action: () => S.openRunSummary && S.openRunSummary(), tip: "key inputs, key outputs and graphs of the active model's run"},
+        {label: "Run View", action: () => SASSI.RunView && SASSI.RunView.open(), tip: "an input file as it runs: its listing beside the model, the part being processed highlighted"},
+        {label: "Properties", check: () => !!(SASSI.Props && SASSI.Props.isShown()), action: () => SASSI.Props && SASSI.Props.toggle(), tip: "the selected nodes and elements: their properties, edited in the model and in its input file"},
         "-",
         {label: "Results Browser", action: () => S.openResults()}]},
       // Learn: the guided course (static/learn.js); its lessons are read from the server
@@ -660,6 +662,7 @@ const SASSI = (() => {
   }
   function onJobEvent(job) {
     if (S.activity) { try { S.activity.onJob(job); } catch (e) { console.error(e); } }
+    if (SASSI.RunView) { try { SASSI.RunView.onJob(job); } catch (e) { console.error(e); } }
     S.state.job = ["starting", "running"].includes(job.state) ? job : null;
     // a job started by typed command text (RUNSITE in Command Entry, commands after it) gets its tab
     if (S.state.job && !S.jobs[job.id] && job.kind === "module") S.openJobTab(job);
@@ -677,6 +680,19 @@ const SASSI = (() => {
   }
 
   // ------------------------------------------------------------------ editor tabs (File > Open, 5.6)
+  S.editors = {};             // open File Editors by path (the Run view marks the line being executed)
+  /** Mark the section and the line of file ``path`` being executed in its File Editor (m = {line, start, end},
+   *  0-based; null clears).  The path of the run (resolved by the interpreter) or, failing that, the only
+   *  open editor of a file of that name. */
+  S.editorHighlight = function (path, m) {
+    let e = S.editors[path];
+    if (!e && path) {
+      const base = path.split(/[\\/]/).pop();
+      const same = Object.values(S.editors).filter((x) => x.path.split(/[\\/]/).pop() === base);
+      if (same.length === 1) e = same[0];
+    }
+    if (e) e.highlight(m);
+  };
   S.openEditor = async function (path) {
     let d;
     try {
@@ -684,8 +700,24 @@ const SASSI = (() => {
     } catch (e) { S.local("ERROR", `File > Open ${path}: ${e.message}`); return; }
     const id = "edit:" + d.path;
     if (S.tab(id)) { S.selectTab(id); return; }
-    const ta = el("textarea", {class: "editor", spellcheck: "false"});
+    const ta = el("textarea", {class: "editor", spellcheck: "false", wrap: "off"});
     ta.value = d.text || "";
+    // the Run view marks the section and the line of this file being executed (behind the transparent text)
+    const hl = el("div", {class: "editor-hl", "aria-hidden": "true"}, el("div", {class: "hl-sec", hidden: true}), el("div", {class: "hl-cur", hidden: true}));
+    const chg = el("div", {class: "hl-chgs"});      // lines the Properties panel changed (D-W6-16), for a while
+    hl.appendChild(chg);
+    let mark = null, changed = [], chgTimer = null;
+    const metrics = () => { const cs = getComputedStyle(ta); return {lh: parseFloat(cs.lineHeight) || 17.4, pt: parseFloat(cs.paddingTop) || 8}; };
+    const placeMark = () => {
+      const [sec, cur] = hl.children;
+      const {lh, pt} = metrics(), y = (i) => pt + i * lh - ta.scrollTop;
+      chg.replaceChildren(...changed.map((i) => el("div", {class: "hl-chg", style: {top: `${y(i)}px`, height: `${lh}px`}})));
+      sec.hidden = cur.hidden = !mark;
+      if (!mark) return;
+      sec.style.top = `${y(mark.start)}px`; sec.style.height = `${(mark.end - mark.start + 1) * lh}px`;
+      cur.style.top = `${y(mark.line)}px`; cur.style.height = `${lh}px`;
+    };
+    ta.addEventListener("scroll", placeMark);
     let dirty = false;
     const status = el("span", {class: "grow", text: d.created ? "new file" : ""});
     const connect = el("button", {class: "btn small", text: "Input ▸ Connect to Command Entry"});
@@ -704,16 +736,44 @@ const SASSI = (() => {
         connect,
         el("button", {class: "btn small", text: "Run (INP)", title: "save, then execute the buffer with INP (extension)", onclick: run}),
         status),
-      ta);
-    const t = S.addTab({id, title: `File Editor - ${d.path}`, kind: "editor", pane,
+      el("div", {class: "editor-wrap"}, hl, ta));
+    const t = S.addTab({id, title: `File Editor - ${d.path}`, kind: "editor", pane, onClose: () => { delete S.editors[d.path]; },
       beforeClose: () => !dirty || SASSI.D.confirm("File Editor", `${d.path} has unsaved changes. Close anyway?`, "Close", "Cancel")});
     ta.addEventListener("input", () => { if (!dirty) { dirty = true; S.setTabTitle(id, `File Editor - ${d.path} *`); } });
     ta.addEventListener("keydown", (ev) => { if ((ev.ctrlKey || ev.metaKey) && ev.key === "s") { ev.preventDefault(); save(); } });
-    const editor = {tabId: id, append: (line) => {
+    const editor = {tabId: id, path: d.path, append: (line) => {
       if (ta.value && !ta.value.endsWith("\n")) ta.value += "\n";
       ta.value += line + "\n";
       if (!dirty) { dirty = true; S.setTabTitle(id, `File Editor - ${d.path} *`); }
+    }, highlight: (m) => {
+      mark = m;
+      if (m) {
+        const {lh, pt} = metrics(), y = pt + m.line * lh;
+        if (y < ta.scrollTop + lh || y > ta.scrollTop + ta.clientHeight - 2 * lh) ta.scrollTop = Math.max(0, y - ta.clientHeight / 3);
+      }
+      placeMark();
+    }, text: () => ta.value, isDirty: () => dirty,
+    /** Replace the buffer (the Properties panel changed the file): saved = the text is the file's. */
+    setText: (text, saved) => {
+      const top = ta.scrollTop;
+      ta.value = text;
+      ta.scrollTop = top;
+      dirty = !saved;
+      S.setTabTitle(id, `File Editor - ${d.path}${dirty ? " *" : ""}`);
+      if (saved) status.textContent = "updated " + new Date().toLocaleTimeString();
+    },
+    /** Mark lines (0-based) for a few seconds and bring the first one into view. */
+    flash: (lines) => {
+      changed = lines.slice();
+      if (changed.length) {
+        const {lh, pt} = metrics(), y0 = pt + changed[0] * lh;
+        if (y0 < ta.scrollTop || y0 > ta.scrollTop + ta.clientHeight - 2 * lh) ta.scrollTop = Math.max(0, y0 - ta.clientHeight / 3);
+      }
+      placeMark();
+      clearTimeout(chgTimer);
+      chgTimer = setTimeout(() => { changed = []; placeMark(); }, 6000);
     }};
+    S.editors[d.path] = editor;
     connect.addEventListener("click", () => {
       if (S.connectedEditor && S.connectedEditor.tabId === id) {
         S.connectedEditor = null;
@@ -744,6 +804,9 @@ const SASSI = (() => {
   S.refreshState = refreshState;
   function handleEvent(ev) {
     if (S.activity) { try { S.activity.onEvent(ev); } catch (e) { console.error(e); } }   // the activity panel
+    if (SASSI.RunView && (ev.type === "run" || ev.type === "progress")) {                 // the Run view
+      try { if (ev.type === "run") SASSI.RunView.onEvent(ev); else SASSI.RunView.onProgress(ev); } catch (e) { console.error(e); }
+    }
     switch (ev.type) {
       case "message": S.appendMessage(ev.kind, ev.text); break;
       case "plot": P().onEvent(ev); break;
@@ -758,6 +821,7 @@ const SASSI = (() => {
         S.state.revision = ev.revision;
         updateTitle();
         P().onModelChanged();
+        if (SASSI.Props) SASSI.Props.refresh();          // the Properties panel (selection and values)
         break;
       case "job": onJobEvent(ev.job); break;
       case "check":         // CHECK / AFWRITE produced messages (requirements 5.5, spec 05a section 3)

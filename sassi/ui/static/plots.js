@@ -373,7 +373,7 @@
         tri2e.push(face.e);
       }
     }
-    const tr = {type: "mesh3d", x, y, z, i: I, j: J, k: K, flatshading: true, hoverinfo: "skip", showscale: false,
+    const tr = {type: "mesh3d", x, y, z, i: I, j: J, k: K, flatshading: true, hoverinfo: opts.click ? "none" : "skip", showscale: false,
       lighting: {ambient: 0.75, diffuse: 0.45, specular: 0.05, roughness: 0.9, fresnel: 0.05}, opacity: opts.opacity || 1, meta: {role: "mesh"}};
     if (opts.intensity) {
       tr.intensity = opts.intensity(x.length, faces, sc);
@@ -393,21 +393,44 @@
     }
     return {type: "scatter3d", mode: "lines", x, y, z, line: {color: opts.color || "#202020", width: opts.width || 1.5}, hoverinfo: "skip"};
   }
-  function lineElementTraces(sc, xyz) {
+  function lineElementTraces(sc, xyz, click) {
     const P0 = xyz || sc.xyz;
     const byColor = {};
     sc.edges.forEach((e, k) => {
       const c = sc.elem_color[sc.edge_elem[k]] || "#008000";
-      const b = byColor[c] || (byColor[c] = {x: [], y: [], z: [], text: []});
-      for (const i of e) { b.x.push(P0[i][0]); b.y.push(P0[i][1]); b.z.push(P0[i][2]); }
-      b.x.push(null); b.y.push(null); b.z.push(null);
+      const b = byColor[c] || (byColor[c] = {x: [], y: [], z: [], cd: []});
+      for (const i of e) { b.x.push(P0[i][0]); b.y.push(P0[i][1]); b.z.push(P0[i][2]); b.cd.push(sc.edge_elem[k]); }
+      b.x.push(null); b.y.push(null); b.z.push(null); b.cd.push(null);
     });
-    const tr = Object.entries(byColor).map(([c, b]) => ({type: "scatter3d", mode: "lines", x: b.x, y: b.y, z: b.z, line: {color: c, width: 5}, hoverinfo: "skip"}));
+    // click: the element index of each point (the Properties panel selects the element, D-W6-16)
+    const hov = (cd) => (click ? {hoverinfo: "none", customdata: cd, meta: {role: "edges"}} : {hoverinfo: "skip"});
+    const tr = Object.entries(byColor).map(([c, b]) => Object.assign({type: "scatter3d", mode: "lines", x: b.x, y: b.y, z: b.z, line: {color: c, width: 5}}, hov(b.cd)));
     if (sc.points.length) {
-      tr.push({type: "scatter3d", mode: "markers", x: sc.points.map((i) => P0[i][0]), y: sc.points.map((i) => P0[i][1]), z: sc.points.map((i) => P0[i][2]),
-        marker: {size: 5, symbol: "diamond", color: sc.point_elem.map((e) => sc.elem_color[e])}, hoverinfo: "skip"});
+      tr.push(Object.assign({type: "scatter3d", mode: "markers", x: sc.points.map((i) => P0[i][0]), y: sc.points.map((i) => P0[i][1]), z: sc.points.map((i) => P0[i][2]),
+        marker: {size: 5, symbol: "diamond", color: sc.point_elem.map((e) => sc.elem_color[e])}}, hov(sc.point_elem)));
     }
     return tr;
+  }
+  const SEL_COLOR = "#2f6fff";
+  /** The selected elements (ELEMSEL): blue outlines and thick blue lines; ``faces``: also their faces (a plot
+   *  without a face mesh -- the node plot; the element plot paints the faces themselves, modelPlotTraces). */
+  function selectedTraces(sc, faces_) {
+    const sel = new Set(sc.elem_selected || []);
+    if (!sel.size) return [];
+    const out = [];
+    const faces = faceList(sc, {all: true, only: (e) => sel.has(e)});
+    if (faces.length) {
+      if (faces_) out.push(meshTrace(sc, faces, {color: () => SEL_COLOR, opacity: 0.55, click: true}));
+      out.push(outlineTrace(sc, faces, {color: "#0038b8", width: 4}));
+    }
+    const x = [], y = [], z = [], cd = [];
+    sc.edges.forEach((ed, k) => {
+      if (!sel.has(sc.edge_elem[k])) return;
+      for (const i of ed) { x.push(sc.xyz[i][0]); y.push(sc.xyz[i][1]); z.push(sc.xyz[i][2]); cd.push(sc.edge_elem[k]); }
+      x.push(null); y.push(null); z.push(null); cd.push(null);
+    });
+    if (x.length) out.push({type: "scatter3d", mode: "lines", x, y, z, line: {color: "#2f6fff", width: 10}, hoverinfo: "none", customdata: cd, meta: {role: "edges"}});
+    return out;
   }
   function markerTrace(sc, idx, opts, xyz) {
     const P0 = xyz || sc.xyz;
@@ -532,25 +555,145 @@
       if (!t.ownRelayout && ev && Object.keys(ev).some((k) => k.startsWith("scene.camera") || k.startsWith("scene.aspectratio"))) t.userView = true;
     });
   }
+  /** Plot kinds whose clicks select nodes and elements. */
+  const SELECTABLE = ["MODELPLOT", "NODEPLOT", "CUTPLOT"];
+  /** Command text of a click on node ``id``: only it (SELCLR, NODESEL), or toggled with ``add``; a click on the
+   *  only selected node clears the selection. */
+  function selectNode(sc, id, add) {
+    if (id === undefined || id === null || Number.isNaN(id)) return;
+    if (add) { S.command(`NODESEL,${id}`); return; }
+    const only = (sc.selected || []).length === 1 && sc.node_id[sc.selected[0]] === id && !(sc.elem_selected || []).length;
+    S.command(only ? ["SELCLR"] : ["SELCLR", `NODESEL,${id}`]);
+  }
+  function selectElement(sc, k, add) {
+    const g = sc.elem_group[k], e = sc.elem_id[k];
+    if (add) { S.command(`ELEMSEL,${g},${e}`); return; }
+    const es = sc.elem_selected || [];
+    const only = es.length === 1 && es[0] === k && !(sc.selected || []).length;
+    S.command(only ? ["SELCLR"] : ["SELCLR", `ELEMSEL,${g},${e}`]);
+  }
+  /** Screen projection of the 3D plot in div: model point -> [x, y (client pixels), depth (smaller = nearer)],
+   *  from the camera matrices of the WebGL scene (the data are scaled by dataScale before them). */
+  function projector(div) {
+    const scn = div && div._fullLayout && div._fullLayout.scene && div._fullLayout.scene._scene;
+    const gp = scn && scn.glplot, cp = gp && gp.cameraParams;
+    if (!cp || !cp.view || !cp.projection) return null;
+    const mul = (A, B) => { const C = new Array(16).fill(0); for (let i = 0; i < 4; i++) for (let j = 0; j < 4; j++) for (let k = 0; k < 4; k++) C[j * 4 + i] += A[k * 4 + i] * B[j * 4 + k]; return C; };
+    const id = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1];
+    const M = mul(Array.from(cp.projection), mul(Array.from(cp.view), cp.model ? Array.from(cp.model) : id));
+    const ds = scn.dataScale || [1, 1, 1], r = gp.canvas.getBoundingClientRect();
+    return (p) => {
+      const x = p[0] * ds[0], y = p[1] * ds[1], z = p[2] * ds[2];
+      const w = M[3] * x + M[7] * y + M[11] * z + M[15];
+      return [r.left + ((M[0] * x + M[4] * y + M[8] * z + M[12]) / w + 1) / 2 * r.width,
+        r.top + (1 - (M[1] * x + M[5] * y + M[9] * z + M[13]) / w) / 2 * r.height, (M[2] * x + M[6] * y + M[10] * z + M[14]) / w];
+    };
+  }
+  /** What a click at client (cx, cy) points at: the front-most face containing it or line element within 6 px
+   *  ({elem}); with ``nodes`` (Alt, the node plot) the nearest visible node within 12 px ({node}). */
+  function pickAt(div, d, cx, cy, nodes) {
+    const sc = d.scene, proj = projector(div);
+    if (!proj) return null;
+    const P = sc.xyz.map(proj);
+    if (nodes) {
+      let best = null, bd = 144;
+      sc.node_id.forEach((id, i) => {
+        if (!sc.node_visible[i]) return;
+        const dd = (P[i][0] - cx) ** 2 + (P[i][1] - cy) ** 2;
+        if (dd < bd || (dd === bd && best !== null && P[i][2] < P[best][2])) { bd = dd; best = i; }
+      });
+      return best === null ? null : {node: sc.node_id[best]};
+    }
+    let hit = null;
+    const take = (elem, depth) => { if (!hit || depth < hit.depth) hit = {elem, depth}; };
+    sc.faces.forEach((f, r) => {
+      const pts = f.filter((i) => i >= 0).map((i) => P[i]);
+      let inside = false;
+      for (let a = 0, b = pts.length - 1; a < pts.length; b = a++) {
+        if ((pts[a][1] > cy) !== (pts[b][1] > cy) && cx < (pts[b][0] - pts[a][0]) * (cy - pts[a][1]) / (pts[b][1] - pts[a][1]) + pts[a][0]) inside = !inside;
+      }
+      if (inside) take(sc.face_elem[r], pts.reduce((s_, q) => s_ + q[2], 0) / pts.length);
+    });
+    sc.edges.forEach(([i, j], r) => {
+      const a = P[i], b = P[j], L2 = (b[0] - a[0]) ** 2 + (b[1] - a[1]) ** 2;
+      const u = L2 > 0 ? Math.max(0, Math.min(1, ((cx - a[0]) * (b[0] - a[0]) + (cy - a[1]) * (b[1] - a[1])) / L2)) : 0;
+      const qx = a[0] + u * (b[0] - a[0]), qy = a[1] + u * (b[1] - a[1]);
+      if ((qx - cx) ** 2 + (qy - cy) ** 2 <= 36) take(sc.edge_elem[r], a[2] + u * (b[2] - a[2]) - 1e-3);   // a line in front of its face
+    });
+    return hit;
+  }
   function attachClick(t) {
     const div = t.plotDiv;
     trackView(t, div);
     if (div._sassiClick) return;
     div._sassiClick = true;
+    // a plot tab of a model selects with a click (the Properties panel, D-W6-16): picked here from the screen
+    // positions of the faces, line elements and nodes (the WebGL picking of the 3D plot misses clicks and keeps
+    // Shift for panning) -- SELCLR + NODESEL / ELEMSEL; Shift, Ctrl or Cmd adds to the selection or removes
+    // from it; Alt (and the node plot) picks the nearest node
+    const selectable = () => t.plotId && t.data && t.data.scene && SELECTABLE.includes(t.data.kind);
+    let down = null;
+    div.addEventListener("mousedown", (ev) => { down = [ev.clientX, ev.clientY]; }, true);
+    div.addEventListener("click", (ev) => {
+      if (!selectable() || !down || Math.hypot(ev.clientX - down[0], ev.clientY - down[1]) > 4) return;   // a drag
+      const hit = pickAt(div, t.data, ev.clientX, ev.clientY, ev.altKey || t.data.kind === "NODEPLOT");
+      if (!hit) return;
+      const add = ev.shiftKey || ev.ctrlKey || ev.metaKey;
+      if (hit.node !== undefined) selectNode(t.data.scene, hit.node, add);
+      else selectElement(t.data.scene, hit.elem, add);
+    });
     div.on("plotly_click", (ev) => {
       const pt = ev && ev.points && ev.points[0];
       if (!pt || !t.data) return;
-      const tr = pt.data;
+      const tr = pt.data, sc = t.data.scene;
+      if (tr.meta && tr.meta.role === "soil") {
+        S.local("INFO", `Soil: ${tr.meta.text} (display only: the SASSI layers are horizontally infinite)`);
+        return;
+      }
+      if (selectable()) return;                          // picked above
+      let elem;
+      if (tr.meta && tr.meta.role === "mesh" && tr._tri2e && pt.pointNumber !== undefined) elem = tr._tri2e[pt.pointNumber];
+      else if (tr.meta && tr.meta.role === "edges" && pt.customdata !== undefined && pt.customdata !== null) elem = pt.customdata;
       if (tr.meta && tr.meta.role === "nodes" && pt.customdata !== undefined) {
         S.local("INFO", `Node ${pt.customdata}: (${S.fmt(pt.x)}, ${S.fmt(pt.y)}, ${S.fmt(pt.z)})`);
-      } else if (tr.meta && tr.meta.role === "soil") {
-        S.local("INFO", `Soil: ${tr.meta.text} (display only: the SASSI layers are horizontally infinite)`);
-      } else if (tr.meta && tr.meta.role === "mesh" && tr._tri2e && pt.pointNumber !== undefined) {
-        const sc = t.data.scene, e = tr._tri2e[pt.pointNumber];
-        if (e !== undefined) S.local("INFO", `Element ${sc.elem_id[e]}, Group ${sc.elem_group[e]} (material ${sc.elem_mat[e]}, property ${sc.elem_prop[e]})`);
+      } else if (elem !== undefined) {
+        S.local("INFO", `Element ${sc.elem_id[elem]}, Group ${sc.elem_group[elem]} (material ${sc.elem_mat[elem]}, property ${sc.elem_prop[elem]})`);
       }
     });
   }
+  /** The traces of an element plot (MODELPLOT): the soil island, the faces, their outlines, the line elements and
+   *  the node markers.  ``dim``: faded, in grey (the Run view draws the part being processed on top). */
+  function modelPlotTraces(d, dim) {
+    const sc = d.scene, v = d.view, traces = [...soilTraces(d, false)];
+    const shrink = v.shrink ? (d.shader.shrink || 0.06) : 0;
+    const faces = faceList(sc, {all: !!shrink});
+    const sel = new Set(sc.elem_selected || []);
+    const own = sel.size ? (face) => (sel.has(face.e) ? SEL_COLOR : sc.elem_color[face.e]) : null;     // selected: blue
+    if (!v.wireframe) traces.push(meshTrace(sc, faces, dim ? {shrink, color: () => "#c9ced4", opacity: 0.45} : {shrink, click: true, color: own}));
+    traces.push(outlineTrace(sc, v.wireframe ? faceList(sc, {all: true}) : faces, {shrink, color: dim ? "#8d949c" : v.wireframe ? "#303030" : "#202020", width: dim ? 1 : v.wireframe ? 1.2 : 1.5}));
+    traces.push(...lineElementTraces(sc, null, !dim).map((tr) => dim && tr.mode === "lines" ? Object.assign(tr, {line: {color: "#9aa1a9", width: 3}}) : tr));
+    if (!dim) traces.push(...selectedTraces(sc, !!v.wireframe), ...nodeMarkers(d, sc, false));
+    return traces;
+  }
+  /** Draw an element plot's data (the Run view's live snapshot: sassi/ui/runview.py snapshot) into the host
+   *  of a plot-like object t ({host}), with extra traces on top (its highlight).  opts: note false (no soil
+   *  note), dim true (the model faded, see modelPlotTraces).  The view is the data's; a view the learner
+   *  rotated or zoomed with the mouse is kept while the drawn extents do not change. */
+  P.drawModel = function (t, d, extra, opts) {
+    t.data = d;
+    const div = plotDiv(t);
+    const traces = d.scene && d.scene.node_id.length ? modelPlotTraces(d, !!(opts && opts.dim)).concat(extra || []) : [];
+    Plotly.react(div, traces, layoutKeepingZoom(t, d, opts && opts.note === false ? null : soilNote(d), false, div), PLOT_CONFIG);
+    attachClick(t);
+  };
+  /** Draw a soil-layer table (LAYERPLOT data) into the host of t. */
+  P.drawLayers = function (t, d) { t.data = d; renderLayer(t, d); };
+  /** Fit a plot drawn with drawModel / drawLayers to its host's new size. */
+  P.resizeHost = function (t) { resize(t); };
+  /** The trace builders the Run view uses for its highlight (same geometry as the plot). */
+  P.sceneHelpers = {faceList, meshTrace, outlineTrace, markerTrace};
+  P.pickAt = pickAt;                 // the click picking of the model plots (tests)
+  P.projector = projector;
   function render3D(t, d) {
     const sc = d.scene, v = d.view;
     const traces = [];
@@ -559,17 +702,13 @@
       Plotly.react(div0, [], sceneLayout(d, {annotations: [{text: "nothing to draw (all elements hidden?)", showarrow: false}]}, false, div0), PLOT_CONFIG);
       return;
     }
-    if (d.kind === "MODELPLOT" || d.kind === "NODEPLOT") traces.push(...soilTraces(d, d.kind === "NODEPLOT"));
     if (d.kind === "MODELPLOT") {
-      const shrink = v.shrink ? (d.shader.shrink || 0.06) : 0;
-      const faces = faceList(sc, {all: !!shrink});
-      if (!v.wireframe) traces.push(meshTrace(sc, faces, {shrink}));
-      traces.push(outlineTrace(sc, v.wireframe ? faceList(sc, {all: true}) : faces, {shrink, color: v.wireframe ? "#303030" : "#202020", width: v.wireframe ? 1.2 : 1.5}));
-      traces.push(...lineElementTraces(sc));
-      traces.push(...nodeMarkers(d, sc, false));
+      traces.push(...modelPlotTraces(d));
     } else if (d.kind === "NODEPLOT") {
+      traces.push(...soilTraces(d, true));
       traces.push(outlineTrace(sc, faceList(sc, {}), {color: "#c8c8c8", width: 1}));
       traces.push(...lineElementTraces(sc).map((tr) => Object.assign(tr, {line: {color: "#c8c8c8", width: 2}})));
+      traces.push(...selectedTraces(sc, true));
       traces.push(...nodeMarkers(d, sc, true));
     } else if (d.kind === "CUTPLOT") {
       traces.push(outlineTrace(sc, faceList(sc, {}), {color: "#404040", width: 1}));

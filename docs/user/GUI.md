@@ -81,7 +81,7 @@ The same GUI also runs with no installation at all, entirely in a web browser: s
   <title>`. Bringing a plot tab to the front sends `ACTIVATEPLOT,<id>`, and closing it sends `CLOSEPLOT`,
   because the plot setting commands act on the active plot. File editors (`File Editor - <path>`),
   module outputs (`SITE output`), Results, Help and Verification also open as tabs. With **View > Split
-  View** (on by default) the plots and the Results browser open in a pane of their own to the right of
+  View** (on by default) the plots, the Results browser and the Run view (section 7.3) open in a pane of their own to the right of
   the work -- Command History, Learn, the lesson, File Editors, module output -- so a lesson step or a
   listing stays on the screen beside its plots. Each pane has its own tabs; the right pane closes with its
   last tab; drag the divider to share the width (double-click: equal halves; kept by the browser). The
@@ -184,6 +184,8 @@ that the folder stays one argument when the history is replayed.
 | Toolbars > Main Toolbar / Plot Toolbar | show or hide the toolbars (not saved, UI-07) |
 | Split View | plots and the Results browser in a pane of their own beside the work (on by default; section 2); kept by the browser |
 | Run Summary | the summary window of the active model's run (section 7.2) |
+| Run View | an input file as it runs: its listing beside the model, the part being processed highlighted (section 7.3) |
+| Properties | the Properties panel of the selected nodes and elements (section 6.4); it opens by itself when something is selected |
 | Results Browser | as File > Results Browser |
 
 ### 3.7 Learn
@@ -379,7 +381,7 @@ BBCGEN for the curves; Help > Option NON). **Modules > NONLINEAR** runs `RUNNONL
 | Plot | Drawn as | Interaction |
 |---|---|---|
 | Element (MODELPLOT) | Plotly `mesh3d` faces for SOLID / SHELL / PLANE, lines for BEAMS, SPRING and GENERAL, element colours by group / material / property (ElemPalette), red interaction nodes, mass markers (X red, Y green, Z blue) | toolbar toggles; mouse: drag to rotate (turntable about the vertical Z axis), wheel to zoom, right-drag to pan; a click on a node or face prints its number in the Command History |
-| Node (NODEPLOT) | element-connected nodes: black, interaction red, fixed DOF green square, mass, selected blue square | `NODESEL`, Window Options hide/show |
+| Node (NODEPLOT) | element-connected nodes: black, interaction red, fixed DOF green square, mass, selected blue square | `NODESEL`, Window Options hide/show; a click selects a node (section 6.4) |
 | Cut (CUTPLOT) | wireframe of the model with the cut elements filled red | any model number |
 | Spectrum / Time History | one line per line object (SpecLines / THLines colours), legend, log axes, minor grids, markers, stippling; the axes span the data extent unless PLOTRANGE sets them | Graph Plot Options (Windows Settings) |
 | Soil Layer | layer column proportional to thickness plus the property table, with a Halfspace row | Soil Layer Windows Setting (Start / End layer, columns) |
@@ -395,6 +397,8 @@ actions and are not recorded: they are kept when the window or the panels are re
 re-draws the plot (labels, colours, shrink ...) and between animation frames, and any view command
 (Change View, Reset View, Change Centre / `CNGVIEW`, `RSTVIEW`, `CNGCENTER`, `RSTCENTER`) replaces them by
 the commanded view.
+
+In an element, node or cut plot tab a **click** selects: see section 6.4.
 
 ### 6.1 Line Selection (Plot > Spectrum TFU-TFI / Time History)
 
@@ -473,6 +477,53 @@ The animation tab has **Pause / Start**, `−` / `+` (one frame, while paused) a
 **Pause** keeps the frame on the screen and records it: `PAUSE` + `WINDOWSETTINGS,FRAME,<k>`, so a
 replayed session (and `CAPTUREPLOT`) shows the same frame; moving the slider while paused submits
 `WINDOWSETTINGS,FRAME,<k>` too. The toolbar's Pause/Start button and the Pause key do the same.
+
+### 6.4 Selecting nodes and elements: the Properties panel
+
+**Selecting.** In an element, node or cut plot a click on an element (a face, or a beam, spring or
+general element drawn as a line) selects it alone; in the node plot a click selects the nearest node. With
+**Shift**, **Ctrl** or **Cmd** the click adds the item to the selection or removes it; with **Alt** a click
+on an element selects its node nearest to the click. A click on the only selected item clears the
+selection; a drag still rotates the view. The clicks are command text (rule L17): `SELCLR` and
+`NODESEL,<node>` or `ELEMSEL,<group>,<element>` appear in the Command History. Selected elements are drawn
+blue, selected nodes with a blue square, in every 3D plot of the model.
+
+**The panel.** The **Properties** panel opens on the right when something is selected (**×** closes it
+until the selection changes; **View > Properties** shows or hides it). **Select** adds nodes, or the
+elements of a group, by numbers and ranges (`1-9, 41`: `NODESEL,1-9,41` / `ELEMSEL,<group>,...`); **Clear**
+submits `SELCLR`. For the selected **nodes** it shows the global coordinates, the fixed DOFs (UX ... ROTZ),
+the interaction flag, the translational and rotational masses (`MT`, `MR`, as weights or masses per
+`MUNITS`) and, for one node, its elements (a click selects one). For the selected **elements**, group by
+group: the material (`M`; for excavated-soil SOLID / PLANE elements the soil layer `L`), the section (`R`,
+BEAMS), the spring (`SC`) or matrix property (GENERAL), the thickness (SHELL, TSHELL), the classification
+(`ETYPE`), the integration rule (`EINT`), the end releases at I and J (`KI`, `KJ`, BEAMS) and, for one
+element, its nodes. Where the selected items differ a field reads *mixed*; check boxes show a dash.
+
+**Editing.** Change fields (a changed field is outlined blue; an invalid number red) and press **Apply**;
+**Revert** restores the values. Only the changed fields are applied, to every selected item, as command
+text run as if typed: `N` (in the global system: wrapped in `CSYS,0` / `CSYS,<active>` when a local system is
+active), `D`, `INT`, `MT`, `MR`, and for elements `GROUP,<g>` then `MSET`, `RSET`, `THICK`, `ETYPE`, `EINT`,
+`KI`, `KJ` over ranges of elements, the active group activated again at the end. The plots and the panel
+then show the new values.
+
+**The input file follows.** When the model was built by an input file in this session (`INP`, **Run
+(INP)**, an example's **Run all**), **also change the input file** (ticked) changes that file so that it
+builds the edited model:
+
+* a node's own explicit line -- `N,82,0,0,16`, `MT,82,...`, `MR,...` -- is rewritten in place when the file
+  has exactly one such line for the node (and the node is in the global system);
+* every other change -- nodes made by `FILL`, `NGEN`, `FOREACH` ..., fixities, interaction flags, element
+  properties -- goes into an **edits section**,
+  `* ------- edits (Properties panel)` and `* model <name>: ...`, placed after the section of the file
+  that last changed the model when it ran, so before its `CHECK`, `AFWRITE` and module runs and before a
+  `CPMODEL` copies it (a file the session did not run: before the section of its first `CHECK`, `AFWRITE`,
+  `WRITE`, `CPMODEL` or `RUN...` line). Later edits go into the same section, and a node's `N`, `MT` or `MR`
+  line there replaces its earlier one.
+
+The file is saved, and an open File Editor of it shows the change with the changed lines marked blue for a
+few seconds (**Show** opens it). A File Editor with unsaved edits of its own gets the change in its buffer,
+not on the disk. A model typed at Command Entry has no input file: the changes go to the model (and to a
+File Editor connected to Command Entry).
 
 ---
 
@@ -591,6 +642,36 @@ selector switches between them. The window does not open by itself while a lesso
 own result buttons) or after a single intermediate module (SITE, POINT, HOUSE, FORCE, ANALYS); **Show this
 summary after every run** switches it off (kept by the browser), and **View > Run Summary** opens it at any
 time.
+
+### 7.3 The Run view
+
+**View > Run View** -- and by itself when an input file starts (`INP`: Model > Input, **Run (INP)** in the File
+Editor, an example's **Run all**), unless **open on run** is unticked or a lesson is open -- shows the file as
+it runs, in the right-hand group of the split view:
+
+* **The listing** of the file, the **section** being processed shaded and the **line** being executed
+  marked; the bar names the line, the part and the section (`line 78 of 197 · structure › Beam orientation
+  (K) nodes 86..89 ...`). Sections are the blocks between blank lines and lone `*` lines; a block's title is
+  its first comment, and a `* ---- name` line starts a part. A nested `INP` file is listed while it runs. The
+  **File Editor** of the running file marks the same section and line.
+* **The model**, drawn as the plot draws it, with the free-field soil around it (SHOWSOIL), redrawn as the file
+  builds it; before the first element the nodes are drawn as dots, before the first node the soil column.
+* **The part being processed**, in orange over the faded model, with a caption: what the last line added or
+  changed (`nodes 10-81 added (72)`, `group 1 elements 9-64 (56)`, `soil layers 2`, `interaction nodes 1-81`,
+  `fixed DOFs at nodes ...`, `masses at nodes 82-85`, the output nodes and elements of `NOUT`, `EOUT`,
+  `RDND`); while a module runs, the part its current step works on (the step of the activity panel): the soil
+  layers (SITE, SOIL), the interaction nodes and the soil (POINT), the elements (HOUSE; the dynamic stiffness of
+  ANALYS), the interaction nodes (the impedance, the condensation and the solution of ANALYS), the loaded nodes
+  (FORCE), the output nodes (MOTION; the node whose spectrum is computed), the output elements (STRESS), the
+  node of RELDISP. A module run from the Modules menu is followed the same way.
+* **Speed**: *full speed* shows what the run reaches -- the commands that build a model take milliseconds, so
+  the build shows only in passing; *watch* (0.12 s) and *slow* (0.4 s) pause after every line that changes the
+  model, to see it being built (module runs are not slowed). The setting is kept by the browser and can be
+  changed while a file runs.
+
+The Run view only shows: it is not command text and changes neither the model nor the results; a file run
+with the view closed is as fast as before. While the view is on the screen the activity panel sits at the
+bottom left.
 ---
 
 ## 8. Help (F1)

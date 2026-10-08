@@ -282,6 +282,11 @@ class Interpreter:
         self.module_progress: Optional[Callable[[str, float, str], None]] = None
         #: module_step(module, key, data): the computation step a module enters, with its sizes (GUI)
         self.module_step: Optional[Callable[[str, str, Dict[str, Any]], None]] = None
+        #: GUI hooks of the Run view: input_frame(event, frame, lines) when an INP / macro file starts ("start",
+        #: before its first line) and ends ("end"); line_done(line, total, source, command_line, ok) after each
+        #: of its lines.  Display aids: they never change or stop the run.
+        self.input_frame: Optional[Callable[[str, "InputFrame", Sequence[str]], None]] = None
+        self.line_done: Optional[Callable[[int, int, str, str, bool], None]] = None
         self.write_options: Dict[str, Any] = {"mdl": False, "afwr": False}
         self._summaries: List[RunSummary] = []
         self._direct = False
@@ -547,6 +552,7 @@ class Interpreter:
             raise CommandError(f"INP nesting deeper than {INP_DEPTH} (L14)")
         self._summaries.append(summary)
         self.inputs.append(frame)
+        self._hook(self.input_frame, "start", frame, lines)
         try:
             total = len(lines)
             for i, line in enumerate(lines, start=1):
@@ -554,16 +560,28 @@ class Interpreter:
                 if self.progress is not None:
                     self.progress(i, total, summary.source, line)
                 self._direct = True
-                self.execute(line)
+                ok = self.execute(line)
                 self._direct = False
+                self._hook(self.line_done, i, total, summary.source, line, ok)
         finally:
             self.inputs.pop()
             self._summaries.pop()
+            self._hook(self.input_frame, "end", frame, lines)
         summary.lines = len(lines)
         self.emit(Kind.INFO, summary.text())
         if not self.inputs:
             self.emit(Kind.INFO, EOF_MESSAGE)
         return summary
+
+    @staticmethod
+    def _hook(fn: Optional[Callable[..., None]], *args: Any) -> None:
+        """Call a GUI display hook; a failing hook never changes or stops the run."""
+        if fn is None:
+            return
+        try:
+            fn(*args)
+        except Exception:                 # noqa: BLE001 -- a display aid
+            pass
 
     def run_file(self, path: Union[str, Path], resolve: bool = True) -> RunSummary:
         """INP: execute the commands of a ``.pre`` file (nested INP allowed, depth 32).

@@ -53,6 +53,21 @@ class EventLog:
             fn(ev)
         return seq
 
+    def replace(self, seq: int, **data: Any) -> bool:
+        """Replace values of the event ``seq`` (the Run view keeps the data of its newest model snapshot only);
+        False when it is no longer kept.  Values are replaced, never keys added or removed, so a reader that is
+        serialising the event at the same time is safe."""
+        with self._cond:
+            for ev in reversed(self._events):
+                if ev["seq"] == seq:
+                    for k, v in data.items():
+                        if k in ev:
+                            ev[k] = v
+                    return True
+                if ev["seq"] < seq:
+                    break
+        return False
+
     def since(self, seq: int, timeout: float = 0.0, limit: int = 5000) -> Tuple[List[Dict[str, Any]], int, bool]:
         """Events with a sequence number above ``seq``.
 

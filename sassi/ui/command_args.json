@@ -1732,6 +1732,24 @@
    }
   ]
  },
+ "ELEMSEL": {
+  "summary": "Toggles the selection of elements of a group (SASSI-EDU extension, the element counterpart of NODESEL): selected elements are drawn blue in the 3D plots and their properties shown in the GUI's Properties panel (a click on an element in a plot submits ELEMSEL).",
+  "configures": "Plots",
+  "source": "requirements §7.20 (D-W6-16); handler docstring",
+  "notes": "An element already selected is deselected. The selection belongs to the model (all its plots); SELCLR clears it. Display only: nothing of the analysis changes.",
+  "args": [
+   {
+    "pos": 1,
+    "name": "group",
+    "meaning": "group number of the elements"
+   },
+   {
+    "pos": 2,
+    "name": "E1..E19",
+    "meaning": "element numbers of the group, or ranges a-b"
+   }
+  ]
+ },
  "ELENUM": {
   "summary": "Shows or hides element number labels on the active element, cut, contour or deformed plot, like ANSYS /PNUM,ELEM.",
   "configures": "Plots",
@@ -5265,6 +5283,19 @@
   "notes": "Error if the active model has no elements.",
   "args": []
  },
+ "NODESEL": {
+  "summary": "Toggles the selection of nodes: a selected node is drawn with a blue square in the 3D plots, and its properties are shown in the GUI's Properties panel (a click on a node in a plot submits NODESEL).",
+  "configures": "Plots",
+  "source": "manual section 9.14.26; requirements §7.20 (D-W6-16); handler docstring",
+  "notes": "A node already selected is deselected. SASSI-EDU: an argument can be a range a-b (NODESEL,1-81). The selection belongs to the model (all its plots); SELCLR clears it.",
+  "args": [
+   {
+    "pos": 1,
+    "name": "N1..N20",
+    "meaning": "node numbers to select or deselect; SASSI-EDU: also ranges a-b"
+   }
+  ]
+ },
  "NONLINBAT": {
   "summary": "Writes <model>_NONLINBAT.pre, a generic editable script of the whole Option NON analysis (elastic SSI pass, then NONLINITER iterations), to run with INP.",
   "configures": "Files",
@@ -6632,6 +6663,24 @@
     "name": "inc",
     "meaning": "system-number step",
     "default": "1"
+   }
+  ]
+ },
+ "SELCLR": {
+  "summary": "Clears the node selection (NODESEL), the element selection (ELEMSEL) or both (SASSI-EDU extension).",
+  "configures": "Plots",
+  "source": "requirements §7.20 (D-W6-16); handler docstring",
+  "notes": "Display only. A plain click on a node or element in a plot submits SELCLR and then NODESEL or ELEMSEL (select only that one); a click with Shift, Ctrl or Cmd adds to the selection or removes from it.",
+  "args": [
+   {
+    "pos": 1,
+    "name": "what",
+    "meaning": "the selection to clear",
+    "default": "blank (both)",
+    "values": {
+     "NODE": "the node selection",
+     "ELEM": "the element selection"
+    }
    }
   ]
  },

@@ -40,6 +40,11 @@ Routes (``route(method, path, query, body)``; all answers are JSON)::
     POST /api/harmonic/show             {"folder", "title"} -> {"lines": [PROCFRAME ..., DEFORMPLOT ...]}
     GET  /api/run_summary[?model=]      key inputs, key outputs and charts of a model's run (sassi/ui/runsummary.py)
     POST /api/run_summary/plot          {"model", "chart"} -> {"lines": [READSPEC ..., SPECPLOT ...]}
+    GET  /api/runview                   the active model as the Run view draws it (sassi/ui/runview.py)
+    POST /api/runview                   {"enabled", "pace"}: the Run view is open / the watching speed
+    GET  /api/selection[?model=]        the selected nodes and elements with their properties (sassi/ui/properties.py)
+    POST /api/properties                {"model", "edits", "input": {"path", "text"?}}: edit them with command
+                                        text and update the input file that built the model
                                         (/api/dynp: the model's DYNP properties and the built-in library
                                         curves; /api/file and /api/fileinfo also read built-in @ names)
     POST /api/export_table {name}       File > Export Table (CSV of the active 2D plot, D-UI-17)
@@ -95,7 +100,7 @@ from ..prep import Interpreter
 from ..prep.lexer import LexError, is_comment, join_command, split_args, split_head
 from ..prep.messages import Kind
 from ..prep.registry import CommandError, lookup
-from . import dialogs, files, harmonic, learn, modeldata, runsummary
+from . import dialogs, files, harmonic, learn, modeldata, properties, runsummary, runview
 from . import explain as explainer
 from . import lessons as lessonfiles
 from .events import EventLog
@@ -193,6 +198,9 @@ class GuiSession:
         self.plots.auto_render = False            # the browser draws the plots (Plotly)
         self.plots.dialog_handler = self._dialog_handler
         self.plots.subscribe(self._on_plot)
+        # the Run view: what each line of a running INP file adds to the model, and the model drawn live
+        self.runview = runview.RunTracker(self.interp, self.events.push, lambda: self.plots)
+        self.runview.replace = self.events.replace
         if sdir is not None:
             self.plots.ani_db_path = sdir / "SASSIani.xml"
         for k in SHADER_FIELDS:                   # shader options persist (UI-07, D-UI-07, 5.10)
@@ -778,6 +786,97 @@ class GuiSession:
         except harmonic.HarmonicError as exc:
             raise ApiError(exc.status, str(exc)) from None
 
+    def run_view_scene(self) -> Dict[str, Any]:
+        """``GET /api/runview``: the active model as the Run view draws it (requirements 7.20, D-W6-15)."""
+        with self.locked():
+            return runview.snapshot(self.interp, self.plots)
+
+    def run_view_settings(self, b: Dict[str, Any]) -> Dict[str, Any]:
+        """``POST /api/runview {"enabled", "pace"}``: a Run view is open (model snapshots are made while a file
+        runs) and the watching speed (seconds of pause after a line that changes the model; 0 = full speed).
+        Not a command: it changes what is shown, never the model or the results."""
+        pace = b.get("pace")
+        try:
+            pace = None if pace is None else float(pace)
+        except (TypeError, ValueError):
+            raise ApiError(400, "pace must be a number of seconds")
+        return self.runview.configure(enabled=b.get("enabled"), pace=pace)
+
+    # ------------------------------------------------------------------ the Properties panel (D-W6-16)
+    def _selection_model(self, value: Any) -> int:
+        """The model of the Properties panel: the given number, else the model of the active 3D plot (the one
+        NODESEL / ELEMSEL act on), else the active model."""
+        if value not in (None, "", "-1"):
+            return _int(str(value), "model")
+        p = self.plots.active_plot
+        if p is not None and p.family in ("3d", "anim") and p.model in self.interp.models:
+            return p.model
+        return self.interp.active_model
+
+    def _input_of(self, number: int) -> Optional[Dict[str, Any]]:
+        """The input file that last changed model ``number`` in this session, if it can be written."""
+        src = self.runview.model_lines.get(number)
+        if src is None:
+            return None
+        path, line = src
+        try:
+            p = files.safe_path(path, self._roots(), must_exist=True)
+        except files.PathError:
+            return None
+        return {"path": str(p), "name": p.name, "line": line}
+
+    def selection(self, q: Dict[str, List[str]]) -> Dict[str, Any]:
+        """``GET /api/selection[?model=]``: the selected nodes and elements with their properties."""
+        with self.locked():
+            num = self._selection_model(_q(q, "model", ""))
+            out = properties.selection(self.interp, num)
+            out["input"] = self._input_of(num) if out["model"] is not None else None
+        return out
+
+    def edit_properties(self, b: Dict[str, Any]) -> Dict[str, Any]:
+        """``POST /api/properties {"model", "edits", "input"}``: the edits as command text (run as typed, so they
+        are in the Command History and a connected File Editor), and the input file that built the model changed
+        to build the edited model.  ``input``: ``{"path"}`` (the file is read, changed and saved) or ``{"path",
+        "text"}`` (the text of a File Editor with unsaved changes: changed and returned, not saved); absent or
+        null: the model only."""
+        edits = b.get("edits")
+        if not isinstance(edits, list) or not edits:
+            raise ApiError(400, "edits must be a non-empty list")
+        inp = b.get("input") or None
+        with self.locked():
+            num = self._selection_model(b.get("model"))
+            m = self.interp.models.get(num)
+            if m is None:
+                raise ApiError(404, f"model {num} is not in memory")
+            try:
+                lines = properties.commands(m, edits)
+            except properties.EditError as exc:
+                raise ApiError(400, str(exc)) from None
+            patched = None
+            if inp and lines:
+                src = self.runview.model_lines.get(num)
+                try:
+                    p = files.safe_path(str(inp.get("path", "")), self._roots(), must_exist=True)
+                    text = inp["text"] if isinstance(inp.get("text"), str) else files.read_text(p)
+                except files.PathError as exc:
+                    raise ApiError(403, str(exc)) from None
+                anchor = src[1] if src is not None and Path(src[0]) == p else None
+                new, info = properties.patch_input(text, m, edits, anchor=anchor)   # before the model changes
+                patched = (p, new, info, isinstance(inp.get("text"), str))
+            if num != self.interp.active_model:
+                lines = [f"ACTM,{num}"] + lines + [f"ACTM,{self.interp.active_model}"]
+        res = self.execute(lines) if lines else {"ok": True, "results": [], "messages": []}
+        out = {"ok": res["ok"], "lines": lines, "results": res.get("results", []), "messages": res.get("messages", [])}
+        if patched is not None:
+            p, new, info, buffer_only = patched
+            if not buffer_only:
+                try:
+                    files.write_text(p, new)
+                except (OSError, files.PathError) as exc:
+                    raise ApiError(403, f"{p}: {exc}") from None
+            out["input"] = dict(info, path=str(p), name=p.name, text=new, saved=not buffer_only)
+        return out
+
     def run_summary(self, query: Dict[str, Any], body: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """The summary window after a run (:mod:`sassi.ui.runsummary`); with ``body`` the command text that opens
         one of its charts as a plot."""
@@ -1279,6 +1378,10 @@ class GuiSession:
         add("POST", r"/api/animations/remove", lambda m, q, b: self.animation_remove(b))
         add("GET", r"/api/harmonic", lambda m, q, b: self.harmonic("sources", {}))
         add("GET", r"/api/run_summary", lambda m, q, b: self.run_summary(q))
+        add("GET", r"/api/runview", lambda m, q, b: self.run_view_scene())
+        add("POST", r"/api/runview", lambda m, q, b: self.run_view_settings(b))
+        add("GET", r"/api/selection", lambda m, q, b: self.selection(q))
+        add("POST", r"/api/properties", lambda m, q, b: self.edit_properties(b))
         add("POST", r"/api/run_summary/plot", lambda m, q, b: self.run_summary(q, b or {}))
         add("POST", r"/api/harmonic/plan", lambda m, q, b: self.harmonic("plan", b))
         add("POST", r"/api/harmonic/show", lambda m, q, b: self.harmonic("show", b))

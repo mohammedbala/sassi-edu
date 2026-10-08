@@ -1,6 +1,6 @@
 # SASSI-EDU Command Reference
 
-> Generated on 2026-10-07 by `python -m sassi.verify.report --commands-only` from the command catalogue of the interpreter (`sassi/prep/registry.py`) and the docstrings of the command handlers (`sassi/prep/commands/`). Do not edit by hand.
+> Generated on 2026-10-08 by `python -m sassi.verify.report --commands-only` from the command catalogue of the interpreter (`sassi/prep/registry.py`) and the docstrings of the command handlers (`sassi/prep/commands/`). Do not edit by hand.
 
 Every command of the ACS SASSI V3 manual and of the SASSI-EDU dialect is listed with its syntax, its documented abbreviation or alias, its priority tier and whether this build implements it. The rules of the command language (comma-separated fields, blank fields take defaults, `*` comment lines, abbreviations, variables and loops) are explained in the [User Guide](../user/USER_GUIDE.md#4-the-command-language); the normative detail of every command is in [requirements section 3](../spec/00_requirements.md) and the manual-derived specifications `docs/spec/07` to `11`.
 
@@ -25,19 +25,19 @@ Every command of the ACS SASSI V3 manual and of the SASSI-EDU dialect is listed 
 | [3.4.I Model conditioning and generation](#34i-model-conditioning-and-generation) | 24 | 24 | 0 | 0 |
 | [3.4.J Cuts, submodels and section calculations](#34j-cuts-submodels-and-section-calculations) | 20 | 19 | 0 | 1 |
 | [3.4.K File conversion](#34k-file-conversion) | 5 | 5 | 0 | 0 |
-| [3.4.L Plotting and line mathematics](#34l-plotting-and-line-mathematics) | 52 | 52 | 0 | 0 |
+| [3.4.L Plotting and line mathematics](#34l-plotting-and-line-mathematics) | 54 | 54 | 0 | 0 |
 | [3.4.M Programming (variables, loops, macros)](#34m-programming-variables-loops-macros) | 13 | 13 | 0 | 0 |
 | [3.4.N Water modelling](#34n-water-modelling) | 5 | 5 | 0 | 0 |
 | [3.4.O Option NON and nonlinear soil](#34o-option-non-and-nonlinear-soil) | 32 | 29 | 0 | 3 |
 | [3.4.P Binary databases](#34p-binary-databases) | 15 | 0 | 1 | 14 |
 | [3.4.Q Thick shell](#34q-thick-shell) | 2 | 2 | 0 | 0 |
 | [3.4.R Extension commands of SASSI-EDU](#34r-extension-commands-of-sassi-edu) | 41 | 41 | 0 | 0 |
-| **Total** | 365 | 342 | 1 | 22 |
+| **Total** | 367 | 344 | 1 | 22 |
 
 | Tier | Commands | Implemented |
 |---|---:|---:|
 | P0 | 162 | 161 |
-| P1 | 125 | 125 |
+| P1 | 127 | 127 |
 | P2 | 78 | 56 |
 
 ## 3.4.A Session, files, models and global options
@@ -319,6 +319,7 @@ Every command of the ACS SASSI V3 manual and of the SASSI-EDU dialect is listed 
 | **DEBUG** | `DEBUG,[switch]` | - | P1 | yes | View values / animation information on 3D plots (0 off, 1 on, 2 toggle). |
 | **DEFORMPLOT** | `DEFORMPLOT,<BufferDir>,<MnF>,<MxF>,<ST>,<Scale>` | - | P1 | yes | Animated deformed shape x' = x + Scale u. |
 | **ELECOLOR** | `ELECOLOR,<val>` | - | P1 | yes | Element colours by 1 group, 2 material, 3 property (ElemPalette, 128 colours). |
+| **ELEMSEL** | `ELEMSEL,<group>,<E1>,...,<E19>` | - | P1 | yes | Toggle the selection of elements of a group, as NODESEL does for nodes (numbers or ranges ``a-b``; SASSI-EDU extension). |
 | **ELENUM** | `ELENUM,[opt]` | - | P1 | yes | Element number labels (-1 toggle, 0 off, 1 on); turns GROUPNUM off. |
 | **GROUPNUM** | `GROUPNUM,[opt]` | - | P1 | yes | Group number labels (-1 toggle, 0 off, 1 on); turns ELENUM off. |
 | **LAYERPLOT** | `LAYERPLOT` | - | P1 | yes | Soil layer column and property table of the active model (TOPL / L, SITE half-space). |
@@ -338,6 +339,7 @@ Every command of the ACS SASSI V3 manual and of the SASSI-EDU dialect is listed 
 | **READTH** | `READTH,<THFile>,<Pair>,<Num>` | - | P1 | yes | Load a time history (Pair 0 one column with dt first, 1 time/value pairs). |
 | **RSTCENTER** | `RSTCENTER` | - | P1 | yes | Rotation centre = centre of the bounding box of the element-connected nodes. |
 | **RSTVIEW** | `RSTVIEW` | - | P1 | yes | Reset the view (default isometric view, zoom and pan fitting the model). |
+| **SELCLR** | `SELCLR,[NODE\|ELEM]` | - | P1 | yes | Clear the node selection (NODESEL), the element selection (ELEMSEL) or both (blank; SASSI-EDU extension). |
 | **SHADEROPTIONS** | `SHADEROPTIONS,[points],[linew],[shrink],[scale]` | - | P1 | yes | Node size, outline, shrink fraction, scale factor. |
 | **SHOWDOF** | `SHOWDOF,[label1],...,[label6]` | - | P1 | yes | Mark nodes with fixed DOFs (X Y Z XX YY ZZ DISP ROT ALL; NONE off). |
 | **SHOWMASS** | `SHOWMASS,[opt]` | - | P1 | yes | Lumped-mass markers (-1 toggle, 0 off, 1 on); red X, green Y, blue Z. |

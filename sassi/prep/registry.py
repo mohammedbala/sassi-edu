@@ -343,6 +343,8 @@ ELENUM         -   P1 ui
 GROUPNUM       -   P1 ui
 NODENUM        -   P1 ui
 NODESEL        -   P1 ui
+ELEMSEL        -   P1 ui
+SELCLR         -   P1 ui
 SHOWDOF        -   P1 ui
 SHOWMASS       -   P1 ui
 SHRINK         -   P1 ui

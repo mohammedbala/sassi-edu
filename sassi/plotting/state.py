@@ -655,7 +655,7 @@ def model_scene(model, color_by: int = 1, show_dof: Sequence[int] = (), show_mas
     * ``interaction`` (indices of interaction nodes), ``fixed`` (indices of nodes with a fixed DOF
       among ``show_dof``), ``fix`` (n, 6) fixity codes, ``mass`` (indices), ``mass_dir`` (k, 3)
       bool (translational mass in X, Y, Z), ``mass_rot`` (k,) bool, ``selected`` (NODESEL); the
-      marker lists hold visible nodes only;
+      marker lists hold visible nodes only; ``elem_selected`` (ELEMSEL) indices of the selected elements;
     * ``bbox`` [xmin, xmax, ymin, ymax, zmin, zmax], ``center`` (bounding-box centre).
 
     Hide requests stored in the model (``model.ui_state``, D-UI-11) are applied when
@@ -802,6 +802,9 @@ def model_scene(model, color_by: int = 1, show_dof: Sequence[int] = (), show_mas
                 mass_rot.append(rot)
     sel = [index[int(n)] for n in model.ui_state.get("nodesel", [])
            if int(n) in index and keep_nodes[index[int(n)]]]
+    # ELEMSEL (SASSI-EDU): the selected elements, as indices of the element rows
+    esel = set((int(g), int(e)) for g, e in model.ui_state.get("elemsel", []))
+    elem_sel = [k for k, (g, e, _) in enumerate(rows) if (g.id, e.id) in esel]
     if len(ids):
         lo, hi = xyz.min(axis=0), xyz.max(axis=0)
         bbox = [lo[0], hi[0], lo[1], hi[1], lo[2], hi[2]]
@@ -825,7 +828,7 @@ def model_scene(model, color_by: int = 1, show_dof: Sequence[int] = (), show_mas
         "interaction": np.asarray(inter, dtype=np.int64), "fix": fix, "fixed": np.asarray(fixed, dtype=np.int64),
         "show_dof": sd, "mass": np.asarray(mass_idx, dtype=np.int64),
         "mass_dir": np.asarray(mass_dir, dtype=bool).reshape(-1, 3), "mass_rot": np.asarray(mass_rot, dtype=bool),
-        "selected": np.asarray(sel, dtype=np.int64),
+        "selected": np.asarray(sel, dtype=np.int64), "elem_selected": np.asarray(elem_sel, dtype=np.int64),
         "bbox": [float(v) for v in bbox], "center": [float(v) for v in center],
         "n_elements": len(rows), "dangling": dangling,
     }
