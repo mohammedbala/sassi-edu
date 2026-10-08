@@ -23,6 +23,12 @@ physically sensible (requirements 2.4, 3.3; ARCHITECTURE sections 3 and 8):
   shear-tab releases and pinned corner bases, clean CHECK and masses, the fixed-base frequency of the
   HOUSE matrices against the rigid-site run, the SSI frequency shift, ISRS, brace forces against the
   base shear of the floor accelerations, and the storey drifts of three RELDISP runs (ex09);
+* a turbine-generator table-top of SOLID elements on an embedded mat, forced vibration: the unbalance
+  force of balance grade G2.5, the solid model (incompatible modes, excavated soil on the mat's nodes,
+  rigid pedestals, distributed machine weights, numbering without gaps), clean CHECK and weights, the
+  quasi-static compliance with and without soil, the fixed-base modes of the HOUSE matrices, the
+  frequency separation of the bearing resonances, the SSI sway shift and radiation damping, and the
+  amplitudes and velocities at the bearings at 60 Hz on the soil and on the fixed base (ex10);
 * WRITE -> INP gives back the same model (UT-03) for every model of every example.
 
 The binary inter-module files are deleted as soon as each example has run and the results the tests
@@ -63,7 +69,7 @@ def _assert_clean_run(ui, summary, ex_dir, name, modules):
     for d, mods in modules.items():
         status = listing_status(ex_dir / d)
         model = {"ex02_fsin": "ex02fsin", "ex02_evbn": "ex02evbn", "ex08_fsin": "ex08fsin",
-                 "ex08_evbn": "ex08evbn", "ex09_fixed": "ex09fb"}.get(d, d)
+                 "ex08_evbn": "ex08evbn", "ex09_fixed": "ex09fb", "ex10_fixed": "ex10fb"}.get(d, d)
         for mod in mods:
             line = status.get(f"{model}_{mod}.out", "listing missing")
             assert "status OK" in line, f"{name} {d} {mod}: {line}"
@@ -796,6 +802,285 @@ def test_ex09_storey_drifts(ex09):
     for (n, ref), h, ssi, fb in zip(EX09_FLOORS.items(), (16.0, 15.0, 15.0), drift["ssi"], drift["fb"]):
         assert 0.013 < fb < ssi < 0.003 * h, (n, ref, ssi, fb)                # ft
         assert 1.05 < ssi / fb < 1.35, (n, ssi, fb)
+
+
+# ======================================================================================
+# Example 10: turbine-generator table-top (SOLID elements) on an embedded mat, unbalance response,
+# SSI against a fixed base
+# ======================================================================================
+EX10_DIRS = {"ssi": "ex10", "fb": "ex10_fixed"}
+EX10_G = 32.2                                   # example 10 is in ft, kip, s
+EX10_BEARINGS = (1591, 1592, 1593, 1594)        # B1, B2 (turbine rotor), B3, B4 (generator rotor)
+EX10_ROTOR = {1591: "T", 1592: "T", 1593: "G", 1594: "G"}
+#: FILE800k: 1 kip on both bearings of one rotor, in one direction (3 = z, 2 = y)
+EX10_CASES = {1: ("T", 3), 2: ("G", 3), 3: ("T", 2), 4: ("G", 2)}
+EX10_W = {"T": 60.0, "G": 80.0}                 # rotor weights, kips
+EX10_OMEGA = 2.0 * np.pi * 60.0                 # 3,600 rpm
+EX10_EW = 2.5e-3 / 0.3048                       # ISO 21940-11 grade G2.5: e w = 2.5 mm/s, in ft/s
+EX10_BAND = (48.0, 72.0)                        # +-20 % of the operating speed
+EX10_VLIMIT = 0.10                              # illustrative velocity limit, in/s
+EX10_MAT = 420                                  # mat nodes 1-420 (bottom 1-210, top 211-420)
+
+
+def _ex10_bearing_force(rotor):
+    """Unbalance force on each of the two bearings of a rotor, kips: (W/g) e w^2 / 2."""
+    return EX10_W[rotor] / EX10_G * EX10_EW * EX10_OMEGA / 2.0
+
+
+def _ex10_case(rotor, dof):
+    return next(k for k, c in EX10_CASES.items() if c == (rotor, dof))
+
+
+def _ex10_model(tmp_path):
+    """The two models of example 10 built from the .pre without module runs (fast)."""
+    pre = stage_example("ex10_turbine_pedestal", tmp_path)
+    keep = [ln for ln in pre.read_text(encoding="utf-8").splitlines()
+            if not ln.strip().upper().startswith(("RUN", "FCOPY"))]
+    pre.write_text("\n".join(keep) + "\n", encoding="utf-8")
+    ui = Interpreter(cwd=pre.parent)
+    ui.run_file(str(pre), resolve=False)
+    assert not ui.sink.texts(Kind.ERROR), ui.sink.texts(Kind.ERROR)[:10]
+    return ui
+
+
+def test_ex10_unbalance_force_from_the_balance_grade():
+    """G2.5 at 3,600 rpm: e = 2.5 mm/s / w = 0.00026 in, F = (W/g) e w^2 = 0.096 W -- 5.76 kips for the
+    60 kip turbine rotor (2.88 per bearing), 7.68 kips for the 80 kip generator rotor (3.84 per bearing)."""
+    assert abs(EX10_EW * 12.0 - 0.0984) < 1e-4                                   # in/s
+    assert abs(EX10_EW / EX10_OMEGA * 12.0 - 0.000261) < 1e-6                   # e, in
+    assert abs(EX10_EW * EX10_OMEGA / EX10_G - 0.0960) < 1e-4                   # F / W
+    assert abs(2 * _ex10_bearing_force("T") - 5.76) < 0.005 and abs(_ex10_bearing_force("T") - 2.88) < 0.005
+    assert abs(2 * _ex10_bearing_force("G") - 7.68) < 0.005 and abs(_ex10_bearing_force("G") - 3.84) < 0.005
+
+
+def test_ex10_solid_model_embedment_and_loads(tmp_path):
+    """After RMVUNUSED and NCOM the nodes are 1-1594 without gaps (mat 1-420, bearings 1591-1594); the
+    structure is SOLID bricks with the incompatible modes (ETYPE 1) and the excavated soil (ETYPE 2, layer
+    L 1, used once in TOPL) lies on the mat's own nodes; the 420 mat nodes are the interaction nodes (none
+    on the fixed base, whose excavated soil is deleted and whose mat bottom and edges are fixed); the
+    bearings sit on six-link rigid pedestals; the machine weighs 1,152 kips, the rotors and pedestals at the
+    bearings and the feet spread over 6-node footprints."""
+    ui = _ex10_model(tmp_path)
+    m, fb = ui.models[0], ui.models[2]
+    for mm in (m, fb):
+        assert len(mm.nodes) == max(mm.nodes) == 1594
+        assert mm.mopt.get("incomp") == 0 and all(e.eint == 0 for g in mm.groups.values() for e in g.elements.values())
+    counts = {g: len(m.groups[g].elements) for g in (13, 5, 3, 4, 1, 12)}
+    assert counts == {13: 180, 5: 180, 3: 240, 4: 280, 1: 128, 12: 24}, counts
+    assert all(e.etype == 1 for g in (13, 3, 4, 1) for e in m.groups[g].elements.values())
+    assert all(e.etype == 2 and e.mat == 1 for e in m.groups[5].elements.values())
+    assert sorted(tuple(sorted(e.nodes)) for e in m.groups[5].elements.values()) == \
+        sorted(tuple(sorted(e.nodes)) for e in m.groups[13].elements.values())        # same bricks
+    assert m.topl.count(1) == 1 and m.topl[0] == 1                              # the embedment layer
+    assert sorted(n for n, nd in m.nodes.items() if 0 in nd.flags) == list(range(1, EX10_MAT + 1))
+    assert m.ui_state.get("hide_groups") == [5]
+    assert 5 not in fb.groups and not [n for n, nd in fb.nodes.items() if 0 in nd.flags]
+    assert all(all(fb.nodes[n].fix[:3]) for n in range(1, 211))                  # the mat bottom is fixed
+    assert not any(fb.nodes[305].fix[:3]) and all(fb.nodes[211].fix[:3])          # top face free, edges fixed
+    ids, xyz = m.global_coordinates()
+    P = {int(n): p for n, p in zip(ids, xyz)}
+    for n, x in zip(EX10_BEARINGS, (0.0, 33.0, 39.0, 72.0)):
+        assert np.allclose(P[n], (x, 0.0, 39.0)), n
+    assert all(abs(P[n][2] - (-6.0 if n <= 210 else 0.0)) < 1e-9 for n in range(1, EX10_MAT + 1))
+    links = m.groups[12].sorted_elements()
+    for b in EX10_BEARINGS:                                                     # 6 links each (B2, B3 share)
+        feet = [P[e.nodes[1]] for e in links if e.nodes[0] == b]
+        assert len(feet) == 6 and all(abs(p[2] - 35.0) < 1e-9 for p in feet), b
+    w = {n: v[2] for n, v in m.tmass.items()}                                   # MT weights, kips
+    assert abs(sum(w.values()) - 1152.0) < 1e-6
+    assert [w[n] for n in EX10_BEARINGS] == [90.0, 50.0, 60.0, 70.0]
+    assert sorted(set(v for n, v in w.items() if n not in EX10_BEARINGS)) == [18.0, 18.75]
+    assert abs(sum(v for v in w.values() if v == 18.75) - 450.0) < 1e-9          # turbine casing
+    assert abs(sum(v for v in w.values() if v == 18.0) - 432.0) < 1e-9           # generator stator
+
+
+@pytest.fixture(scope="module")
+def ex10(tmp_path_factory):
+    import scipy.sparse as sp
+    import scipy.sparse.linalg as spla
+    from sassi.elements.base import blas_quiet
+    ui, summary, ex = _run("ex10_turbine_pedestal", tmp_path_factory)
+    tf = {}
+    for k, d in EX10_DIRS.items():
+        for case, (rotor, dof) in EX10_CASES.items():
+            f8 = B.read_file8(ex / d, f"FILE800{case}")
+            freq = np.asarray(f8["freq"])
+            for n in EX10_BEARINGS:
+                tf[(k, case, n)] = B.tf(f8, n, dof)
+    # fixed-base modes from the HOUSE matrices of model 2 (the mat bottom and edges are fixed); the
+    # massless rotations of the pedestal links are condensed out; mass participation of the frame above
+    # the mat (nodes > 420)
+    md = ex / "ex10_fixed"
+    f4 = read_container(md / "ex10fb.N4", "FILE4")
+    Ks = read_container(md / "COOSK", "COOSK").sparse("Ks").tocsc().real
+    Ms = read_container(md / "COOSM", "COOSM").sparse("Ms").tocsc().real
+    eqd, eqn = np.asarray(f4["eq_dof"]), np.asarray(f4["eq_node"])
+    dm = Ms.diagonal()
+    m, z = np.flatnonzero(dm > 0), np.flatnonzero(dm <= 0)
+    with blas_quiet():
+        X = spla.splu(Ks[z][:, z].tocsc()).solve(Ks[m][:, z].T.toarray())
+        Kc = (Ks[m][:, m] - sp.csc_matrix(Ks[m][:, z] @ X)).tocsc()
+        Mm = Ms[m][:, m].tocsc()
+        w2, phi = spla.eigsh(Kc, k=45, M=Mm, sigma=0.0, which="LM")
+        order = np.argsort(w2)
+        w2, phi = w2[order], phi[:, order]
+        gen = np.einsum("ij,ij->j", phi, Mm @ phi)
+        part = {}
+        for d in (1, 2, 3):
+            r = ((eqd[m] == d) & (eqn[m] > EX10_MAT)).astype(float)
+            part[d] = (phi.T @ (Mm @ r)) ** 2 / gen / (r @ (Mm @ r))
+    modes = (np.sqrt(np.abs(w2)) / (2 * np.pi), part)
+    for d in EX10_DIRS.values():
+        purge_binaries(ex / d)
+    return ui, summary, ex, freq, tf, modes
+
+
+def _ex10_own(tf, k, n, dof):
+    """TF of bearing n in direction dof for the case of its own rotor (ft per kip on each of its bearings)."""
+    return tf[(k, _ex10_case(EX10_ROTOR[n], dof), n)]
+
+
+def _ex10_amplitude(tf, freq, k, n, dof):
+    """(own-rotor amplitude, both rotors with the worst phase) at 60 Hz, ft."""
+    j = int(np.argmin(np.abs(freq - 60.0)))
+    other = "G" if EX10_ROTOR[n] == "T" else "T"
+    own = abs(_ex10_own(tf, k, n, dof)[j]) * _ex10_bearing_force(EX10_ROTOR[n])
+    return own, own + abs(tf[(k, _ex10_case(other, dof), n)][j]) * _ex10_bearing_force(other)
+
+
+@pytest.mark.slow                     # 75 frequencies with 420 interaction nodes: about 65 s
+def test_ex10_runs_every_module(ex10):
+    ui, summary, ex, freq, *_ = ex10
+    _assert_clean_run(ui, summary, ex, "ex10", {"ex10": ("SITE", "POINT", "HOUSE", "FORCE", "ANALYS", "MOTION"),
+                                                "ex10_fixed": ("SITE", "POINT", "HOUSE", "ANALYS", "MOTION")})
+    _assert_write_inp_roundtrip(ui, ex, {0: "ex10/ex10.pre", 2: "ex10_fixed/ex10fb.pre"})
+    assert len(freq) == 75 and freq[0] == 0.625 and 60.0 in freq and freq[-1] == 80.0
+    for d in EX10_DIRS.values():
+        for n in EX10_BEARINGS:
+            for tag in ("Z", "Y"):
+                assert (ex / d / f"{n:05d}TR_{tag}.TFU").exists(), (d, n, tag)
+    assert "no interaction nodes" in (ex / "ex10_fixed" / "ex10fb_ANALYS.out").read_text(encoding="utf-8")
+
+
+@pytest.mark.slow
+def test_ex10_model_checks_and_weights(ex10):
+    """CHECK: no error and no warning for either model (one element layer in the mat: no excavation node is
+    interior); HOUSE weighs 7,783 kips (mat 3,402, columns 1,458, deck 1,771, machine 1,152) and subtracts
+    3,062 kips of excavated soil on the soil (none on the fixed base)."""
+    ui, _, ex, *_ = ex10
+    for num, d, soil in ((0, "ex10", 3061.8), (2, "ex10_fixed", 0.0)):
+        mm = ui.models[num]
+        rep = run_check(mm, dirs=[mm.path])
+        assert not rep.errors() and not rep.warnings(), [x.line() for x in rep.errors() + rep.warnings()][:5]
+        txt = (ex / d / f"{mm.name}_HOUSE.out").read_text(encoding="utf-8").splitlines()
+        line = next(ln for ln in txt if "Total structural mass" in ln)
+        assert abs(float(line.split(":")[1].split()[0]) * EX10_G - 7783.2) < 1.0, line
+        line = next(ln for ln in txt if "Total excavated soil mass" in ln)
+        assert abs(float(line.split(":")[1].split()[0]) * EX10_G - soil) < 1.0, line
+
+
+@pytest.mark.slow
+def test_ex10_low_frequency_compliance_and_symmetry(ex10):
+    """At 0.625 Hz the response is quasi-static: the soil adds 15-25 % to the vertical compliance of a
+    bearing (2.0-2.4E-6 against 1.6-2.1E-6 ft/kip), the phase is the 2 % material damping, and the turbine
+    and generator cases mirror each other (the frame is symmetric about x = 36 ft; the masses do not matter
+    yet).  The MOTION .TFU files are the FILE8 transfer functions."""
+    _, _, ex, freq, tf, _ = ex10
+    assert freq[0] < 1.0
+    for n in EX10_BEARINGS:
+        ssi, fb = abs(_ex10_own(tf, "ssi", n, 3)[0]), abs(_ex10_own(tf, "fb", n, 3)[0])
+        assert 1.9e-6 < ssi < 2.5e-6 and 1.5e-6 < fb < 2.2e-6, (n, ssi, fb)
+        assert 1.1 < ssi / fb < 1.3, (n, ssi / fb)
+        assert abs(np.angle(_ex10_own(tf, "fb", n, 3)[0])) < np.radians(3.0)        # atan(2 x 0.02) = 2.3 deg
+    for k in EX10_DIRS:
+        for dof in (3, 2):
+            assert abs(abs(_ex10_own(tf, k, 1591, dof)[0]) / abs(_ex10_own(tf, k, 1594, dof)[0]) - 1) < 0.01
+            assert abs(abs(_ex10_own(tf, k, 1592, dof)[0]) / abs(_ex10_own(tf, k, 1593, dof)[0]) - 1) < 0.01
+    f, H, _ = textfiles.read_tf(ex / "ex10" / "01593TR_Z.TFU")
+    assert np.allclose(f, freq) and np.allclose(np.abs(H), np.abs(_ex10_own(tf, "ssi", 1593, 3)), rtol=1e-9)
+
+
+@pytest.mark.slow
+def test_ex10_fixed_base_modes(ex10):
+    """Eigenvalues of the fixed-base HOUSE matrices: sway in y at 7.4 Hz and in x at 7.8 Hz (more than 80 %
+    of the mass above the mat each), the main vertical mode at 32.3 Hz (44 % of the vertical mass), and a
+    crowd of modes in the +-20 % band (23 between 48 and 72 Hz, two within 1 % of 60 Hz).  The fixed-base
+    bearing transfer function of B3 peaks next to the main vertical mode."""
+    _, _, _, freq, tf, (fe, part) = ex10
+    ky, kx = int(np.argmax(part[2])), int(np.argmax(part[1]))
+    assert 7.0 < fe[ky] < 7.8 and part[2][ky] > 0.8, (fe[ky], part[2][ky])
+    assert 7.4 < fe[kx] < 8.2 and part[1][kx] > 0.8, (fe[kx], part[1][kx])
+    kz = int(np.argmax(part[3]))
+    assert 30.0 < fe[kz] < 34.0 and 0.35 < part[3][kz] < 0.55, (fe[kz], part[3][kz])
+    inband = fe[(fe >= EX10_BAND[0]) & (fe <= EX10_BAND[1])]
+    assert 15 <= len(inband) <= 30, inband
+    assert np.sum(np.abs(inband / 60.0 - 1.0) < 0.01) >= 1, inband
+    f_b3, _ = _peak(freq, _ex10_own(tf, "fb", 1593, 3))
+    assert abs(f_b3 - fe[kz]) < 1.0, (f_b3, fe[kz])
+
+
+@pytest.mark.slow
+def test_ex10_frequency_separation(ex10):
+    """The largest peak of every bearing transfer function (both models, both directions) lies outside the
+    band 48-72 Hz, but every vertical bearing TF has peaks inside it: the +-20 % rule cannot be met mode by
+    mode.  The peaks inside the band are smaller (at most 30 % of the largest on the fixed base, 60 % on the
+    soil, where radiation damping has flattened the large ones)."""
+    from scipy.signal import find_peaks
+    _, _, _, freq, tf, _ = ex10
+    inb = (freq >= EX10_BAND[0]) & (freq <= EX10_BAND[1])
+    for k in EX10_DIRS:
+        for n in EX10_BEARINGS:
+            for dof in (3, 2):
+                a = np.abs(_ex10_own(tf, k, n, dof))
+                fmax = freq[int(np.argmax(a))]
+                assert not EX10_BAND[0] <= fmax <= EX10_BAND[1], (k, n, dof, fmax)
+                if dof == 3:
+                    pk = [i for i in find_peaks(a)[0] if inb[i]]
+                    assert pk, (k, n)
+                    assert max(a[pk]) / a.max() < (0.6 if k == "ssi" else 0.3), (k, n, max(a[pk]) / a.max())
+
+
+@pytest.mark.slow
+def test_ex10_ssi_lowers_the_sway_and_damps_the_bents(ex10):
+    """On the soil the sway peak of the coupling bearings moves down from 7.5 Hz to about 6.25 Hz, and the
+    vertical resonance peaks of the bents (30-46 Hz) drop 1.7-4 times (radiation damping)."""
+    _, _, _, freq, tf, _ = ex10
+    for n in (1592, 1593):
+        f_ssi, _ = _peak(freq, _ex10_own(tf, "ssi", n, 2))
+        f_fb, _ = _peak(freq, _ex10_own(tf, "fb", n, 2))
+        assert f_ssi < 6.6 and 7.0 < f_fb < 8.0 and f_ssi < 0.9 * f_fb, (n, f_ssi, f_fb)
+    bents = (freq >= 30.0) & (freq <= 46.5)
+    for n in EX10_BEARINGS:
+        drop = np.abs(_ex10_own(tf, "fb", n, 3))[bents].max() / np.abs(_ex10_own(tf, "ssi", n, 3))[bents].max()
+        assert 1.5 < drop < 6.0, (n, drop)
+
+
+@pytest.mark.slow
+def test_ex10_amplitudes_and_velocities_at_the_operating_speed(ex10):
+    """At 60 Hz the bearings move 0.02-0.20 mil (unbalance forces 2.88 and 3.84 kips per bearing); the
+    largest velocity is 0.046 in/s at B3 horizontal on the soil and 0.077 in/s at B1 horizontal on the fixed
+    base, both below the illustrative 0.10 in/s.  On this stiff site the soil lowers the motion of every
+    bearing or leaves it about the same (B2 and B3 vertical within 4 %)."""
+    _, _, _, freq, tf, _ = ex10
+    j = int(np.argmin(np.abs(freq - 60.0)))
+    assert freq[j] == 60.0
+    vmax = {}
+    for k in EX10_DIRS:
+        v = {}
+        for n in EX10_BEARINGS:
+            for dof in (3, 2):
+                own, both = _ex10_amplitude(tf, freq, k, n, dof)
+                assert 1e-6 < own <= both < 3e-5, (k, n, dof, own, both)          # ft: 0.012-0.36 mil
+                v[(n, dof)] = EX10_OMEGA * both * 12.0                             # in/s
+        vmax[k] = max(v, key=v.get), max(v.values())
+    assert vmax["ssi"][0] == (1593, 2) and 0.035 < vmax["ssi"][1] < 0.06, vmax
+    assert vmax["fb"][0] == (1591, 2) and 0.06 < vmax["fb"][1] < EX10_VLIMIT, vmax
+    r = {(n, dof): abs(_ex10_own(tf, "ssi", n, dof)[j]) / abs(_ex10_own(tf, "fb", n, dof)[j])
+         for n in EX10_BEARINGS for dof in (3, 2)}
+    assert all(x < 1.06 for x in r.values()), r
+    assert r[(1591, 3)] < 0.7 and r[(1594, 3)] < 0.85, r                       # -42 % and -24 %
+    assert 0.9 < r[(1592, 3)] < 1.06 and 0.9 < r[(1593, 3)] < 1.06, r          # about the same
+    assert r[(1591, 2)] < 0.45 and r[(1593, 2)] < 0.8 and r[(1594, 2)] < 0.8, r     # -65 %, -31 %, -31 %
 
 
 # ======================================================================================

@@ -1668,7 +1668,7 @@ A paraphrase of the "Engineering Considerations" of manual §4.1.2, with the num
 The examples in `examples/` are ordinary `.pre` files, commented line by line. Run them from the
 `examples` directory (`../.venv/bin/sassi run exNN_....pre`) or with `--cwd examples` from the
 project root; the results go to `examples/exNN/`. [examples/README.md](../../examples/README.md)
-lists the expected results, which `tests/integration/test_examples.py` (examples 1-5, 8 and 9),
+lists the expected results, which `tests/integration/test_examples.py` (examples 1-5 and 8-10),
 `tests/unit/test_nlsoil_example.py` (example 6) and `tests/unit/test_nonlinear_example.py` (example 7)
 check.
 
@@ -1683,6 +1683,7 @@ check.
 | ex07 | Option NON: shear-wall building with cracking wall panels | SITE ×3 POINT HOUSE ANALYS MOTION ×3 RELDISP ×3 NONLINEAR, then 7 iterations; MOTION | 30-120 s |
 | ex08 | embedded shear-wall building with a tower: FV against FI-FSIN (SM) and FI-EVBN (MSM) | SITE POINT HOUSE ANALYS MOTION STRESS (3 models) | 60-90 s |
 | ex09 | three-storey braced steel frame (W and HSS shapes) on a 4 ft RC mat: SSI against a fixed base, ISRS, brace forces, storey drifts | SITE POINT HOUSE ANALYS MOTION STRESS RELDISP ×3 (2 models) | ~30 s |
+| ex10 | steam turbine-generator table-top of SOLID elements on an embedded 6 ft mat: unbalance forces, bearing transfer functions, amplitude and velocity at 60 Hz, ±20 % frequency separation, SSI against a fixed base | SITE POINT HOUSE FORCE ×4 ANALYS MOTION ×4 (2 models) | ~65 s |
 
 ### 15.1 Example 1: stick on a surface mat (the basic workflow)
 
@@ -1843,6 +1844,56 @@ from the 6.5 Hz SSI mode. FI-EVBN follows FV within 5.1 % (X within 1.1 %, ISRS 
 about 1.25 times as long as FI-FSIN in ANALYS): the structure's equations cost as much as the impedance.
 Lesson 11 of the guided course builds the example step by step, shows the soil, the interaction nodes
 and a cutaway, animates the spurious resonance and discusses the validation against FV.
+
+### 15.9 Example 9: a braced steel frame on a mat, SSI against a fixed base
+
+*Model.* A three-storey steel building, 60 ft × 40 ft in plan (20 ft bays; storeys of 16, 15 and 15 ft),
+on a 4 ft reinforced-concrete mat of 70 ft × 50 ft on the ground surface: W14 columns, W24 and W21 girders
+and beams, HSS X-braces (pin-ended truss members) in the end bays, welded moment frames on the interior
+lines, shear-tab connections released with `KI` / `KJ`, 6 in SHELL slabs as diaphragms; AISC section
+properties in ft units, 3,494 kips in all. The site is 19.5 ft of medium-dense sand (Vs 800 ft/s) over
+39 ft of dense sand and gravel (Vs 1,300 ft/s) and stiffer layers; model 2 (`ex09fb`) is the same frame on a
+practically rigid site.
+
+*Results to look at.* The fixed-base frame has its first X mode at 4.38 Hz; on the soil the roof X
+transfer function peaks at 3.98 Hz (18.3, against 20.2 at 4.37 Hz on the fixed base). The roof 5 % ISRS
+peak is 10.27 g with SSI against 10.01 g on the fixed base, the 2 % peak 20.27 g against 15.52 g: the
+SSI frequency moves onto a peak of this record's spectrum. The storey-1 braces carry 208 kips (198 on
+the fixed base), 97 % of the hand estimate V/(8 cos θ). See `examples/README.md` for the full set and
+`tests/integration/test_examples.py` for the checks.
+
+### 15.10 Example 10: a turbine-generator table-top, unbalance response and SSI
+
+*Model.* An illustrative 130 MW steam turbine-generator (1,152 kips, 3,600 rpm) on a reinforced-concrete
+table-top modelled with SOLID elements: five bents of two 6 ft × 6 ft columns (27 ft clear) with 6 ft × 8 ft
+transverse girders, 6 ft × 8 ft longitudinal girders and the deck from 27 to 35 ft, on a 90 ft × 42 ft × 6 ft
+mat embedded with its top at grade, in very dense sand and gravel (Vs 2,400 ft/s) over weathered rock and
+rock; 7,783 kips in all. `MOPT,0` adds the incompatible modes to the bricks (`EINT` 0), so two bricks across
+every member and four through the girders suffice; one plan grid serves the mat, the columns and the deck,
+so that `EGEN` copies every element, and `RMVUNUSED` and `NCOM` close the gaps of the coordinate-coded
+numbering. The excavated soil (`ETYPE` 2, its own L layer) lies on the mat's nodes; with one brick through
+the mat its 420 nodes are the flexible-volume set and no node is interior (`EXCSTRCHK`). The bearings sit on
+rigid six-link pedestals (a solid node has no rotation; `FIXSLDROT`), and the casing and stator weights are
+spread over the nodes of their feet. The 6 ft mesh and the 6 ft embedment layer pass the one-fifth-wavelength
+rule at 80 Hz; a mesh twice as fine lowers the fixed-base frequencies by about 5 %.
+
+*Walk-through.* Four FORCE runs put 1 kip on both bearings of one rotor (turbine or generator, z or y) and
+are copied to FILE9001-9004; one ANALYS run (`<type>` 1, `<simul>` 4) writes FILE8001-8004; four MOTION
+runs with `<out>` = 1 and `EDUOPT,TFFILE` write the bearing transfer functions (`.TFU`, ft per kip).
+`CPMODEL` makes the fixed-base model: `GDEL` deletes the excavated soil, `INT,1,420,1,0` removes the
+interaction nodes and `D` fixes the mat's bottom and sides; ANALYS analyses the structure without soil. The
+comments compute the unbalance force of balance grade G2.5 (ISO 21940-11), F = (W/g) e ω² = 0.096 W: 2.88
+kips per turbine bearing and 3.84 kips per generator bearing; then u = |H| F and v = ω u at each bearing.
+
+*Results to look at.* The fixed-base model has 23 modes between 48 and 72 Hz, so the ±20 % separation rule
+cannot be met mode by mode; the largest bearing resonances lie below the band (fixed base: sway 7.4-7.8 Hz,
+bents 32-45 Hz; on the soil: sway 6.25 Hz, bents 31-44 Hz, the foundation heaving at about 15 Hz). At 60 Hz
+the bearings move 0.02-0.20 mil; the largest velocity is 0.046 in/s at the generator coupling bearing B3
+(horizontal) on the soil and 0.077 in/s at the turbine front bearing B1 (horizontal) on the fixed base,
+both below an illustrative 0.10 in/s. On this stiff site the soil adds only 15-25 % of flexibility, but
+its radiation damping cuts the vertical resonance peaks of the bents 1.7-4 times and lowers the motion at
+60 Hz at every bearing or leaves it about the same: the fixed base is conservative here, but it points to
+another bearing.
 
 ---
 

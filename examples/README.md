@@ -1,6 +1,6 @@
 # SASSI-EDU tutorial examples
 
-Nine small models that run the complete ACS SASSI workflow the way a user runs it: a `.pre` file
+Ten small models that run the complete ACS SASSI workflow the way a user runs it: a `.pre` file
 of ACS SASSI V3 commands builds the model, `CHECK` lists the errors and warnings of the model
 and of the enabled modules, `AFWRITE` writes one input deck per module, and `RUN<MODULE>` runs the
 modules one after the other in the model directory. Each file is commented line by line; read it
@@ -17,6 +17,7 @@ next to the results.
 | `ex07_option_non.pre` | Option NON: two-storey shear-wall building with cracking wall panels | SITE (x3) POINT HOUSE ANALYS MOTION (x3) RELDISP (x3) NONLINEAR, then 7 iterations; MOTION | 30-120 s |
 | `ex08_embedded_building.pre` | embedded shear-wall building with a two-level basement and a tower: FV against the subtraction (FI-FSIN) and modified subtraction (FI-EVBN) methods | SITE POINT HOUSE ANALYS MOTION STRESS (3 models) | 60-90 s |
 | `ex09_steel_frame.pre` | three-storey braced steel frame (AISC W and HSS shapes, moment frames, composite slabs, equipment) on a 4 ft RC mat: SSI against a fixed base, ISRS, brace and column forces, storey drifts | SITE POINT HOUSE ANALYS MOTION STRESS RELDISP (x3), 2 models | ~30 s |
+| `ex10_turbine_pedestal.pre` | steam turbine-generator on a table-top foundation of SOLID elements (incompatible modes, rigid pedestals, distributed machine weights) on an embedded 6 ft mat: unbalance forces at the bearings, bearing transfer functions, amplitude and velocity at 60 Hz, ±20 % frequency separation, SSI against a fixed base | SITE POINT HOUSE FORCE (x4) ANALYS MOTION (x4), 2 models | ~65 s |
 
 `data/` holds the input data:
 
@@ -49,11 +50,11 @@ or, from the repository root, give the working directory with `--cwd`:
 Do not run `sassi run examples/ex01_surface_stick.pre` from the repository root without
 `--cwd examples`: the model directory would be created in the repository root (`./ex01`), the
 control-motion file would not be found (CHECK Error 73), and MOTION would be blocked. The results of
-example `exNN` are written to `examples/exNN/` (examples 2, 8 and 9 also write to `examples/ex02_fsin/`,
-`examples/ex02_evbn/`, `examples/ex08_fsin/`, `examples/ex08_evbn/` and `examples/ex09_fixed/`). Example 6 also reads the soil curves `../sassi/data/dynp_library.pre`, so keep
+example `exNN` are written to `examples/exNN/` (examples 2, 8, 9 and 10 also write to `examples/ex02_fsin/`,
+`examples/ex02_evbn/`, `examples/ex08_fsin/`, `examples/ex08_evbn/`, `examples/ex09_fixed/` and `examples/ex10_fixed/`). Example 6 also reads the soil curves `../sassi/data/dynp_library.pre`, so keep
 the repository layout. Example 7 leaves about 105 MB in `examples/ex07/` (72 MB of binary inter-module
 files such as the ANALYS restart files `COOTKnnn`, which can be deleted after the run); example 8 about 60 MB
-in its three folders, example 9 about 58 MB in its two. Each example ends with `WRITE`, which saves the complete model as
+in its three folders, example 9 about 58 MB and example 10 about 95 MB in their two. Each example ends with `WRITE`, which saves the complete model as
 commands (`examples/exNN/<model>.pre`). `INP` of that file rebuilds the same model.
 
 The same commands can be typed in the console (`sassi`) or the browser GUI (`sassi-gui`); both
@@ -104,7 +105,11 @@ the examples cover the same workflows:
   for the FV, FI-FSIN and FI-EVBN sets on one model, and the validation of the reduced sets against FV
   that the manual's ASCE 4-16 warning asks for;
 * ex09: a steel-framed structure (the BEAMS element with real sections, K nodes and end releases) on a
-  surface mat, with the fixed-base reference run of lesson 1 and storey drifts by RELDISP.
+  surface mat, with the fixed-base reference run of lesson 1 and storey drifts by RELDISP;
+* ex10: a machine foundation (a turbine-generator table-top of SOLID elements on an embedded mat) in a
+  foundation-vibration analysis like ex03: unbalance load cases at the bearings (FORCE, FCOPY to
+  FILE9001-9004, `ANALYS <simul>` = 4), the bearing transfer functions from MOTION (`<out>` = 1), and a
+  fixed-base vibration analysis without interaction nodes.
 
 ## Example 1: lumped-mass stick on a rigid surface mat
 
@@ -667,14 +672,191 @@ Whether the ISRS and member forces go up or down then depends on the input spect
 frequencies, which is why design ISRS are enveloped over soil cases and broadened. The drifts include
 rocking of the foundation that the fixed-base model does not have.
 
+## Example 10: a turbine-generator table-top foundation, unbalance response and SSI
+
+**Model.** Units ft, kip, s (g = 32.2 ft/s²). An illustrative 130 MW steam turbine-generator (3,600 rpm,
+the 60 Hz US grid; typical proportions, not a specific machine): a single-casing steam turbine with a down
+exhaust and a two-pole generator on one shaft along x, with four bearings B1-B4 on the shaft centreline,
+4 ft above the deck.
+
+| Machine item | Weight | Where |
+|---|---|---|
+| turbine rotor | 60 kips | 30 kips at B1 (node 1591, x = 0) and B2 (1592, x = 33 ft), z = 39 ft |
+| generator rotor | 80 kips | 40 kips at B3 (1593, x = 39 ft) and B4 (1594, x = 72 ft) |
+| front standard, coupling pedestal, B4 pedestal | 60, 40, 30 kips | at B1; 20 kips at B2 and B3; at B4 |
+| turbine casing and stationary parts | 450 kips | four feet of 112.5 kips on 6 x 6 ft areas of bents B and C (18.75 kips on each of 6 deck-top nodes) |
+| generator stator | 432 kips | four feet of 108 kips on the longitudinal girders at x = 45-51 and 63-69 ft (18 kips on each of 6 nodes) |
+| machine in all | 1,152 kips | |
+
+The table-top is modelled with **SOLID elements**, as an ANSYS user models such a pedestal: five bents A-E at
+x = 0, 18, 36, 54 and 72 ft, each with two 6 x 6 ft columns (y = ±12 ft, 27 ft clear from the mat top to the
+deck soffit) and a transverse girder 6 ft wide x 8 ft deep; longitudinal girders of the same section on the
+column lines; the deck from z = 27 to 35 ft. The mat, 90 x 42 x 6 ft (6 ft beyond the column faces), is
+**embedded**: its top at grade, its bottom 6 ft below (a usual thickness for a unit this size, about 1/15
+of its length, founded below the frost line on the undisturbed soil). Concrete E = 4,000 ksi = 576,000 ksf
+(f'c 5 ksi), 0.150 kcf, 2 % damping (machine loads stress the concrete far less than an earthquake; 1-2 %
+is commonly used for concrete in machine-foundation analyses, ACI 351.3R discusses damping). Modelling
+choices:
+
+* **Bricks with the incompatible modes.** `MOPT,0` adds the 9 Wilson-Taylor modes to the structural SOLIDs
+  (the default leaves them out); `EINT` stays 0 (2 x 2 x 2 Gauss points). A plain trilinear brick locks in
+  bending; with the incompatible modes two bricks across every member and four through the 8 ft girders
+  (2 ft layers) are enough.
+* **One plan grid** for the mat, the columns and the deck: 21 x-lines (three across each bent, x0 - 3, x0,
+  x0 + 3, and one at mid-span) and 10 y-lines (three across each column line, two inside the bents), with
+  6 ft as the largest spacing. Every level is a copy of the grid (node = 1000 L + p while the model is
+  built), so every element is copied with `EGEN` at a fixed increment; `RMVUNUSED` deletes the grid nodes
+  no element uses and `NCOM` renumbers the rest without gaps (CHECK warns about every gap): mat 1-420
+  (bottom 1-210, top 211-420), columns 421-870, deck 871-1590, bearings 1591-1594. 828 structural bricks
+  (mat 180, columns 240, bents 280, longitudinal girders 128).
+* **The embedded mat**: the concrete bricks (group 13, `ETYPE` 1 -- below grade a SOLID would otherwise be
+  taken as soil) and the excavated soil (group 5, `ETYPE` 2, `MACT,1` = the L layer) are the same 180 bricks
+  on the same nodes, as in examples 2, 6 and 8; the embedment layer has its own L number (L 1) in TOPL and
+  POINT has one embedded layer. With one element through the mat the excavation has **no interior node**:
+  the flexible-volume set (`INT` on all 420 mat nodes) is also the FI-EVBN set, and `EXCSTRCHK` finds
+  nothing (two layers would put 126 interior nodes in the structure, which CHECK reports). FI-FSIN would
+  drop the 152 inner nodes of the top face and bring the spurious resonance of lessons 5 and 11.
+  `WINDOWSETTINGS,HIDEGROUP,5` hides the excavated soil in the 3D views.
+* **What solids need.** A solid node has no rotation: `FIXSLDROT` fixes the rotations of the nodes that
+  carry solids only, and a single link from a bearing to one deck node would be a hinge. Each bearing node
+  is tied by six rigid links (group 12, 100 x stiffer, massless) to the deck-top nodes of a 6 x 6 ft
+  pedestal footprint, which then moves as one rigid pedestal base (B2 and B3 share the coupling pedestal of
+  bent C). The stationary weights are spread over the nodes of their feet: a heavy weight on one node of a
+  continuum bounces on a local flexibility that grows as the mesh is refined (with the feet lumped at
+  single nodes the vertical frequencies dropped by 15 % when the mesh was halved).
+
+HOUSE weighs **7,783 kips** (mass 241.7 kip s²/ft): mat 3,402, columns 1,458, deck 1,771 and machine
+1,152 kips; it subtracts 3,062 kips of excavated soil.
+
+**Mesh check** (eigenvalues of the fixed-base HOUSE matrices, done outside the program as in ex09): the same
+model with every brick split in two in each direction (9,546 nodes, 6,624 bricks) has frequencies 3-8 %
+lower up to 60 Hz (median 5 %; sway 7.41 → 7.05 Hz, main vertical mode 32.25 → 31.23 Hz) and 4-7 % lower
+above (median 6 %), and 25 modes between 48 and 72 Hz instead of 23. The example's mesh is a few percent
+stiff -- small against the ±20 % margin, and the price of keeping the interaction nodes few.
+
+The site, at low strain (machine vibration strains the soil of the order of 1E-5 %, so the geophysical Vs
+and small damping apply, not the strain-compatible properties of a seismic analysis): **very dense sand and
+gravel**, Vs 2,400 ft/s, 1.5 % damping, to 50 ft (the embedment layer L 1, then 11 sublayers of 4 ft),
+weathered rock (Vs 3,500 ft/s, 9 x 5 ft), rock (Vs 5,000 ft/s); 21 TOPL layers. A competent site of this
+kind is typical for a turbine-generator mat, and its stiffness is what keeps the model affordable: the
+6 ft mesh of the interaction nodes and the 6 ft embedment layer pass the one-fifth-wavelength rule at the
+highest analysis frequency, 2,400/(5 x 6) = **80 Hz**. Frequencies: dt = 0.003125 s and NFFT 4096 give
+df = 0.078125 Hz, so 60 Hz is exactly frequency number 768; 75 frequencies: 0.625-12.5 Hz every 1.25 Hz,
+15-30 Hz every 2.5 Hz, 31.25-46.25 Hz every 1.25 Hz, **47.5-72.5 Hz every 0.625 Hz** (the ±20 % band; with
+2 % damping a resonance has a half-power width of 2.4 Hz at 60 Hz, so the step puts about four computed
+frequencies in it) and 75, 77.5, 80 Hz.
+
+**Analyses.** A forced-vibration (foundation vibration) analysis, as in ex03:
+
+1. SITE (Mode 1 only, no free field and no WAVE), POINT and HOUSE;
+2. four FORCE load cases, each 1 kip on both bearings of one rotor in phase (the static unbalance of that
+   rotor), copied to FILE9001-9004 (`FCOPY`): 1 turbine z, 2 generator z, 3 turbine y, 4 generator y;
+3. one ANALYS run, `<type>` 1, `<simul>` 4: FILE8001-8004, the displacement of every node per kip (ft/kip);
+   the impedance is a dense matrix in 3 x 420 = 1,260 DOFs, which sets the run time;
+4. four MOTION runs with `<out>` = 1 (transfer functions only, no load history) and
+   `EDUOPT,TFFILE,FILE800k`, each with `NOUT` at the two bearings of the loaded rotor in the load direction
+   (so that no file name repeats): `01591TR_Z.TFU` and `01592TR_Z.TFU` (case 1), `01593TR_Z`/`01594TR_Z`
+   (case 2), `01591TR_Y`/`01592TR_Y` (case 3), `01593TR_Y`/`01594TR_Y` (case 4);
+5. model 2 (`ex10fb`, results in `ex10_fixed/`) is the same foundation on a **fixed base**. A vibration
+   analysis has no free-field input, so the soil is simply removed: `GDEL,5` deletes the excavated soil
+   (without the soil impedance it would only subtract its mass and stiffness), `INT,1,420,1,0` leaves no
+   interaction node, and `D` fixes the mat where it touches the soil -- its bottom face and its sides --
+   while its top face stays free. ANALYS solves the structure alone and warns "no interaction nodes". The
+   load cases are copied from `ex10/` (`FCOPY,../ex10/FILE9001,FILE9001` ...). A seismic fixed-base
+   reference needs the practically rigid site of ex09 instead, because there the input comes from the site.
+
+**The checks, by hand** (in the comments of the `.pre`):
+
+* **Unbalance force** (ISO 21940-11): a rotor balanced to grade G has a residual eccentricity e with
+  e ω = G mm/s; G2.5 (turbine and generator rotors) gives e ω = 2.5 mm/s = 0.0984 in/s = 0.00820 ft/s. At
+  3,600 rpm, ω = 377.0 rad/s, e = 0.00026 in and F = (W/g) e ω² = 0.00820 x 377.0 / 32.2 W = **0.096 W**:
+  5.76 kips for the 60 kip turbine rotor (**2.88 kips per bearing**), 7.68 kips for the 80 kip generator
+  rotor (**3.84 kips per bearing**). The force grows with the square of the speed. ACI 351.3R discusses
+  this estimate and allowances for the balance getting worse in service; none is applied here.
+* **Amplitude**: u = |H(60 Hz)| F, with |H| the `.TFU` value (ft per kip on each bearing of the rotor). The
+  other rotor adds |H'| F' with an unknown relative phase (H' from the other rotor's FILE800k at the same
+  bearing), so u ≤ |H| F + |H'| F' (both rotors, worst phase). **Velocity** v = ω u.
+* **Acceptance** (illustrative): 0.10 in/s peak velocity at the bearings, of the order used in practice;
+  the limit of a real project comes from the machine vendor or the owner (ACI 351.3R discusses velocity
+  and displacement criteria).
+* **Frequency separation**: a common rule keeps the resonances at least 20 % from the operating speed,
+  i.e. outside 48-72 Hz.
+
+**Look at.**
+* `ex10/01593TR_Z.TFU` against `ex10_fixed/01593TR_Z.TFU`: the vertical transfer function of the generator
+  coupling bearing B3, on the soil and on the fixed base (`READSPEC` plots a `.TFU`); the other seven per
+  folder likewise.
+* Plot > Deformed Shape on `ex10/FILE8002` at 60 Hz: the steady-state motion of the whole foundation under
+  the generator unbalance (`HARMFRAME`); at 15 Hz the foundation heaves on the soil, at 31-33 Hz the
+  heavily loaded coupling bent C bounces on its columns.
+* `ex10_ANALYS.out` (the solver path, condition numbers and time per frequency) and, in `ex10_fixed/`, the
+  ANALYS warning "no interaction nodes".
+
+**Model checks.**
+* CHECK: no error and no warning for either model (CPMODEL warns that the copy has the name of the original
+  until `MDL` renames it). `INTCOUNT`: 420 interaction nodes; `FIXEDINT`, `KINT` and `EXCSTRCHK` find
+  nothing.
+* At 0.625 Hz the response is quasi-static: a bearing moves 2.0-2.4E-6 ft per vertical kip on the soil and
+  1.6-2.1E-6 ft/kip on the fixed base (the soil adds 15-25 %), with the phase of the 2 % material damping;
+  the turbine and generator cases mirror each other (the frame is symmetric about x = 36 ft). The `.TFU`
+  files are the FILE8 transfer functions.
+* **Fixed-base modes** (the HOUSE matrices of `ex10_fixed`): sway in y 7.41 Hz (88 % of the mass above the
+  mat), in x 7.83 Hz (90 %), torsion 8.97 Hz, vertical 32.25 Hz (44 % of the vertical mass: the deck on its
+  columns, largest at the heavily loaded coupling bent C) and 39.39 Hz (20 %). **23 modes lie between 48
+  and 72 Hz** (19 % of the vertical mass), two within 1 % of 60 Hz (60.00 and 60.43 Hz). The fixed-base
+  transfer function of B3 peaks at 32.5 Hz, the computed frequency next to 32.25 Hz.
+
+**Expected results** (`tests/integration/test_examples.py`, marked `slow`):
+* Run time about 65 s (ANALYS on the soil 55 s, on the fixed base 7 s); about 95 MB in `ex10/` and
+  `ex10_fixed/` (FILE2 11 MB and FILE8001-8004 6 MB each, per model).
+* **Resonances and frequency separation.** The largest peak of every bearing transfer function lies
+  outside the band. Fixed base: vertical at 32.5 Hz (B2, B3; B3 3.0E-5 ft/kip), 38.75 Hz (B4) and 45 Hz (B1);
+  horizontal at 7.5-8.75 Hz (sway, torsion). On the soil: vertical at 31-44 Hz (B3 7.3E-6 ft/kip at
+  31.25 Hz); horizontal at 6.25 Hz (sway) and 8.75 Hz (torsion, B1 and B4). But every vertical bearing
+  transfer function also has peaks inside the band (for example B3 on the soil 2.7E-6 ft/kip at 50 Hz, on
+  the fixed base 3.7E-6 at 51.25 Hz): at most 26 % of the largest peak on the fixed base and 37-48 % on the
+  soil, where radiation damping has flattened the large ones. The ±20 % rule cannot be met mode by mode,
+  which is normal for a table-top; the forced response at the bearings is the check that decides.
+* **At 60 Hz** (|H| in 1E-6 ft/kip; u in mil = 0.001 in, own rotor / both rotors with the worst phase; v in
+  in/s from u for both rotors):
+
+  | bearing | dir. | soil \|H\| | soil u | soil v | fixed \|H\| | fixed u | fixed v |
+  |---|---|---|---|---|---|---|---|
+  | B1 | z | 0.50 | 0.017 / 0.036 | 0.014 | 0.87 | 0.030 / 0.054 | 0.020 |
+  | B2 | z | 0.98 | 0.034 / 0.061 | 0.023 | 0.94 | 0.033 / 0.098 | 0.037 |
+  | B3 | z | 1.23 | 0.057 / 0.075 | 0.028 | 1.24 | 0.057 / 0.095 | 0.036 |
+  | B4 | z | 0.68 | 0.031 / 0.035 | 0.013 | 0.90 | 0.042 / 0.043 | 0.016 |
+  | B1 | y | 1.11 | 0.038 / 0.056 | 0.021 | 3.14 | 0.109 / **0.203** | **0.077** |
+  | B2 | y | 1.66 | 0.057 / 0.111 | 0.042 | 1.87 | 0.065 / 0.129 | 0.049 |
+  | B3 | y | 1.71 | 0.079 / **0.123** | **0.046** | 2.46 | 0.113 / 0.194 | 0.073 |
+  | B4 | y | 0.98 | 0.045 / 0.057 | 0.022 | 1.43 | 0.066 / 0.106 | 0.040 |
+
+  Every bearing passes the illustrative 0.10 in/s. On the soil the largest velocity is **0.046 in/s at B3
+  horizontal**; on the fixed base it is **0.077 in/s at B1 horizontal**.
+* **SSI against the fixed base.** The soil adds 15-25 % of flexibility at low frequency, lowers the sway
+  from 7.4-7.8 Hz to about 6.25 Hz (the mat rocks with it; the torsion stays near 8.75 Hz), lets the whole
+  foundation heave on the soil (a vertical peak at about 15 Hz) and cuts the vertical resonance peaks of
+  the bents 1.7-4 times by radiation damping (B3: 3.0E-5 ft/kip at 32.5 Hz fixed, 7.3E-6 at 31.25 Hz on the
+  soil). At 60 Hz every bearing moves less on the soil or about the same: vertical B1 -42 %, B4 -24 %, B2
+  and B3 within 4 %; horizontal B1 -65 %, B3 -31 %, B4 -31 %, B2 -11 %.
+
+**What it shows.** A table-top has many modes near the operating speed, so the frequency-separation rule
+alone cannot be satisfied and the design rests on the forced response at the bearings. With realistic
+unbalance forces the amplitudes are a fraction of a mil. On this stiff site, with an embedded mat, the
+soil's radiation damping makes the fixed base conservative at the operating speed -- but the fixed base
+points to another bearing (B1 instead of B3) and misses the low-frequency rocking and heaving of the whole
+foundation, which the machine passes through during run-up and coast-down. Modelling with solids brings
+its own rules: the incompatible modes, a mesh fine enough across the members, rigid pedestals instead of
+single-node connections, and weights spread over their footprints.
+
 ## Tests
 
-* `tests/integration/test_examples.py` runs examples 1-5, 8 and 9 in a temporary copy, through the
+* `tests/integration/test_examples.py` runs examples 1-5 and 8-10 in a temporary copy, through the
   interpreter as `sassi --cwd examples run` does. It asserts that every module finishes with
   status OK, checks the key results above (with physically motivated bounds), checks that
   `WRITE` -> `INP` gives back the same model for every model of every example, and checks the
-  documented `--cwd` command line. The example 4, 8 and 9 tests are marked `slow` (EQUAKE; three ANALYS
-  runs; two models of 97 frequencies).
+  documented `--cwd` command line. The example 4, 8, 9 and 10 tests are marked `slow` (EQUAKE; three ANALYS
+  runs; two models of 97 frequencies; 75 frequencies with 420 interaction nodes).
 * `tests/unit/test_nlsoil_example.py` runs example 6: a clean run, the convergence history, the
   wall-top spectrum and the `WRITE` -> `INP` round trip.
 * `tests/unit/test_nonlinear_example.py` runs example 7 (marked `slow`): a clean run, the panels and

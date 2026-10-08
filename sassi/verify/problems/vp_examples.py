@@ -51,6 +51,7 @@ EXAMPLES: Dict[str, Tuple[str, ...]] = {
     "ex05_xyz_simultaneous": ("ex05",),
     "ex08_embedded_building": ("ex08", "ex08_fsin", "ex08_evbn"),
     "ex09_steel_frame": ("ex09", "ex09_fixed"),
+    "ex10_turbine_pedestal": ("ex10", "ex10_fixed"),
 }
 
 #: binary intermediate files deleted by :func:`purge_binaries` (decks, listings and text results kept)
