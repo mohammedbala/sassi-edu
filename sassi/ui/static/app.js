@@ -693,13 +693,20 @@ const SASSI = (() => {
     }
     if (e) e.highlight(m);
   };
-  S.openEditor = async function (path) {
+  /** File > Open: a File Editor of ``path``.  opts.text: the file's text is known already (a running file:
+   *  the Run view opens it without a request, which the browser version could answer only after the run);
+   *  opts.focus false: do not bring it to the front when it exists. */
+  S.openEditor = async function (path, opts) {
+    opts = opts || {};
     let d;
-    try {
-      d = await S.post("/api/file", {name: path});      // creates the file when missing
-    } catch (e) { S.local("ERROR", `File > Open ${path}: ${e.message}`); return; }
+    if (typeof opts.text === "string") d = {path, text: opts.text, created: false};
+    else {
+      try {
+        d = await S.post("/api/file", {name: path});      // creates the file when missing
+      } catch (e) { S.local("ERROR", `File > Open ${path}: ${e.message}`); return; }
+    }
     const id = "edit:" + d.path;
-    if (S.tab(id)) { S.selectTab(id); return; }
+    if (S.tab(id)) { if (opts.focus !== false) S.selectTab(id); return; }
     const ta = el("textarea", {class: "editor", spellcheck: "false", wrap: "off"});
     ta.value = d.text || "";
     // the Run view marks the section and the line of this file being executed (behind the transparent text)

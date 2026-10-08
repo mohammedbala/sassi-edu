@@ -748,18 +748,8 @@ button.linkish { border: 0; background: none; color: var(--learn-accent); cursor
 .rv-now { flex: none; padding: 4px 10px; font-size: 12.5px; min-height: 1.7em; border-bottom: 1px solid var(--border-2); color: var(--muted); background: var(--panel); }
 .rv-now.on { color: #7a3d00; background: #fff4e6; }
 .rv-body { flex: 1; display: flex; min-height: 0; background: var(--panel); }
-.rv-body.stacked { flex-direction: column; }
-.rv-list { flex: none; width: 40%; min-width: 220px; overflow: auto; font: 11.5px/1.45 var(--mono); border-right: 1px solid var(--border-2); }
-.rv-body.stacked .rv-list { width: auto; min-width: 0; height: 36%; border-right: 0; border-bottom: 1px solid var(--border-2); }
 .rv-plot { flex: 1; position: relative; min-width: 0; min-height: 0; }
 .rv-plot .plot-split { position: absolute; inset: 0; }
-.rv-ln { display: flex; white-space: pre; padding-right: 8px; }
-.rv-ln.c .rv-tx { color: var(--c-comment); }
-.rv-ln.s0 { box-shadow: inset 0 1px 0 var(--border-2); }
-.rv-ln.sec { background: rgba(255, 140, 0, 0.09); }
-.rv-ln.cur { background: rgba(255, 140, 0, 0.34); }
-.rv-no { flex: none; width: 3.6em; text-align: right; padding-right: 8px; color: #a9b0b8; user-select: none; }
-.rv-empty { padding: 14px; color: var(--muted); font: 12.5px/1.4 var(--ui); white-space: normal; }
 /* while the Run view is on the screen (right-hand group), the activity panel moves to the left */
 body.runview-shown .activity { right: auto; left: 16px; }
 

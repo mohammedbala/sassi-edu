@@ -1,18 +1,18 @@
 /* SASSI-EDU GUI -- the Run view (requirements 7.20, D-W6-15): an input file as it runs.
  *
- * While an INP file runs, the Run view shows its listing -- the section being processed shaded, the line
- * being executed marked -- beside the model drawn live (sassi/ui/runview.py: snapshots of the active model,
- * with the free-field soil around it), and highlights the part of the model the line added or changed:
- * nodes, elements, soil layers, interaction nodes, fixities, masses, output requests.  While a module runs it
- * highlights the part the module works on: the soil layers (SITE, SOIL), the interaction nodes (POINT, the
- * impedance and the solution of ANALYS), the elements (HOUSE, the dynamic stiffness of ANALYS), the loaded
- * nodes (FORCE), the output nodes and elements (MOTION, STRESS, RELDISP).  The File Editor of the running file
- * marks the same section and line (S.editorHighlight, app.js).
+ * While an INP file runs, its File Editor -- opened by itself when it is not open yet -- marks the section
+ * being processed and the line being executed, and the Run view (right-hand group of the split view) draws
+ * the model as the file builds it (sassi/ui/runview.py: snapshots of the active model, with the free-field
+ * soil around it), the part of the model the last line added or changed highlighted: nodes, elements, soil
+ * layers, interaction nodes, fixities, masses, output requests.  While a module runs it highlights the part
+ * the module works on: the soil layers (SITE, SOIL), the interaction nodes (POINT, the impedance and the
+ * solution of ANALYS), the elements (HOUSE, the dynamic stiffness of ANALYS), the loaded nodes (FORCE), the
+ * output nodes and elements (MOTION, STRESS, RELDISP).  Its bar names the file, the line and the section.
  *
  * Speed: "full speed" draws what the run reaches (the commands that build a model take milliseconds); "watch"
- * and "slow" pause after every line that changes the model (POST /api/runview {pace}).  The view opens by
- * itself when a file starts (unless switched off, or while a lesson is open) and lives in the right-hand group
- * of the split view.  It shows; it never changes the model (no command text).
+ * and "slow" pause after every line that changes the model (POST /api/runview {pace}).  The editor and the
+ * view open by itself when a file starts (unless "open on run" is off, or while a lesson is open).  It shows;
+ * it never changes the model (no command text).
  *
  * Events: run {file, end, line, scene} (the server), progress {line, source} and {kind: "step"} and job (the
  * activity panel's: the module steps).
@@ -94,28 +94,43 @@ const SASSI_RUNVIEW = (function () {
   };
 
   // ---------------------------------------------------------------- events
+  /** The File Editor of a file (the run's resolved path, else the only open editor of a file of that name). */
+  const editorFor = (path) => {
+    const E = S.editors || {};
+    if (!path) return null;
+    if (E[path]) return E[path];
+    const b = path.split(/[\\/]/).pop(), same = Object.values(E).filter((x) => x.path.split(/[\\/]/).pop() === b);
+    return same.length === 1 ? same[0] : null;
+  };
+  const lessonOpen = () => !!(SASSI.Learn && SASSI.Learn.isLessonOpen && SASSI.Learn.isLessonOpen());
   R.onEvent = function (ev) {
     if (ev.type !== "run") return;
     if (ev.event === "file") {
       run.files.push({path: ev.path, name: ev.name, lines: ev.lines || [], sections: R.sections(ev.lines || []), cur: -1, depth: ev.depth});
       if (ev.depth === 1) {
         run.active = true; run.last = null; run.focus = null; run.step = null; run.text = "";
-        if (R.follow() && !view && !(SASSI.Learn && SASSI.Learn.isLessonOpen && SASSI.Learn.isLessonOpen())) R.open({auto: true});
+        if (R.follow() && !lessonOpen()) {
+          // the file being run in its File Editor (opened from the lines the run sent: no request, which the
+          // browser version could answer only after the run), the model being built beside it
+          if (ev.kind === "file" && ev.path && !editorFor(ev.path) && S.openEditor) S.openEditor(ev.path, {text: (ev.lines || []).join("\n") + "\n"});
+          if (!view) R.open({auto: true});
+        }
       }
-      paintList(true);
+      paintWhere();
     } else if (ev.event === "end") {
       const f = run.files.pop();
       if (f && S.editorHighlight) S.editorHighlight(f.path, null);
       if (!run.files.length) { run.active = false; run.step = null; if (f) { f.done = true; run.last = f; } }
-      paintList(true);
+      paintWhere();
       paintHead();
+      scheduleDraw();
     } else if (ev.event === "line") {
       const f = run.files.find((x) => x.path === ev.path) || top();
       if (f) f.cur = ev.line - 1;
       run.focus = ev.focus || null;
       run.text = ev.text || "";
       run.step = null;
-      paintList(false);
+      paintWhere();
       paintHead();
       scheduleDraw();
     } else if (ev.event === "scene") {
@@ -133,7 +148,7 @@ const SASSI_RUNVIEW = (function () {
     const f = top();
     if (f && (!ev.source || ev.source === f.name)) {
       f.cur = ev.line - 1;
-      paintList(false);
+      paintWhere();
     }
   };
   /** A module run in a worker (Modules menu, RUN<MODULE> typed): its steps; at its start the model is drawn
@@ -151,11 +166,14 @@ const SASSI_RUNVIEW = (function () {
     scheduleDraw();
   }
 
-  // ---------------------------------------------------------------- the tab
+  // ---------------------------------------------------------------- the tab: the model being built
+  /** Snapshots are made while a file runs if the view is open or opens by itself (the browser version answers
+   *  a request only after the run: the setting must be on before it starts). */
+  const wantScenes = () => R.follow() || !!view;
+  const sendSettings = () => S.post("/api/runview", {enabled: wantScenes(), pace: R.pace()}).catch(() => {});
   R.open = function (opts) {
     opts = opts || {};
     if (view && S.tab(view.id)) { if (!opts.auto) S.selectTab(view.id); return; }
-    const list = el("div", {class: "rv-list", role: "list", "aria-label": "input file"});
     const plotHost = el("div", {class: "rv-plot"});
     const title = el("span", {class: "rv-file"});
     const where = el("span", {class: "rv-where"});
@@ -168,24 +186,24 @@ const SASSI_RUNVIEW = (function () {
     const pane = el("div", {class: "pane runview"},
       el("div", {class: "pane-bar rv-bar"}, title, where, el("span", {class: "grow"}),
         el("label", {class: "rv-opt", title: "speed of the next lines of a running file"}, "Speed ", speed),
-        el("label", {class: "rv-opt", title: "open the Run view when an input file starts"}, follow, " open on run")),
+        el("label", {class: "rv-opt", title: "open the input file and the Run view when an input file starts"}, follow, " open on run")),
       now,
-      el("div", {class: "rv-body"}, list, plotHost));
-    speed.addEventListener("change", () => { lsSet(PACE_KEY, speed.value); S.post("/api/runview", {pace: Number(speed.value)}).catch(() => {}); });
-    follow.addEventListener("change", () => lsSet(FOLLOW_KEY, follow.checked ? "1" : "0"));
-    view = {id: "runview", title: "Run view", kind: "runview", pane, list, title_: title, where, now, plot: {host: plotHost}, body: pane.querySelector(".rv-body")};
+      el("div", {class: "rv-body"}, plotHost));
+    speed.addEventListener("change", () => { lsSet(PACE_KEY, speed.value); sendSettings(); });
+    follow.addEventListener("change", () => { lsSet(FOLLOW_KEY, follow.checked ? "1" : "0"); sendSettings(); });
+    view = {id: "runview", title: "Run view", kind: "runview", pane, title_: title, where, now, plot: {host: plotHost}};
     const t = S.addTab({id: view.id, title: "Run view", kind: "runview", pane,
-      onClose: () => { view = null; document.body.classList.remove("runview-shown"); S.post("/api/runview", {enabled: false}).catch(() => {}); },
-      onActivate: () => { layout(); scheduleDraw(); }});
+      onClose: () => { view = null; document.body.classList.remove("runview-shown"); sendSettings(); },
+      onActivate: () => scheduleDraw()});
     view.tab = t;
     if (window.ResizeObserver) {
-      const ro = new ResizeObserver(() => { layout(); if (view && view.plot.plotDiv) P().resizeHost(view.plot); });
+      const ro = new ResizeObserver(() => { if (view && view.plot.plotDiv) P().resizeHost(view.plot); });
       ro.observe(pane);
     }
-    S.post("/api/runview", {enabled: true, pace: R.pace()}).catch(() => {});
+    sendSettings();
     if (!opts.auto || !S.keepFocus || t.group === "view") S.selectTab(t.id);
     if (!run.active) loadScene();
-    paintList(true);
+    paintWhere();
     paintHead();
     scheduleDraw();
   };
@@ -198,50 +216,17 @@ const SASSI_RUNVIEW = (function () {
     try { run.scene = await S.get("/api/runview"); } catch (e) { /* the server is busy: the next snapshot comes */ }
     scheduleDraw();
   }
-  function layout() {
-    if (!view) return;
-    const w = view.pane.getBoundingClientRect().width;
-    view.body.classList.toggle("stacked", w > 0 && w < 760);
-  }
 
-  // ---------------------------------------------------------------- the listing
-  function paintList(full) {
+  // ---------------------------------------------------------------- the line being run: in the File Editor
+  /** Mark the section and the line being executed in the File Editor of the running file, and name them in
+   *  the Run view's bar. */
+  function paintWhere() {
     const f = top();
-    if (f && !f.done && S.editorHighlight) {
-      const sec = f.cur >= 0 ? sectionOf(f, f.cur) : null;
-      S.editorHighlight(f.path, f.cur >= 0 ? {line: f.cur, start: sec ? sec.start : f.cur, end: sec ? sec.end : f.cur} : null);
-    }
+    const sec = f && f.cur >= 0 ? sectionOf(f, f.cur) : null;
+    if (f && !f.done && S.editorHighlight) S.editorHighlight(f.path, f.cur >= 0 ? {line: f.cur, start: sec ? sec.start : f.cur, end: sec ? sec.end : f.cur} : null);
     if (!view) return;
-    const L = view.list;
-    if (full || L.dataset.path !== (f ? f.path + "#" + f.depth : "")) {
-      L.innerHTML = "";
-      L.dataset.path = f ? f.path + "#" + f.depth : "";
-      if (!f) {
-        L.appendChild(el("div", {class: "rv-empty", text: "Run an input file (File Editor > Run, Model > Input, an example's Run) to follow it here."}));
-        view.title_.textContent = "";
-        return;
-      }
-      const sectionStarts = new Set(f.sections.map((s) => s.start));
-      f.lines.forEach((ln, i) => {
-        L.appendChild(el("div", {class: "rv-ln" + (isComment(ln) ? " c" : "") + (sectionStarts.has(i) ? " s0" : ""), role: "listitem"},
-          el("span", {class: "rv-no", text: String(i + 1)}), el("span", {class: "rv-tx", text: ln || " "})));
-      });
-      view.title_.textContent = f.name + (run.files.length > 1 ? ` (in ${run.files[run.files.length - 2].name})` : "");
-      L._sec = null; L._cur = -1;
-    }
-    if (!f) return;
-    const rows = L.children, sec = f.cur >= 0 ? sectionOf(f, f.cur) : null;
-    if (L._sec && L._sec !== sec) for (let i = L._sec.start; i <= L._sec.end; i++) rows[i] && rows[i].classList.remove("sec");
-    if (sec && L._sec !== sec) for (let i = sec.start; i <= sec.end; i++) rows[i] && rows[i].classList.add("sec");
-    L._sec = sec;
-    if (L._cur >= 0 && rows[L._cur]) rows[L._cur].classList.remove("cur");
-    if (f.cur >= 0 && rows[f.cur]) {
-      rows[f.cur].classList.add("cur");
-      const r = rows[f.cur], top_ = r.offsetTop - L.offsetTop;
-      if (top_ < L.scrollTop + 20 || top_ > L.scrollTop + L.clientHeight - 40) L.scrollTop = Math.max(0, top_ - L.clientHeight / 3);
-    }
-    L._cur = f.cur;
-    view.where.textContent = f.done ? `finished · ${f.lines.length} lines`
+    view.title_.textContent = f ? f.name + (run.files.length > 1 ? ` (in ${run.files[run.files.length - 2].name})` : "") : "";
+    view.where.textContent = !f ? "" : f.done ? `finished · ${f.lines.length} lines`
       : f.cur >= 0 ? `line ${f.cur + 1} of ${f.lines.length}` + (sec ? ` · ${sec.part && sec.part !== sec.title ? sec.part + " › " : ""}${sec.title}` : "") : "";
   }
 
@@ -284,7 +269,8 @@ const SASSI_RUNVIEW = (function () {
     const d = run.scene, t = view.plot;
     if (!d || d.empty) {
       if (t.kind !== "empty") { try { Plotly.purge(t.plotDiv); } catch (e) { /* none */ } t.host.innerHTML = ""; t.plotDiv = null; t.kind = "empty"; }
-      if (!t.host.firstChild) t.host.appendChild(el("div", {class: "empty", text: d && d.model ? "The model has no nodes or soil layers yet." : "No model yet."}));
+      t.host.replaceChildren(el("div", {class: "empty", text: run.active ? "Building the model: it appears with its first nodes or soil layers."
+        : d && d.model !== null && d.model !== undefined ? "The model has no nodes or soil layers yet." : "Run an input file (File Editor > Run, Model > Input, an example's Run all): the model is drawn here as the file builds it."}));
       return;
     }
     if (t.kind !== d.family) { try { Plotly.purge(t.plotDiv); } catch (e) { /* none */ } t.host.innerHTML = ""; t.plotDiv = null; t.kind = d.family; }
@@ -372,6 +358,7 @@ const SASSI_RUNVIEW = (function () {
     try { Plotly.relayout(t.plotDiv, {shapes}); } catch (e) { /* hidden */ }
   }
 
+  setTimeout(sendSettings, 800);             // on before the first run (see wantScenes)
   return R;
 })();
 SASSI.RunView = SASSI_RUNVIEW;

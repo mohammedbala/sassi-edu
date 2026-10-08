@@ -645,15 +645,16 @@ time.
 
 ### 7.3 The Run view
 
-**View > Run View** -- and by itself when an input file starts (`INP`: Model > Input, **Run (INP)** in the File
-Editor, an example's **Run all**), unless **open on run** is unticked or a lesson is open -- shows the file as
-it runs, in the right-hand group of the split view:
+When an input file starts (`INP`: Model > Input, **Run (INP)** in the File Editor, an example's **Run
+all**) -- unless **open on run** is unticked or a lesson is open -- the file is shown in a **File Editor**
+(opened by itself when it is not open yet) and the **Run view** (also **View > Run View**) opens in the
+right-hand group of the split view:
 
-* **The listing** of the file, the **section** being processed shaded and the **line** being executed
-  marked; the bar names the line, the part and the section (`line 78 of 197 · structure › Beam orientation
-  (K) nodes 86..89 ...`). Sections are the blocks between blank lines and lone `*` lines; a block's title is
-  its first comment, and a `* ---- name` line starts a part. A nested `INP` file is listed while it runs. The
-  **File Editor** of the running file marks the same section and line.
+* **The input**: the File Editor of the running file shades the **section** being processed and marks the
+  **line** being executed, scrolling with the run. Sections are the blocks between blank lines and lone `*`
+  lines; a block's title is its first comment, and a `* ---- name` line starts a part. The Run view's bar
+  names the file, the line, the part and the section (`line 78 of 197 · structure › Beam orientation (K)
+  nodes 86..89 ...`); a nested `INP` file is followed while it runs.
 * **The model**, drawn as the plot draws it, with the free-field soil around it (SHOWSOIL), redrawn as the file
   builds it; before the first element the nodes are drawn as dots, before the first node the soil column.
 * **The part being processed**, in orange over the faded model, with a caption: what the last line added or

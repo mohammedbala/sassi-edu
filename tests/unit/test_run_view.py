@@ -146,7 +146,7 @@ def test_event_log_replace():
 def test_sections_and_step_focus_in_the_browser_code():
     deck = (ROOT / "examples" / "ex01_surface_stick.pre").read_text(encoding="utf-8").splitlines()
     code = """
-      globalThis.SASSI = {el: () => ({}), selectTab: () => {}};
+      globalThis.SASSI = {el: () => ({}), selectTab: () => {}, post: () => Promise.resolve()};
       require(process.argv[1]);
       const R = SASSI.RunView, lines = JSON.parse(require("fs").readFileSync(0, "utf8"));
       const secs = R.sections(lines);
@@ -179,7 +179,11 @@ def test_front_end_wiring():
     plots = (STATIC / "plots.js").read_text(encoding="utf-8")
     assert "P.drawModel = function (t, d, extra, opts)" in plots and "P.sceneHelpers = {faceList, meshTrace, outlineTrace, markerTrace};" in plots
     js = (STATIC / "runview.js").read_text(encoding="utf-8")
-    assert 'S.post("/api/runview", {enabled: true, pace: R.pace()})' in js and 'S.get("/api/runview")' in js
+    assert 'S.post("/api/runview", {enabled: wantScenes(), pace: R.pace()})' in js and 'S.get("/api/runview")' in js
     assert "SASSI.Learn.isLessonOpen()" in js                                    # not opened over a lesson
+    # the input is followed in its File Editor (opened from the run's lines), not in a second listing
+    assert 'S.openEditor(ev.path, {text: (ev.lines || []).join("\\n") + "\\n"})' in js and "rv-list" not in js
+    assert "if (typeof opts.text === \"string\") d = {path, text: opts.text, created: false};" in app
+    assert "setTimeout(sendSettings, 800);" in js                               # snapshots on before the first run
     css = (STATIC / "styles.css").read_text(encoding="utf-8")
-    assert ".rv-ln.cur" in css and ".editor-hl .hl-cur" in css and "body.runview-shown .activity" in css
+    assert ".rv-ln" not in css and ".editor-hl .hl-cur" in css and "body.runview-shown .activity" in css
